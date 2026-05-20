@@ -44,7 +44,6 @@
   const BUBBLE_SECONDS_AUTO_COMMIT_DELAY_MS = 600;
 
   let state = null;
-  let runtime = null;
   let readers = null;
   let helpers = null;
   let ops = null;
@@ -1423,7 +1422,6 @@
 
   function init(core) {
     state = core.state;
-    runtime = core.runtime;
     readers = core.readers;
     helpers = core.helpers;
     ops = core.ops;

@@ -59,6 +59,8 @@ function makeCtx(overrides = {}) {
     replyOpencodePermission: [],
     resolved: [],
     maybeStartRemoteApproval: [],
+    addPendingPermission: [],
+    removePendingPermission: [],
   };
   const ctx = {
     doNotDisturb: false,
@@ -79,6 +81,18 @@ function makeCtx(overrides = {}) {
     replyOpencodePermission: (payload) => calls.replyOpencodePermission.push(payload),
     resolvePermissionEntry: (entry, behavior, message) => calls.resolved.push({ entry, behavior, message }),
     maybeStartRemoteApproval: (entry) => calls.maybeStartRemoteApproval.push(entry),
+    addPendingPermission(entry) {
+      calls.addPendingPermission.push(entry);
+      this.pendingPermissions.push(entry);
+      return entry;
+    },
+    removePendingPermission(entry, reason) {
+      calls.removePendingPermission.push({ entry, reason });
+      const idx = this.pendingPermissions.indexOf(entry);
+      if (idx === -1) return false;
+      this.pendingPermissions.splice(idx, 1);
+      return true;
+    },
     ...overrides,
   };
   ctx.calls = calls;
@@ -214,6 +228,7 @@ describe("server-route-permission POST", () => {
     ]]);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, [entry]);
     assert.deepStrictEqual(res.ctx.calls.maybeStartRemoteApproval, [entry]);
+    assert.deepStrictEqual(res.ctx.calls.addPendingPermission, [entry]);
   });
 
   it("silently drops disabled opencode permissions after ACK", async () => {
@@ -308,6 +323,7 @@ describe("server-route-permission POST", () => {
     ]]);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, [entry]);
     assert.deepStrictEqual(res.ctx.calls.maybeStartRemoteApproval, [entry]);
+    assert.deepStrictEqual(res.ctx.calls.addPendingPermission, [entry]);
     assert.deepStrictEqual(res.recorder.map((item) => item.outcome).filter(Boolean), ["accepted"]);
   });
 
@@ -394,6 +410,7 @@ describe("server-route-permission POST", () => {
     assert.strictEqual(res.destroyed, true);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.maybeStartRemoteApproval, []);
+    assert.deepStrictEqual(res.ctx.calls.removePendingPermission.map((item) => item.reason), ["bubble-failed"]);
   });
 
   it("returns terminal fallback when an elicitation bubble fails", async () => {

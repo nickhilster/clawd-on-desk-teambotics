@@ -27,6 +27,10 @@ const {
   normalizeTelegramApproval,
 } = require("./telegram-approval-settings");
 const {
+  DEFAULT_HARDWARE_BUDDY_SETTINGS,
+  normalizeHardwareBuddySettings,
+} = require("./hardware-buddy-settings");
+const {
   NOTIFICATION_DEFAULT_SECONDS,
   UPDATE_DEFAULT_SECONDS,
   PERMISSION_DEFAULT_SECONDS,
@@ -181,6 +185,11 @@ const SCHEMA = {
     type: "object",
     defaultFactory: () => cloneDefaultTelegramApproval(),
     normalize: normalizeTelegramApproval,
+  },
+  hardwareBuddy: {
+    type: "object",
+    defaultFactory: () => ({ ...DEFAULT_HARDWARE_BUDDY_SETTINGS }),
+    normalize: normalizeHardwareBuddySettings,
   },
 };
 

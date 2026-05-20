@@ -123,6 +123,7 @@ function registerSettingsIpc(options = {}) {
   const getSoundVolume = options.getSoundVolume || (() => 1);
   const getAllAgents = requiredDependency(options.getAllAgents, "getAllAgents");
   const checkForUpdates = options.checkForUpdates || (() => {});
+  const getHardwareBuddyStatus = options.getHardwareBuddyStatus || (() => null);
   const now = options.now || (() => Date.now());
   const aboutHeroSvgPath = options.aboutHeroSvgPath
     || path.join(__dirname, "..", "assets", "svg", "clawd-about-hero.svg");
@@ -384,6 +385,8 @@ function registerSettingsIpc(options = {}) {
       return { status: "error", message: (err && err.message) || String(err) };
     }
   });
+
+  handle("settings:get-hardware-buddy-status", () => getHardwareBuddyStatus());
 
   handle("settings:open-external", async (_event, url) => {
     if (typeof url !== "string" || !/^https?:\/\//i.test(url)) {

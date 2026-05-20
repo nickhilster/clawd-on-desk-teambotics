@@ -607,6 +607,29 @@ function dismissPermissionWithoutDecision(permEntry, message) {
   resolvePermissionEntry(permEntry, "no-decision", message || "Auto-closed");
 }
 
+function notifyPermissionsChanged(reason) {
+  if (typeof ctx.onPermissionsChanged !== "function") return;
+  try {
+    ctx.onPermissionsChanged(reason);
+  } catch (err) {
+    permLog(`onPermissionsChanged failed: ${err && err.message ? err.message : err}`);
+  }
+}
+
+function addPendingPermission(permEntry, reason = "added") {
+  pendingPermissions.push(permEntry);
+  notifyPermissionsChanged(reason);
+  return permEntry;
+}
+
+function removePendingPermission(permEntry, reason = "removed") {
+  const idx = pendingPermissions.indexOf(permEntry);
+  if (idx === -1) return false;
+  pendingPermissions.splice(idx, 1);
+  notifyPermissionsChanged(reason);
+  return true;
+}
+
 // Called by settings-effect-router after permissionBubbleAutoCloseSeconds
 // changes. Re-arm every visible permission entry against the current policy
 // so a freshly-raised value extends pending bubbles and a lowered value
@@ -755,7 +778,10 @@ function dismissPermissionForTerminal(perm) {
   // the splice and the abort.
   cancelRemoteApproval(perm);
   const idx = pendingPermissions.indexOf(perm);
-  if (idx !== -1) pendingPermissions.splice(idx, 1);
+  if (idx !== -1) {
+    pendingPermissions.splice(idx, 1);
+    notifyPermissionsChanged("deny-and-focus");
+  }
   if (perm.bubble && !perm.bubble.isDestroyed()) {
     perm.bubble.webContents.send("permission-hide");
     if (perm.hideTimer) clearTimeout(perm.hideTimer);
@@ -835,6 +861,7 @@ function maybeStartRemoteApproval(permEntry) {
   }
 
   pendingPermissions.splice(idx, 1);
+  notifyPermissionsChanged("resolved");
 
   if (permEntry.autoCloseTimer) {
     clearTimeout(permEntry.autoCloseTimer);
@@ -1169,7 +1196,7 @@ function showCodexNotifyBubble({ sessionId, command }) {
     agentId: "codex",
     autoExpireTimer: null,
   };
-  pendingPermissions.push(permEntry);
+  addPendingPermission(permEntry, "passive-added");
   showPermissionBubble(permEntry);
   permLog(`passive notify show: agent=codex session=${sessionId} autoCloseMs=${policy.autoCloseMs}`);
   schedulePassiveNotifyAutoExpire(permEntry, policy.autoCloseMs);
@@ -1193,7 +1220,7 @@ function showKimiNotifyBubble({ sessionId, command }) {
     agentId: "kimi-cli",
     autoExpireTimer: null,
   };
-  pendingPermissions.push(permEntry);
+  addPendingPermission(permEntry, "passive-added");
   showPermissionBubble(permEntry);
   permLog(`passive notify show: agent=kimi-cli session=${sessionId} autoCloseMs=${policy.autoCloseMs}`);
   schedulePassiveNotifyAutoExpire(permEntry, policy.autoCloseMs);
@@ -1217,6 +1244,7 @@ function dismissPassiveNotify(permEntry, reason = "unknown") {
     `passive notify dismiss: agent=${getPassiveNotifyAgentId(permEntry)} session=${permEntry.sessionId || "(none)"} reason=${reason}`
   );
   pendingPermissions.splice(idx, 1);
+  notifyPermissionsChanged("passive-dismissed");
   if (permEntry.autoExpireTimer) clearTimeout(permEntry.autoExpireTimer);
   if (permEntry.hideTimer) clearTimeout(permEntry.hideTimer);
   if (permEntry.bubble && !permEntry.bubble.isDestroyed()) {
@@ -1265,7 +1293,10 @@ function refreshPassiveNotifyAutoClose() {
 
 function dismissInteractivePermissionWithoutDecision(perm, reason) {
   const idx = pendingPermissions.indexOf(perm);
-  if (idx !== -1) pendingPermissions.splice(idx, 1);
+  if (idx !== -1) {
+    pendingPermissions.splice(idx, 1);
+    notifyPermissionsChanged("dismissed");
+  }
   cancelRemoteApproval(perm);
   if (perm._delayTimer) { clearTimeout(perm._delayTimer); perm._delayTimer = null; }
   if (perm.autoCloseTimer) { clearTimeout(perm.autoCloseTimer); perm.autoCloseTimer = null; }
@@ -1386,6 +1417,7 @@ return {
   showPermissionBubble, resolvePermissionEntry,
   sendPermissionResponse, repositionBubbles, permLog,
   pendingPermissions, PASSTHROUGH_TOOLS,
+  addPendingPermission, removePendingPermission,
   maybeStartRemoteApproval,
   dismissPermissionForTerminal,
   handleBubbleHeight, handleDecide, cleanup,

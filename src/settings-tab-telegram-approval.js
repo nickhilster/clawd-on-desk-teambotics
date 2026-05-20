@@ -2,6 +2,7 @@
 
 (function initSettingsTabTelegramApproval(root) {
   let state = null;
+  let coreRef = null;
   let helpers = null;
   let ops = null;
 
@@ -143,9 +144,9 @@
     parent.appendChild(subtitle);
 
     // Each remote approval channel renders as its own collapsible card so the
-    // page can stay tidy once more channels (Discord, …) are added. Telegram
-    // is the only channel today.
+    // page can stay tidy as external approval channels grow.
     parent.appendChild(buildTelegramChannelCard());
+    parent.appendChild(buildHardwareBuddyChannelCard());
   }
 
   function buildTelegramChannelCard() {
@@ -159,13 +160,21 @@
       id: "remote-approval.telegram",
       headerContent: buildChannelHeader(t("telegramApprovalChannelName"), kind),
       defaultCollapsed,
-      className: "tg-approval-channel-card",
+      className: "remote-approval-channel-card tg-approval-channel-card",
       children: [
         buildChannelStatusRow(kind),
         helpers.buildSection(t("telegramApprovalStep1Title"), [buildTokenRow()]),
         helpers.buildSection(t("telegramApprovalStep2Title"), [buildRecipientRow()]),
         buildStep3Section(),
       ],
+    });
+  }
+
+  function buildHardwareBuddyChannelCard() {
+    return root.ClawdSettingsHardwareBuddyPanel.build(coreRef, {
+      id: "remote-approval.hardware-buddy",
+      activeTabId: "telegram-approval",
+      className: "remote-approval-channel-card",
     });
   }
 
@@ -622,6 +631,7 @@
   }
 
   function init(core) {
+    coreRef = core;
     state = core.state;
     helpers = core.helpers;
     ops = core.ops;

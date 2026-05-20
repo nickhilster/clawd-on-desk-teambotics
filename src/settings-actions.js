@@ -114,6 +114,9 @@ const {
   validateTelegramApproval,
   validateTelegramBotToken,
 } = require("./telegram-approval-settings");
+const {
+  validateHardwareBuddySettings,
+} = require("./hardware-buddy-settings");
 
 // ── updateRegistry ──
 // Maps prefs field name → validator. Controller looks up by key and runs.
@@ -287,6 +290,10 @@ const updateRegistry = {
   },
   tgApproval(value) {
     return validateTelegramApproval(value);
+  },
+
+  hardwareBuddy(value) {
+    return validateHardwareBuddySettings(value);
   },
 
   shortcuts: {

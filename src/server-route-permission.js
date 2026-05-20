@@ -123,6 +123,24 @@ function startRemoteApproval(ctx, permEntry) {
   }
 }
 
+function addPendingPermission(ctx, permEntry) {
+  if (typeof ctx.addPendingPermission === "function") {
+    return ctx.addPendingPermission(permEntry);
+  }
+  ctx.pendingPermissions.push(permEntry);
+  return permEntry;
+}
+
+function removePendingPermission(ctx, permEntry, reason) {
+  if (typeof ctx.removePendingPermission === "function") {
+    return ctx.removePendingPermission(permEntry, reason);
+  }
+  const idx = ctx.pendingPermissions.indexOf(permEntry);
+  if (idx === -1) return false;
+  ctx.pendingPermissions.splice(idx, 1);
+  return true;
+}
+
 function handlePermissionPost(req, res, options) {
   const {
     ctx,
@@ -242,7 +260,7 @@ function handlePermissionPost(req, res, options) {
           opencodeAlwaysCandidates: alwaysCandidates,
           opencodePatterns: patterns,
         };
-        ctx.pendingPermissions.push(permEntry);
+        addPendingPermission(ctx, permEntry);
         // Play notification animation on the pet body so the bubble doesn't
         // appear "silently". Mirrors the Codex path (main.js showCodexNotifyBubble)
         // and the Elicitation branch below. state.js:581 has a special
@@ -262,8 +280,7 @@ function handlePermissionPost(req, res, options) {
           // Pop the ghost entry and send an immediate reject so the
           // TUI unblocks and the user can re-answer in the terminal.
           ctx.permLog(`opencode bubble failed: ${bubbleErr && bubbleErr.message} — reject via bridge`);
-          const popIdx = ctx.pendingPermissions.indexOf(permEntry);
-          if (popIdx !== -1) ctx.pendingPermissions.splice(popIdx, 1);
+          removePendingPermission(ctx, permEntry, "opencode-bubble-failed");
           ctx.replyOpencodePermission({ bridgeUrl, bridgeToken, requestId, reply: "reject", toolName });
         }
         return;
@@ -353,7 +370,7 @@ function handlePermissionPost(req, res, options) {
         permEntry.abortHandler = abortHandler;
         res.on("close", abortHandler);
 
-        ctx.pendingPermissions.push(permEntry);
+        addPendingPermission(ctx, permEntry);
         ctx.updateSession(sessionId, "notification", "PermissionRequest", codexSessionOptions);
 
         ctx.permLog(`codex showing bubble: tool=${toolName} session=${sessionId} stack=${ctx.pendingPermissions.length}`);
@@ -362,8 +379,7 @@ function handlePermissionPost(req, res, options) {
           ctx.showPermissionBubble(permEntry);
         } catch (bubbleErr) {
           ctx.permLog(`codex bubble failed: ${bubbleErr && bubbleErr.message} -> no decision`);
-          const popIdx = ctx.pendingPermissions.indexOf(permEntry);
-          if (popIdx !== -1) ctx.pendingPermissions.splice(popIdx, 1);
+          removePendingPermission(ctx, permEntry, "codex-bubble-failed");
           if (permEntry.abortHandler) res.removeListener("close", permEntry.abortHandler);
           sendCodexPermissionNoDecision(res);
           return;
@@ -434,7 +450,7 @@ function handlePermissionPost(req, res, options) {
         permEntry.abortHandler = abortHandler;
         res.on("close", abortHandler);
 
-        ctx.pendingPermissions.push(permEntry);
+        addPendingPermission(ctx, permEntry);
         ctx.updateSession(sessionId, "notification", "PermissionRequest", { agentId: "pi" });
 
         ctx.permLog(`pi showing bubble: tool=${toolName} session=${sessionId} stack=${ctx.pendingPermissions.length}`);
@@ -443,8 +459,7 @@ function handlePermissionPost(req, res, options) {
           ctx.showPermissionBubble(permEntry);
         } catch (bubbleErr) {
           ctx.permLog(`pi bubble failed: ${bubbleErr && bubbleErr.message} -> no decision`);
-          const popIdx = ctx.pendingPermissions.indexOf(permEntry);
-          if (popIdx !== -1) ctx.pendingPermissions.splice(popIdx, 1);
+          removePendingPermission(ctx, permEntry, "pi-bubble-failed");
           if (permEntry.abortHandler) res.removeListener("close", permEntry.abortHandler);
           sendPiPermissionNoDecision(res);
           return;
@@ -550,14 +565,13 @@ function handlePermissionPost(req, res, options) {
         };
         permEntry.abortHandler = abortHandler;
         res.on("close", abortHandler);
-        ctx.pendingPermissions.push(permEntry);
+        addPendingPermission(ctx, permEntry);
         recordRequestHookEvent.accepted();
         try {
           ctx.showPermissionBubble(permEntry);
         } catch (bubbleErr) {
           ctx.permLog(`elicitation bubble failed: ${bubbleErr && bubbleErr.message} -> terminal fallback`);
-          const popIdx = ctx.pendingPermissions.indexOf(permEntry);
-          if (popIdx !== -1) ctx.pendingPermissions.splice(popIdx, 1);
+          removePendingPermission(ctx, permEntry, "elicitation-bubble-failed");
           if (permEntry.abortHandler) res.removeListener("close", permEntry.abortHandler);
           if (permEntry.autoCloseTimer) { clearTimeout(permEntry.autoCloseTimer); permEntry.autoCloseTimer = null; }
           if (permEntry.hideTimer) { clearTimeout(permEntry.hideTimer); permEntry.hideTimer = null; }
@@ -593,7 +607,7 @@ function handlePermissionPost(req, res, options) {
       permEntry.abortHandler = abortHandler;
       res.on("close", abortHandler);
 
-      ctx.pendingPermissions.push(permEntry);
+      addPendingPermission(ctx, permEntry);
 
       // Play notification animation on the pet body so the bubble doesn't
       // appear "silently". Mirrors the Codex path (main.js showCodexNotifyBubble)
@@ -617,8 +631,7 @@ function handlePermissionPost(req, res, options) {
         // throw after that point leaves a partially-constructed window —
         // tear it down along with any timers we've armed.
         ctx.permLog(`bubble failed: ${bubbleErr && bubbleErr.message} -> drop connection, chat fallback`);
-        const popIdx = ctx.pendingPermissions.indexOf(permEntry);
-        if (popIdx !== -1) ctx.pendingPermissions.splice(popIdx, 1);
+        removePendingPermission(ctx, permEntry, "bubble-failed");
         if (permEntry.abortHandler) res.removeListener("close", permEntry.abortHandler);
         if (permEntry.autoCloseTimer) { clearTimeout(permEntry.autoCloseTimer); permEntry.autoCloseTimer = null; }
         if (permEntry.hideTimer) { clearTimeout(permEntry.hideTimer); permEntry.hideTimer = null; }

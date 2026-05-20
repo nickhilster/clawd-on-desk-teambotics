@@ -205,7 +205,7 @@
 
   function t(key) {
     const dict = STRINGS[getLang()] || STRINGS.en || {};
-    return dict[key] || key;
+    return dict[key] || (STRINGS.en && STRINGS.en[key]) || key;
   }
 
   function escapeHtml(s) {
