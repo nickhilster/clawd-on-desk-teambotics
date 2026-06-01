@@ -10,6 +10,8 @@ const DEFAULT_MAPPING_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_REPLY_TEXT = 3800;
 const DEFAULT_MAX_DELIVERIES = 100;
 const WINDOWS_PASTE_RESTORE_DELAY_MS = 800;
+const WINDOWS_PASTE_READY_DELAY_MS = 250;
+const WINDOWS_EDITOR_PASTE_READY_DELAY_MS = 1200;
 const WINDOWS_PASTE_TIMEOUT_MS = 1500;
 const DELIVERY_STATUSES = new Set([
   "focus_only",
@@ -107,6 +109,40 @@ function createFocusOnlyDeliveryAdapter() {
   };
 }
 
+function createClipboardFallbackDeliveryAdapter({ clipboard } = {}) {
+  return {
+    copy: async (payload = {}) => {
+      const promptText = typeof payload.promptText === "string" ? payload.promptText : "";
+      if (!promptText) {
+        return { status: "failed", delivered: false, errorClass: "empty_prompt" };
+      }
+      if (!clipboard || typeof clipboard.writeText !== "function") {
+        return { status: "failed", delivered: false, errorClass: "clipboard_unavailable" };
+      }
+      try {
+        clipboard.writeText(promptText, "clipboard");
+      } catch {
+        return { status: "failed", delivered: false, errorClass: "clipboard_write_failed" };
+      }
+      if (typeof clipboard.readText === "function") {
+        try {
+          if (clipboard.readText("clipboard") !== promptText) {
+            return { status: "failed", delivered: false, errorClass: "clipboard_write_unconfirmed" };
+          }
+        } catch {
+          return { status: "failed", delivered: false, errorClass: "clipboard_verify_failed" };
+        }
+      }
+      return {
+        status: "fallback_copied",
+        delivered: false,
+        autoEnter: false,
+        errorClass: null,
+      };
+    },
+  };
+}
+
 function buildWindowsPasteShortcutScript() {
   return `
 Add-Type @"
@@ -141,13 +177,19 @@ function defaultDelay(ms) {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 }
 
+function isEditorHostedEntry(entry) {
+  return !!entry && (entry.editor === "code" || entry.editor === "cursor");
+}
+
 function createWindowsPasteOnlyDeliveryAdapter({
   clipboard,
   execFile = defaultExecFile,
   osPlatform = process.platform,
   restoreDelayMs = WINDOWS_PASTE_RESTORE_DELAY_MS,
+  readyDelayMs = WINDOWS_PASTE_READY_DELAY_MS,
   timeoutMs = WINDOWS_PASTE_TIMEOUT_MS,
   delay = defaultDelay,
+  restoreClipboardOnSuccess = false,
 } = {}) {
   return {
     async deliver(payload = {}) {
@@ -184,6 +226,10 @@ function createWindowsPasteOnlyDeliveryAdapter({
       }
 
       try {
+        const effectiveReadyDelayMs = isEditorHostedEntry(payload.entry)
+          ? Math.max(readyDelayMs, WINDOWS_EDITOR_PASTE_READY_DELAY_MS)
+          : readyDelayMs;
+        await delay(effectiveReadyDelayMs);
         await execFileAsync(execFile, "powershell.exe", [
           "-NoProfile",
           "-NonInteractive",
@@ -202,7 +248,7 @@ function createWindowsPasteOnlyDeliveryAdapter({
       }
 
       let errorClass = null;
-      if (canRestore) {
+      if (canRestore && restoreClipboardOnSuccess) {
         try {
           await delay(restoreDelayMs);
           clipboard.writeText(previousText);
@@ -253,15 +299,23 @@ async function invokeDeliveryAdapter(deliveryAdapter, payload) {
   return { status: "failed", delivered: false, errorClass: "delivery_adapter_missing" };
 }
 
+async function invokeFallbackAdapter(fallbackAdapter, payload) {
+  if (!fallbackAdapter) return { status: "failed", delivered: false, errorClass: "fallback_not_configured" };
+  if (typeof fallbackAdapter === "function") return fallbackAdapter(payload);
+  if (fallbackAdapter && typeof fallbackAdapter.copy === "function") return fallbackAdapter.copy(payload);
+  if (fallbackAdapter && typeof fallbackAdapter.deliver === "function") return fallbackAdapter.deliver(payload);
+  return { status: "failed", delivered: false, errorClass: "fallback_adapter_missing" };
+}
+
 function formatDeliveryAck(status, entry, deliveryResult) {
   const shortId = shortSessionId(entry && entry.id);
   switch (status) {
     case "sent_with_enter":
       return `Sent to terminal for session ${shortId}.`;
     case "pasted_without_enter":
-      return `Pasted text into session ${shortId}; press Enter locally to send it.`;
+      return `Pasted text into session ${shortId}; press Enter locally to send it. The text is still on this computer's clipboard for manual retry.`;
     case "fallback_copied":
-      return `Direct Send fell back for session ${shortId}. Use the local fallback to finish sending.`;
+      return `Copied text to this computer's clipboard for session ${shortId}. Paste and send it locally when ready.`;
     case "failed":
       return "Direct Send failed after focus confirmation. No text was pasted.";
     case "focus_only":
@@ -278,6 +332,7 @@ function createTelegramDirectSend({
   getPendingPermissions,
   focusSession,
   deliveryAdapter = createFocusOnlyDeliveryAdapter(),
+  fallbackAdapter = null,
   isEnabled = () => false,
   now = () => Date.now(),
   mappingTtlMs = DEFAULT_MAPPING_TTL_MS,
@@ -339,6 +394,64 @@ function createTelegramDirectSend({
     deliveryEntry.statusHistory.push({ status: nextStatus, at: deliveryEntry.updatedAt });
     Object.assign(deliveryEntry, patch);
     return deliveryEntry;
+  }
+
+  async function tryClipboardFallback(deliveryEntry, entry, reason, patch = {}) {
+    if (!fallbackAdapter) return null;
+    let fallbackResult;
+    try {
+      fallbackResult = normalizeDeliveryResult(await invokeFallbackAdapter(fallbackAdapter, {
+        deliveryId: deliveryEntry && deliveryEntry.id,
+        promptText: deliveryEntry && deliveryEntry.promptText,
+        sessionId: patch.sessionId || (entry && entry.id) || null,
+        agentId: patch.agentId || (entry && entry.agentId) || null,
+        reason,
+        entry,
+        focusResult: patch.focusResult || null,
+        autoEnter: false,
+      }));
+    } catch {
+      fallbackResult = normalizeDeliveryResult({
+        status: "failed",
+        delivered: false,
+        errorClass: "fallback_adapter_threw",
+      });
+    }
+
+    if (fallbackResult.status !== "fallback_copied") {
+      safeLog("warn", "direct-send fallback copy failed", {
+        sessionId: patch.sessionId || (entry && entry.id) || undefined,
+        reason,
+        errorClass: fallbackResult.errorClass || undefined,
+      });
+      if (deliveryEntry) {
+        Object.assign(deliveryEntry, {
+          deliveryResult: fallbackResult,
+          fallbackReason: reason,
+          fallbackErrorClass: fallbackResult.errorClass,
+          updatedAt: now(),
+        });
+      }
+      return null;
+    }
+
+    safeLog("info", "direct-send fallback copied", {
+      sessionId: patch.sessionId || (entry && entry.id) || undefined,
+      reason,
+    });
+    updateDeliveryEntry(deliveryEntry, "fallback_copied", {
+      ...patch,
+      deliveryResult: fallbackResult,
+      fallbackReason: reason,
+    });
+    return {
+      status: "fallback_copied",
+      sessionId: patch.sessionId || (entry && entry.id) || null,
+      deliveryId: deliveryEntry && deliveryEntry.id,
+      focusResult: patch.focusResult || undefined,
+      deliveryResult: fallbackResult,
+      text: formatDeliveryAck("fallback_copied", entry || { id: patch.sessionId }, fallbackResult),
+    };
   }
 
   function pruneExpired() {
@@ -404,6 +517,13 @@ function createTelegramDirectSend({
         sessionId: mapping.sessionId,
         errorClass: "session_not_live",
       });
+      const fallback = await tryClipboardFallback(
+        deliveryEntry,
+        { id: mapping.sessionId },
+        "session_not_live",
+        { sessionId: mapping.sessionId, errorClass: "session_not_live" }
+      );
+      if (fallback) return fallback;
       return {
         status: "session_not_live",
         sessionId: mapping.sessionId,
@@ -420,6 +540,13 @@ function createTelegramDirectSend({
     if (hasInteractivePermissionPending(entry, getPendingPermissions)) {
       safeLog("info", "direct-send rejected: session waiting for permission", { sessionId: entry.id });
       updateDeliveryEntry(deliveryEntry, "permission_pending", { errorClass: "permission_pending" });
+      const fallback = await tryClipboardFallback(
+        deliveryEntry,
+        entry,
+        "permission_pending",
+        { errorClass: "permission_pending" }
+      );
+      if (fallback) return fallback;
       return {
         status: "permission_pending",
         sessionId: entry.id,
@@ -438,6 +565,13 @@ function createTelegramDirectSend({
       updateDeliveryEntry(deliveryEntry, "not_focusable", {
         errorClass: "not_focusable_terminal",
       });
+      const fallback = await tryClipboardFallback(
+        deliveryEntry,
+        entry,
+        "not_focusable_terminal",
+        { errorClass: "not_focusable_terminal" }
+      );
+      if (fallback) return fallback;
       return {
         status: "not_focusable",
         sessionId: entry.id,
@@ -467,6 +601,13 @@ function createTelegramDirectSend({
         focusResult,
         errorClass: "focus_unconfirmed",
       });
+      const fallback = await tryClipboardFallback(
+        deliveryEntry,
+        entry,
+        "focus_unconfirmed",
+        { focusResult, errorClass: "focus_unconfirmed" }
+      );
+      if (fallback) return fallback;
       return {
         status: "focus_unconfirmed",
         sessionId: entry.id,
@@ -510,6 +651,20 @@ function createTelegramDirectSend({
       errorClass: deliveryResult.errorClass,
     });
 
+    if (deliveryResult.status === "failed") {
+      const fallback = await tryClipboardFallback(
+        deliveryEntry,
+        entry,
+        deliveryResult.errorClass || "delivery_failed",
+        {
+          focusResult,
+          deliveryResult,
+          errorClass: deliveryResult.errorClass,
+        }
+      );
+      if (fallback) return fallback;
+    }
+
     safeLog("info", "direct-send delivery result", {
       sessionId: entry.id,
       status: resultStatus,
@@ -538,6 +693,7 @@ module.exports = {
   DEFAULT_MAPPING_TTL_MS,
   DEFAULT_MAX_DELIVERIES,
   createTelegramDirectSend,
+  createClipboardFallbackDeliveryAdapter,
   createFocusOnlyDeliveryAdapter,
   createWindowsPasteOnlyDeliveryAdapter,
   buildWindowsPasteShortcutScript,
