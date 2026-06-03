@@ -147,6 +147,7 @@ const i18n = {
     confirm: "Confirm",
     cancel: "Cancel",
     selectFolder: "Select Project Folder",
+    launchFailed: "Failed to launch Claude Code. No supported terminal was found.",
     quit: "Quit",
   },
   zh: {
@@ -288,6 +289,7 @@ const i18n = {
     confirm: "确认",
     cancel: "取消",
     selectFolder: "选择项目文件夹",
+    launchFailed: "启动 Claude Code 失败，未找到可用的终端。",
     quit: "退出",
   },
   "zh-TW": {
@@ -432,6 +434,7 @@ const i18n = {
     confirm: "確認",
     cancel: "取消",
     selectFolder: "選擇專案資料夾",
+    launchFailed: "啟動 Claude Code 失敗，找不到可用的終端機。",
     quit: "結束",
   },
   ko: {
@@ -573,6 +576,7 @@ const i18n = {
     confirm: "확인",
     cancel: "취소",
     selectFolder: "프로젝트 폴더 선택",
+    launchFailed: "Claude Code 실행에 실패했습니다. 지원되는 터미널을 찾을 수 없습니다.",
     quit: "종료",
   },
   ja: {
@@ -714,6 +718,7 @@ const i18n = {
     confirm: "確認",
     cancel: "キャンセル",
     selectFolder: "プロジェクトフォルダを選択",
+    launchFailed: "Claude Code の起動に失敗しました。利用可能なターミナルが見つかりません。",
     quit: "終了",
   },
 };

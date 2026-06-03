@@ -2300,6 +2300,34 @@ async function confirmDangerousMode(t) {
   return result.response === 0;
 }
 
+// Await launchClaudeSession and surface failures instead of swallowing them:
+// show a localized error dialog so the user knows nothing happened, and log
+// for diagnosis. Never throws.
+async function runLaunchClaudeSession(t, mode, cwd, sessionId) {
+  let res;
+  try {
+    res = await launchClaudeSession(mode, cwd, sessionId);
+  } catch (err) {
+    console.error("[launch-claude] launch threw:", err);
+    res = { ok: false, message: (err && err.message) || String(err) };
+  }
+  if (res && res.ok) return res;
+  console.error("[launch-claude] launch failed:", res && res.message);
+  try {
+    const parent = win && !win.isDestroyed() ? win : null;
+    await electronDialog.showMessageBox(parent, {
+      type: "error",
+      buttons: [t("dismiss") || "OK"],
+      title: t("newSession") || "New Session",
+      message: t("launchFailed") || "Failed to launch Claude Code.",
+      detail: (res && res.message) || "",
+    });
+  } catch (err) {
+    console.error("[launch-claude] failed to show error dialog:", err);
+  }
+  return res;
+}
+
 function showResumeInput(t) {
   return new Promise((resolve) => {
     const inputWin = new BrowserWindow({
@@ -2316,7 +2344,7 @@ function showResumeInput(t) {
     });
     const title = t("resumeSessionTitle") || "Resume Session";
     const hint = t("resumeSessionHint") || "Enter Session ID";
-    const confirmLabel = t("newSessionNormal") || "OK";
+    const confirmLabel = t("confirm") || "OK";
     const cancelLabel = t("dismiss") || "Cancel";
     const html = `<!DOCTYPE html><html><head><style>
       *{margin:0;padding:0;box-sizing:border-box}
@@ -2440,12 +2468,12 @@ const _menuCtx = {
       });
       if (resumeMode.response === 2) return;
       if (resumeMode.response === 1 && !(await confirmDangerousMode(t))) return;
-      launchClaudeSession(resumeMode.response === 1 ? "resume-dangerous" : "resume", folder, sessionId);
+      await runLaunchClaudeSession(t, resumeMode.response === 1 ? "resume-dangerous" : "resume", folder, sessionId);
       return;
     }
     if (mode.response === 1 && !(await confirmDangerousMode(t))) return;
     const modes = ["normal", "dangerous", "continue"];
-    launchClaudeSession(modes[mode.response], folder);
+    await runLaunchClaudeSession(t, modes[mode.response], folder);
   },
   newSessionInCurrentDir: async (t) => {
     const parent = win && !win.isDestroyed() ? win : null;
@@ -2471,12 +2499,12 @@ const _menuCtx = {
       });
       if (resumeMode.response === 2) return;
       if (resumeMode.response === 1 && !(await confirmDangerousMode(t))) return;
-      launchClaudeSession(resumeMode.response === 1 ? "resume-dangerous" : "resume", undefined, sessionId);
+      await runLaunchClaudeSession(t, resumeMode.response === 1 ? "resume-dangerous" : "resume", undefined, sessionId);
       return;
     }
     if (mode.response === 1 && !(await confirmDangerousMode(t))) return;
     const modes = ["normal", "dangerous", "continue"];
-    launchClaudeSession(modes[mode.response]);
+    await runLaunchClaudeSession(t, modes[mode.response]);
   },
   // The settings controller is the only writer of persisted prefs. Toggle
   // setters above route through it; resize/sendToDisplay use
