@@ -340,6 +340,13 @@ function resetBubbleContent() {
   elicitationForm.classList.remove("visible");
   elicitationProgress.textContent = "";
   elicitationProgress.classList.remove("visible");
+  // NOTE: this resets the feedback form's visibility + textarea value only, not
+  // the other side effects of enterPlanFeedbackMode() (suggestionsContainer
+  // display:none and the disabled flags on textarea/back/submit). That's safe
+  // today because every ExitPlanMode bubble is a fresh BrowserWindow/document —
+  // show() runs once per window so resetBubbleContent never has to undo a prior
+  // feedback session. If plan bubbles ever start reusing a window, restore those
+  // here too (suggestionsContainer.style.display + the disabled flags).
   planFeedbackForm.classList.remove("visible");
   planFeedbackTextarea.value = "";
   toolPill.style.display = "";

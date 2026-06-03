@@ -7,8 +7,28 @@
 
 const { describe, it } = require("node:test");
 const assert = require("node:assert");
+const Module = require("node:module");
 
+// ── Mock electron before requiring permission.js ──
+// permission.js does `const { BrowserWindow, globalShortcut } = require("electron")`
+// at load, and handleDecide() calls BrowserWindow.fromWebContents(event.sender) to
+// map the IPC sender back to its perm entry. The node test runtime's require("electron")
+// returns the binary path string (no BrowserWindow), so without this mock the
+// handleDecide-driven tests below would throw. The mock resolves a sender to its
+// window via a `__win` sentinel; globalShortcut is stubbed to harmless no-ops.
+const __electronMock = {
+  BrowserWindow: { fromWebContents: (sender) => (sender && sender.__win) || null },
+  globalShortcut: {
+    register: () => {}, unregister: () => {}, unregisterAll: () => {}, isRegistered: () => false,
+  },
+};
+const __origModuleLoad = Module._load;
+Module._load = function (request) {
+  if (request === "electron") return __electronMock;
+  return __origModuleLoad.apply(this, arguments);
+};
 const initPermission = require("../src/permission");
+Module._load = __origModuleLoad;
 
 function createMockResponse() {
   const captured = {
@@ -105,14 +125,15 @@ function makePlanPermEntry(res, overrides = {}) {
   };
 }
 
-// Fake IPC event sender — handleDecide uses BrowserWindow.fromWebContents to
-// find the matching perm entry via perm.bubble. We wire the fake so the lookup
-// succeeds.
-function makeFakeSenderEvent(perm) {
-  // handleDecide calls BrowserWindow.fromWebContents(event.sender) which is
-  // mocked at module level. We skip the real BrowserWindow: instead, manually
-  // invoke resolvePermissionEntry/dismissPermissionForTerminal.
-  return { sender: perm.bubble ? perm.bubble.webContents : {} };
+// Fake bubble window + IPC event. handleDecide() calls
+// BrowserWindow.fromWebContents(event.sender) (mocked above) which resolves
+// event.sender.__win back to the perm's bubble, so the lookup
+// pendingPermissions.find(p => p.bubble === senderWin) matches.
+function makeFakeBubble() {
+  return { isDestroyed: () => false, webContents: { send: () => {} }, destroy: () => {} };
+}
+function makeEventFor(bubble) {
+  return { sender: { __win: bubble } };
 }
 
 describe("permission plan-feedback handleDecide", () => {
@@ -230,5 +251,71 @@ describe("permission plan-feedback handleDecide", () => {
     assert.strictEqual(res.captured.ended, true);
     const parsed = JSON.parse(res.captured.body);
     assert.strictEqual(parsed.hookSpecificOutput.decision.behavior, "deny");
+  });
+});
+
+// These drive handleDecide() itself — the routing logic the ExitPlanMode
+// feedback feature added (toolName guard, behavior.type check, empty→dismiss,
+// trim) — through the real IPC entry point, instead of calling
+// resolvePermissionEntry/dismissPermissionForTerminal directly. That entry
+// point is what an actual "Send"/"Back" click in the bubble reaches.
+describe("permission plan-feedback handleDecide routing (IPC entry point)", () => {
+  function setup(permOverrides = {}) {
+    const ctx = makeCtx();
+    const perm = initPermission(ctx);
+    const res = createMockResponse();
+    const bubble = makeFakeBubble();
+    const permEntry = makePlanPermEntry(res, { bubble, ...permOverrides });
+    perm.pendingPermissions.push(permEntry);
+    return { ctx, perm, res, bubble, permEntry };
+  }
+
+  it("routes ExitPlanMode plan-feedback to deny + trimmed message", () => {
+    const { perm, res, bubble, permEntry } = setup();
+
+    perm.handleDecide(makeEventFor(bubble), { type: "plan-feedback", feedback: "  改成只用 React  " });
+
+    assert.strictEqual(res.captured.ended, true);
+    const parsed = JSON.parse(res.captured.body);
+    assert.strictEqual(parsed.hookSpecificOutput.decision.behavior, "deny");
+    assert.strictEqual(parsed.hookSpecificOutput.decision.message, "改成只用 React", "feedback should be trimmed");
+    assert.strictEqual(perm.pendingPermissions.indexOf(permEntry), -1);
+  });
+
+  it("routes empty/whitespace plan-feedback to dismiss-for-terminal (socket left open)", () => {
+    const { ctx, perm, res, bubble, permEntry } = setup();
+
+    perm.handleDecide(makeEventFor(bubble), { type: "plan-feedback", feedback: "   " });
+
+    // dismiss-for-terminal does NOT write an HTTP decision — it leaves the
+    // connection open so CC detects the socket close and falls back to terminal.
+    assert.strictEqual(res.captured.ended, false);
+    assert.strictEqual(perm.pendingPermissions.indexOf(permEntry), -1);
+    assert.strictEqual(ctx.focusTerminalCalls.length, 1);
+    assert.strictEqual(ctx.focusTerminalCalls[0].sessionId, "plan-session-1");
+  });
+
+  it("does NOT treat a plan-feedback object as feedback for a non-ExitPlanMode tool", () => {
+    const { perm, res, bubble, permEntry } = setup({ toolName: "Bash" });
+
+    perm.handleDecide(makeEventFor(bubble), { type: "plan-feedback", feedback: "must not become a message" });
+
+    // toolName guard fails → falls through to the default branch: an object
+    // behavior !== "allow" becomes a plain deny, and crucially NO feedback
+    // message leaks into the wire for a non-plan tool.
+    assert.strictEqual(res.captured.ended, true);
+    const parsed = JSON.parse(res.captured.body);
+    assert.strictEqual(parsed.hookSpecificOutput.decision.behavior, "deny");
+    assert.strictEqual(parsed.hookSpecificOutput.decision.message, undefined);
+    assert.strictEqual(perm.pendingPermissions.indexOf(permEntry), -1);
+  });
+
+  it("is a no-op when the sender maps to no pending permission", () => {
+    const ctx = makeCtx();
+    const perm = initPermission(ctx);
+    // Sender resolves to a bubble that was never added to pendingPermissions.
+    assert.doesNotThrow(() =>
+      perm.handleDecide(makeEventFor(makeFakeBubble()), { type: "plan-feedback", feedback: "x" })
+    );
   });
 });
