@@ -1,0 +1,10 @@
+{
+    "workbench.colorTheme": "HighCoCo Neon: Hot Orange",
+    "workbench.colorCustomizations": {
+        "statusBar.background": "#000000",
+        "statusBar.foreground": "#FF6B00",
+        "statusBar.border": "#FF6B0044",
+        "statusBarItem.hoverBackground": "#FF6B0033",
+        "statusBarItem.activeBackground": "#FF6B0055"
+    }
+}

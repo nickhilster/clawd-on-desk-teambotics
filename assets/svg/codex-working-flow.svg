@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 45" width="500" height="500">
+  <defs>
+
+    <!-- Core radial gradient: brighter top-left, slightly grey at edge -->
+    <radialGradient id="cx-core-grad" cx="38%" cy="34%" r="66%">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D8D8D8"/>
+    </radialGradient>
+
+    <!--
+      Single petal: smooth ellipse, centre 4.3 px above bloom centre (7.5, 0).
+      rx=1.9  →  width  3.8 px (round, not blade-like)
+      ry=2.7  →  height 5.4 px
+      Extends y −7.0 … −1.6; core (r 3.0) hides the inner end cleanly.
+    -->
+    <ellipse id="cx-petal" cx="7.5" cy="-4.3" rx="1.9" ry="2.7"/>
+
+    <style>
+      /* ── Float: whole character bobs slowly (weightless) ── */
+      .cx-float { animation: cx-float 3s ease-in-out infinite; }
+
+      /* ── Bloom petals rotate around centre (7.5, 0) ── */
+      .cx-petals {
+        transform-origin: 7.5px 0px;
+        animation: cx-petals 9s linear infinite;
+      }
+
+      /* ── Core breathes / pulses ── */
+      .cx-core {
+        transform-origin: 7.5px 0px;
+        animation: cx-core 1.6s ease-in-out infinite;
+      }
+
+      /* ── Eyes: focused squint, blinks, look-down at ~50 % ── */
+      .cx-eyes {
+        transform-origin: 7.5px 0.2px;
+        animation: cx-eyes 7s ease-in-out infinite;
+      }
+
+      /* ── Ground shadow scales as character floats ── */
+      .cx-shadow {
+        transform-origin: 7.5px 14px;
+        animation: cx-shadow 3s ease-in-out infinite;
+      }
+
+      /* ── Token particles ── */
+      .tok { opacity: 0; }
+      .t0 { animation: tok0 2s  0.00s linear infinite; }
+      .t1 { animation: tok1 2s -0.40s linear infinite; }
+      .t2 { animation: tok2 2s -0.80s linear infinite; }
+      .t3 { animation: tok3 2s -1.20s linear infinite; }
+      .t4 { animation: tok4 2s -1.60s linear infinite; }
+
+      /* ══ Keyframes ══ */
+
+      @keyframes cx-float {
+        0%, 100% { transform: translateY(0px); }
+        50%       { transform: translateY(-3px); }
+      }
+
+      @keyframes cx-petals {
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes cx-core {
+        0%, 100% { opacity: 0.88; transform: scale(1); }
+        50%       { opacity: 1;    transform: scale(1.06); }
+      }
+
+      @keyframes cx-shadow {
+        0%, 100% { transform: scale(1, 1);      opacity: 0.22; }
+        50%       { transform: scale(0.6, 0.5);  opacity: 0.08; }
+      }
+
+      /*
+        Eyes: mostly squinted (scaleY 0.45 = focused),
+        quick blinks at 5 % and 91 %,
+        look-down at 48–66 % (deep in the flow).
+      */
+      @keyframes cx-eyes {
+        0%    { transform: scaleY(0.45); }
+        5%    { transform: scaleY(0.05); }
+        7%    { transform: scaleY(0.45); }
+        44%   { transform: scaleY(0.45); }
+        48%   { transform: translateY(0.5px) scaleY(0.38); }
+        66%   { transform: translateY(0.5px) scaleY(0.38); }
+        70%   { transform: scaleY(0.45); }
+        88%   { transform: scaleY(0.45); }
+        91%   { transform: scaleY(0.05); }
+        93%   { transform: scaleY(0.45); }
+        100%  { transform: scaleY(0.45); }
+      }
+
+      /* Tokens fly outward at 5 angles matching the 5 petals (0 °=up, +72 ° each) */
+      @keyframes tok0 { 0%{transform:translate(0,0);opacity:0}  18%{opacity:.65} 100%{transform:translate(0px,-10px);    opacity:0} }
+      @keyframes tok1 { 0%{transform:translate(0,0);opacity:0}  18%{opacity:.65} 100%{transform:translate(6.2px,-4.5px); opacity:0} }
+      @keyframes tok2 { 0%{transform:translate(0,0);opacity:0}  18%{opacity:.65} 100%{transform:translate(3.8px,8.1px);  opacity:0} }
+      @keyframes tok3 { 0%{transform:translate(0,0);opacity:0}  18%{opacity:.65} 100%{transform:translate(-3.8px,8.1px); opacity:0} }
+      @keyframes tok4 { 0%{transform:translate(0,0);opacity:0}  18%{opacity:.65} 100%{transform:translate(-6.2px,-4.5px);opacity:0} }
+    </style>
+  </defs>
+
+  <!-- Ground shadow: fixed position, pulses smaller as character floats up -->
+  <ellipse class="cx-shadow" cx="7.5" cy="14" rx="5.8" ry="1.1" fill="#000"/>
+
+  <!-- Everything inside here floats -->
+  <g class="cx-float">
+
+    <!-- Token particles: 5 circles fly outward staggered, one per petal direction -->
+    <circle class="tok t0" cx="7.5" cy="-1" r="1.1" fill="#7AB8FF"/>
+    <circle class="tok t1" cx="7.5" cy="-1" r="1.1" fill="#7AB8FF"/>
+    <circle class="tok t2" cx="7.5" cy="-1" r="1.1" fill="#7AB8FF"/>
+    <circle class="tok t3" cx="7.5" cy="-1" r="1.1" fill="#7AB8FF"/>
+    <circle class="tok t4" cx="7.5" cy="-1" r="1.1" fill="#7AB8FF"/>
+
+    <!-- Bloom petals: 5 bezier almond shapes, rotating continuously -->
+    <g class="cx-petals">
+      <use href="#cx-petal" fill="#C0C0C0"/>
+      <use href="#cx-petal" transform="rotate(72,  7.5, 0)" fill="#C0C0C0"/>
+      <use href="#cx-petal" transform="rotate(144, 7.5, 0)" fill="#C0C0C0"/>
+      <use href="#cx-petal" transform="rotate(216, 7.5, 0)" fill="#C0C0C0"/>
+      <use href="#cx-petal" transform="rotate(288, 7.5, 0)" fill="#C0C0C0"/>
+    </g>
+
+    <!-- Soft halo ring (barely visible glow behind core) -->
+    <circle cx="7.5" cy="0" r="4.5" fill="#FFFFFF" opacity="0.10"/>
+
+    <!-- Core circle: white with gradient, pulses gently -->
+    <g class="cx-core">
+      <circle cx="7.5" cy="0" r="3.1" fill="url(#cx-core-grad)"/>
+    </g>
+
+    <!-- Eyes: ellipses with scaleY squint animation -->
+    <g class="cx-eyes">
+      <ellipse cx="6.3" cy="0.2" rx="0.62" ry="0.94" fill="#0A0A0A"/>
+      <ellipse cx="8.7" cy="0.2" rx="0.62" ry="0.94" fill="#0A0A0A"/>
+    </g>
+
+  </g>
+</svg>
