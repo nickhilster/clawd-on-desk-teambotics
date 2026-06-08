@@ -158,7 +158,7 @@ describe("auto-pilot: showPermissionBubble auto-approve chokepoint", () => {
     assert.equal(perm.pendingPermissions.indexOf(permEntry), 0);
   });
 
-  it("pre-fills empty answers for elicitation so allow is a real allow", () => {
+  it("answers elicitation questions with a deferral reply so allow is a real allow", () => {
     const captured = { body: "" };
     const res = {
       writableEnded: false,
@@ -176,16 +176,20 @@ describe("auto-pilot: showPermissionBubble auto-approve chokepoint", () => {
       agentId: "claude-code",
       isElicitation: true,
       toolName: "AskUserQuestion",
-      toolInput: { questions: [{ question: "Pick one" }] },
+      toolInput: { questions: [{ question: "Pick one" }, { question: "And another?" }] },
     });
     perm.pendingPermissions.push(permEntry);
 
     perm.showPermissionBubble(permEntry);
 
-    // Elicitation allow path emits updatedInput, not a bare deny.
+    // Elicitation allow path emits updatedInput, not a bare deny, and every
+    // question is answered with the neutral defer-to-agent reply (not blank).
     const parsed = JSON.parse(captured.body);
     assert.equal(parsed.hookSpecificOutput.decision.behavior, "allow");
     assert.ok(parsed.hookSpecificOutput.decision.updatedInput, "updatedInput present");
-    assert.deepEqual(parsed.hookSpecificOutput.decision.updatedInput.answers, {});
+    assert.deepEqual(parsed.hookSpecificOutput.decision.updatedInput.answers, {
+      "Pick one": "You choose whatever is best.",
+      "And another?": "You choose whatever is best.",
+    });
   });
 });
