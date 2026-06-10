@@ -568,6 +568,11 @@ const MAC_FOCUS_TIMEOUT_MS = 1500;
 // can answer (#465), so that one script gets a human-scale timeout.
 const MAC_FOCUS_CONSENT_TIMEOUT_MS = 15000;
 const MAC_OPEN_TIMEOUT_MS = 3000;
+// After the stepping-stone focus switches Spaces, wait this long for the Space
+// switch to settle before focusing the real target (the tab swap). Shorter than
+// the old 450+400ms double-wait: the target focus runs directly here, with no
+// extra runGhosttyScript pre-delay stacked on top.
+const GHOSTTY_STEP_SETTLE_MS = 300;
 const WINDOWS_FOCUS_DEDUP_MS = 400;
 const WINDOWS_FOCUS_RESULT_TIMEOUT_MS = 3000;
 const WINDOWS_FOCUS_POSITIVE_REASONS = new Set([
@@ -1560,26 +1565,39 @@ function scheduleGhosttyFocus(sourcePid, cwd, pidChain, ghosttyTerminalId = null
     // yanking the window — wait for the Space switch, then focus the target
     // (the tab swap now happens within the active Space). "direct"/"miss"
     // fall through to the legacy focus script unchanged.
-    const runWithSteppingStone = (probeScript, thenFn) => {
+    const runWithSteppingStone = (probeScript, finalScript, finalLabel, thenFn) => {
       if (!probeScript) {
         thenFn();
         return;
       }
+      const t0 = Date.now();
       execFile("osascript", ["-e", probeScript], { timeout: MAC_FOCUS_TIMEOUT_MS }, (probeErr, probeOut) => {
         const status = probeErr ? "error" : (String(probeOut || "").trim() || "empty");
         if (!status.startsWith("via:")) {
-          logGhosttyFocusResult(`probe-${status}`);
+          logGhosttyFocusResult(`probe-${status} t=${Date.now() - t0}ms`);
           thenFn();
           return;
         }
-        logGhosttyFocusResult("probe-via");
         const stoneScript = buildGhosttyIdFocusScript(status.slice(4));
-        if (!stoneScript) {
+        if (!stoneScript || !finalScript) {
+          logGhosttyFocusResult("probe-via no-final");
           thenFn();
           return;
         }
+        logGhosttyFocusResult(`probe-via t=${Date.now() - t0}ms`);
+        // Focus the stepping-stone terminal (the window's already-selected tab)
+        // to switch Spaces, wait for the switch to settle, then focus the real
+        // target directly — no runGhosttyScript pre-delay, since the Space is
+        // already active and the tab swap no longer yanks the window.
+        const tStone = Date.now();
         execFile("osascript", ["-e", stoneScript], { timeout: MAC_FOCUS_TIMEOUT_MS }, () => {
-          setTimeout(thenFn, 450);
+          setTimeout(() => {
+            const tFinal = Date.now();
+            execFile("osascript", ["-e", finalScript], { timeout: MAC_FOCUS_TIMEOUT_MS }, (finalErr, finalOut) => {
+              const finalStatus = normalizeGhosttyScriptStatus(finalLabel, finalErr, finalOut);
+              logGhosttyFocusResult(`${finalStatus} via-stone stone=${tFinal - tStone}ms final=${Date.now() - tFinal}ms`);
+            });
+          }, GHOSTTY_STEP_SETTLE_MS);
         });
       });
     };
@@ -1591,7 +1609,7 @@ function scheduleGhosttyFocus(sourcePid, cwd, pidChain, ghosttyTerminalId = null
       }
       const script = buildGhosttyCwdFocusScript(cwdCandidates);
       logGhosttyFocusResult("cwd-fallback");
-      runWithSteppingStone(buildGhosttyCwdProbeScript(cwdCandidates), () => {
+      runWithSteppingStone(buildGhosttyCwdProbeScript(cwdCandidates), script, "cwd", () => {
         runGhosttyScript(script, "cwd", null);
       });
     };
@@ -1630,7 +1648,7 @@ function scheduleGhosttyFocus(sourcePid, cwd, pidChain, ghosttyTerminalId = null
         runPrecisePath();
         return;
       }
-      runWithSteppingStone(buildGhosttyIdProbeScript(ghosttyTerminalId), () => {
+      runWithSteppingStone(buildGhosttyIdProbeScript(ghosttyTerminalId), idScript, "id", () => {
         runGhosttyScript(idScript, "id", runPrecisePath);
       });
     };
