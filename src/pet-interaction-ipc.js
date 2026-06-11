@@ -55,6 +55,9 @@ function registerPetInteractionIpc(options = {}) {
   const statPath = requiredDependency(options.statPath, "statPath");
   const openTerminalAt = requiredDependency(options.openTerminalAt, "openTerminalAt");
   const dropLog = options.dropLog || (() => {});
+  const isMacPlatform = options.isMacPlatform != null
+    ? !!options.isMacPlatform
+    : process.platform === "darwin";
   const disposers = [];
 
   function on(channel, listener) {
@@ -128,12 +131,19 @@ function registerPetInteractionIpc(options = {}) {
     revealSessionHud();
   });
 
-  // OS file drop from the hit window (#459): first path wins, files resolve to
-  // their parent directory, then open a plain terminal there (no agent). The
-  // accept ping goes back to the SENDING window (hit renderer plays its own
-  // reaction so its isReacting gate stays consistent).
+  // OS file drop from the hit window (#459, Windows/Linux only): first path
+  // wins, files resolve to their parent directory, then open a plain terminal
+  // there (no agent). The accept ping goes back to the SENDING window (hit
+  // renderer plays its own reaction so its isReacting gate stays consistent).
+  // macOS never registers the renderer-side listeners (screen-saver-level
+  // windows are invisible to macOS drag-destination search); this guard is the
+  // second layer so a stray IPC can't open terminals there either.
   on("pet-drop-paths", async (event, paths) => {
     try {
+      if (isMacPlatform) {
+        dropLog("drop ignored: OS file drop is disabled on macOS");
+        return;
+      }
       if (isMiniMode() || isMiniTransitioning()) return;
       if (!Array.isArray(paths)) return;
       const first = paths.find((p) => typeof p === "string" && p.length > 0);

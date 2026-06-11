@@ -94,6 +94,9 @@ function createHarness(overrides = {}) {
       return state.openTerminalResult;
     },
     dropLog: (message) => calls.push(["dropLog", message]),
+    // Default to the enabled platforms so the suite behaves the same on a
+    // macOS dev machine; the macOS-disabled path has its own explicit test.
+    isMacPlatform: overrides.isMacPlatform != null ? overrides.isMacPlatform : false,
   });
   return { ipcMain, runtime, calls, state };
 }
@@ -352,6 +355,20 @@ test("pet drop takes the first usable path only", async () => {
     calls.filter((c) => c[0] === "openTerminalAt"),
     [["openTerminalAt", "/first"]],
   );
+});
+
+test("pet drop is disabled on macOS: no stat, no terminal, no accept ping", async () => {
+  const { ipcMain, calls, state } = createHarness({ isMacPlatform: true });
+  state.statDirs.add("/proj/dir");
+  const sender = makeDropSender();
+
+  await sendDrop(ipcMain, ["/proj/dir"], sender);
+
+  assert.deepStrictEqual(calls.filter((c) => c[0] === "statPath"), []);
+  assert.deepStrictEqual(calls.filter((c) => c[0] === "openTerminalAt"), []);
+  assert.deepStrictEqual(sender.sent, []);
+  const logs = calls.filter((c) => c[0] === "dropLog").map((c) => c[1]);
+  assert.ok(logs.some((m) => m.includes("disabled on macOS")), logs.join("; "));
 });
 
 test("pet drop is ignored in mini mode and during mini transitions", async () => {

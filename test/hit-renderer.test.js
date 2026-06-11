@@ -245,6 +245,13 @@ describe("hit-renderer OS file drop (#459)", () => {
     };
   }
 
+  it("macOS registers no drop machinery at all: no listeners, no affordance, no accept handler", () => {
+    const h = createHarness({ isMac: true });
+    assert.strictEqual(h.area.listeners.get("dragover"), undefined);
+    assert.strictEqual(h.area.listeners.get("drop"), undefined);
+    assert.strictEqual(h.apiHandlers.dropAccepted, undefined);
+  });
+
   it("dragover with files shows the copy affordance outside mini mode", () => {
     const h = createHarness();
     const evt = makeDragEvent();
