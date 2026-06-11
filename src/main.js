@@ -1406,6 +1406,7 @@ const _tickCtx = {
   getObjRect,
   getHitRectScreen,
   getAssetPointerPayload,
+  get roam() { return _roam; },
 };
 const _tick = require("./tick")(_tickCtx);
 requestFastTick = (maxDelay) => _tick.scheduleSoon(maxDelay);
@@ -2772,6 +2773,7 @@ const SETTINGS_MIRROR_SETTERS = {
   soundMuted: (v) => { soundMuted = v; }, soundVolume: (v) => { soundVolume = v; }, lowPowerIdleMode: (v) => { lowPowerIdleMode = v; },
   keepAwakeWhileWorking: (v) => { keepAwakeWhileWorking = v; },
   allowEdgePinning: (v) => { allowEdgePinningCached = v; }, disableMiniMode: (v) => { disableMiniModeCached = v; }, keepSizeAcrossDisplays: (v) => { keepSizeAcrossDisplaysCached = v; },
+  freeRoam: (v) => { _roam.setEnabled(v); },
   textScale: (v) => { textScale = v; textScalePreview = null; },
   textScaleByDisplay: (v) => { textScaleByDisplay = v; textScalePreview = null; },
 };
@@ -3305,6 +3307,30 @@ const _miniCtx = {
 const _mini = require("./mini")(_miniCtx);
 const { enterMiniMode, exitMiniMode, enterMiniViaMenu, miniPeekIn, miniPeekOut,
         checkMiniModeSnap, cancelMiniTransition, animateWindowX, animateWindowParabola } = _mini;
+
+// ── Free Roam — initialized here after state and mini modules ──
+const _roamCtx = {
+  get win() { return win; },
+  getPetWindowBounds,
+  applyPetWindowPosition,
+  syncHitWin: () => syncHitWin(),
+  repositionAnchoredSurfaces: () => repositionAnchoredFloatingSurfaces(),
+  getNearestWorkArea,
+  clampToScreenVisual,
+  getMiniMode: () => _mini.getMiniMode(),
+  getCurrentState: () => _state.getCurrentState(),
+};
+const _roam = require("./roam")(_roamCtx);
+
+// Free roam: initialize from prefs and react to toggle changes
+_roam.setEnabled(_settingsController.get("freeRoam") === true);
+try {
+  _settingsController.subscribeKey("freeRoam", (value) => {
+    _roam.setEnabled(value === true);
+  });
+} catch (err) {
+  console.warn("Clawd: freeRoam subscribeKey failed:", err && err.message);
+}
 
 // Convenience getters for mini state (used throughout main.js)
 Object.defineProperties(this || {}, {}); // no-op placeholder
