@@ -40,7 +40,7 @@ describe("settings agent order", () => {
       { id: "cursor-agent", name: "Cursor Agent", capabilities: {} },
       { id: "openclaw", name: "OpenClaw", capabilities: {} },
       { id: "hermes", name: "Hermes Agent", capabilities: {} },
-      { id: "reasonix", name: "Reasonix", capabilities: {} },
+      { id: "reasonix", name: "Reasonix CLI", capabilities: { notificationHook: true } },
       { id: "codex", name: "Codex CLI", capabilities: { interactiveBubble: true } },
       { id: "kimi-cli", name: "Kimi CLI", capabilities: { permissionApproval: true, notificationHook: true } },
       { id: "qwen-code", name: "Qwen Code", capabilities: { permissionApproval: true, notificationHook: true } },
@@ -56,6 +56,7 @@ describe("settings agent order", () => {
       "codewhale",
       "opencode",
       "codebuddy",
+      "reasonix",
       "antigravity-cli",
       "cursor-agent",
       "copilot-cli",
@@ -63,7 +64,6 @@ describe("settings agent order", () => {
       "pi",
       "openclaw",
       "hermes",
-      "reasonix",
     ]);
   });
 

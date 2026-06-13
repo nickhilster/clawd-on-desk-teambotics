@@ -53,7 +53,8 @@ function safeExit(code) {
   if (_exited) return;
   _exited = true;
   if (safetyTimer) clearTimeout(safetyTimer);
-  process.stdout.write("{}\n");
+  // Reasonix consumes stdout as text for PreCompact/PostLLMCall hooks; this
+  // state-only observer must stay silent and rely on exit code 0 as pass.
   process.exit(code);
 }
 
