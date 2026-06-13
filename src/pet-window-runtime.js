@@ -28,6 +28,20 @@ function isLiveWindow(win) {
   return !!(win && typeof win.isDestroyed === "function" && !win.isDestroyed());
 }
 
+function reloadWindowWebContents(win) {
+  try {
+    if (!isLiveWindow(win)) return false;
+    const contents = win.webContents;
+    if (!contents) return false;
+    if (typeof contents.isDestroyed === "function" && contents.isDestroyed()) return false;
+    if (typeof contents.reload !== "function") return false;
+    contents.reload();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function createPetWindowRuntime(options = {}) {
   const screen = options.screen || {};
   const isWin = !!options.isWin;
@@ -193,16 +207,25 @@ function createPetWindowRuntime(options = {}) {
     if (isLiveWindow(hitWin)) hitWin.hide();
   }
 
-  function togglePetVisibility() {
+  // Idempotent visibility setter. Returns { applied, deferred, changed }:
+  //  - no render window  -> { applied:false, deferred:false, changed:false }
+  //  - mini transitioning -> { applied:false, deferred:true,  changed:false } (petHidden untouched)
+  //  - already in target  -> { applied:true,  deferred:false, changed:false }
+  //  - state flipped      -> { applied:true,  deferred:false, changed:true  }
+  function setPetHidden(hidden) {
+    const target = !!hidden;
     const win = getRenderWindow();
-    if (!isLiveWindow(win)) return;
-    if (getMiniTransitioning()) return;
+    if (!isLiveWindow(win)) return { applied: false, deferred: false, changed: false };
+    if (getMiniTransitioning()) return { applied: false, deferred: true, changed: false };
+    if (target === petHidden) return { applied: true, deferred: false, changed: false };
     if (petHidden) {
+      // becoming visible
       showPetWindows();
       showFloatingSurfacesForPet();
       reapplyMacVisibility();
       petHidden = false;
     } else {
+      // becoming hidden
       hidePetWindows();
       hideFloatingSurfacesForPet();
       petHidden = true;
@@ -211,6 +234,11 @@ function createPetWindowRuntime(options = {}) {
     syncPermissionShortcuts();
     buildTrayMenu();
     buildContextMenu();
+    return { applied: true, deferred: false, changed: true };
+  }
+
+  function togglePetVisibility() {
+    return setPetHidden(!petHidden);
   }
 
   function bringPetToPrimaryDisplay() {
@@ -446,7 +474,7 @@ function createPetWindowRuntime(options = {}) {
       renderWin.on("unresponsive", () => {
         if (isQuitting()) return;
         console.warn("Clawd: renderer unresponsive — reloading");
-        renderWin.webContents.reload();
+        reloadWindowWebContents(renderWin);
       });
     }
 
@@ -466,6 +494,16 @@ function createPetWindowRuntime(options = {}) {
       renderWin.on("session-end", flushForSessionEnd);
     }
     renderWin.loadFile(optionsArg.loadFilePath);
+    // file:// zoom propagates partition-wide and persists across restarts;
+    // builds that briefly used setZoomFactor for textScale may have left a
+    // non-1 factor behind. Reset it from the first window to load so the pet
+    // (and, via propagation, every file:// page) renders 1:1 — textScale uses
+    // per-document CSS zoom instead and never touches this map.
+    if (renderWin.webContents && typeof renderWin.webContents.once === "function") {
+      renderWin.webContents.once("did-finish-load", () => {
+        try { renderWin.webContents.setZoomFactor(1); } catch {}
+      });
+    }
     applyPetWindowBounds(optionsArg.initialVirtualBounds);
     renderWin.showInactive();
     keepOutOfTaskbar(renderWin);
@@ -535,7 +573,7 @@ function createPetWindowRuntime(options = {}) {
         optionsArg.onRenderProcessGone(details, hitWin);
         return;
       }
-      hitWin.webContents.reload();
+      reloadWindowWebContents(hitWin);
     });
     return hitWin;
   }
@@ -760,6 +798,7 @@ function createPetWindowRuntime(options = {}) {
     applyPetWindowBounds,
     applyPetWindowPosition,
     isPetHidden,
+    setPetHidden,
     togglePetVisibility,
     bringPetToPrimaryDisplay,
     getViewportOffsetY,
@@ -775,6 +814,7 @@ function createPetWindowRuntime(options = {}) {
     getInitialHitWindowBounds,
     createRenderWindow,
     createHitWindow,
+    reloadWindowWebContents,
     setDragLocked,
     isDragLocked,
     beginDragSnapshot,

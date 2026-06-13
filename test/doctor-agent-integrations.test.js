@@ -12,6 +12,8 @@ const {
 const { GEMINI_HOOK_EVENTS } = require("../hooks/gemini-install");
 const { ANTIGRAVITY_HOOK_EVENTS, __test: antigravityInstallTest } = require("../hooks/antigravity-install");
 const { QWEN_CODE_HOOK_EVENTS, buildQwenCodeHookCommand } = require("../hooks/qwen-code-install");
+const { HOOK_ENTRIES: CODEWHALE_HOOK_ENTRIES } = require("../hooks/codewhale-install");
+const { QODER_HOOK_EVENTS, buildQoderHookCommand } = require("../hooks/qoder-install");
 
 const tempDirs = [];
 
@@ -24,6 +26,11 @@ function makeTempDir() {
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
+}
+
+function writeText(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, value, "utf8");
 }
 
 function baseDescriptor(overrides = {}) {
@@ -48,12 +55,24 @@ function runOne(descriptor, options = {}) {
     fs,
     prefs: options.prefs || {},
     descriptors: [descriptor],
+    server: options.server || null,
     validateCommand: options.validateCommand || (() => ({
       ok: true,
       nodeBin: "/node",
       scriptPath: "/app/hooks/test-hook.js",
     })),
   }).details[0];
+}
+
+function suspiciousShrinkGuardServer() {
+  return {
+    getClaudeHookGuardStatus: () => ({
+      type: "suspicious-shrink",
+      at: 1234,
+      before: { keyCount: 5, hookCount: 12, thirdPartyHookCount: 2 },
+      after: { keyCount: 1, hookCount: 0, thirdPartyHookCount: 0 },
+    }),
+  };
 }
 
 function geminiHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/gemini-hook.js" ${event}`) {
@@ -113,6 +132,63 @@ function qwenDescriptor() {
     nested: true,
     hookEvents: QWEN_CODE_HOOK_EVENTS,
   });
+}
+
+function qoderDescriptor() {
+  const root = makeTempDir();
+  const parentDir = path.join(root, ".qoder");
+  return baseDescriptor({
+    agentId: "qoder",
+    agentName: "Qoder",
+    marker: "qoder-hook.js",
+    parentDir,
+    configPath: path.join(parentDir, "settings.json"),
+    configMode: "file",
+    nested: true,
+    hookEvents: QODER_HOOK_EVENTS,
+  });
+}
+
+function qoderHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/qoder-hook.js" ${event}`) {
+  const hooks = {};
+  for (const event of QODER_HOOK_EVENTS) {
+    hooks[event] = [{
+      matcher: "*",
+      hooks: [{ name: "clawd", type: "command", command: commandForEvent(event) }],
+    }];
+  }
+  return hooks;
+}
+
+function codewhaleDescriptor() {
+  const root = makeTempDir();
+  const parentDir = path.join(root, ".codewhale");
+  return baseDescriptor({
+    agentId: "codewhale",
+    agentName: "CodeWhale",
+    parentDir,
+    configPath: path.join(parentDir, "config.toml"),
+    commandMarker: "codewhale-hook.js",
+    marker: "managed by clawd-on-desk",
+    configMode: "codewhale-hooks-toml",
+    hookEvents: CODEWHALE_HOOK_ENTRIES.map((entry) => entry[0]),
+  });
+}
+
+function codewhaleToml(events = CODEWHALE_HOOK_ENTRIES.map((entry) => entry[0]), commandForEvent = (event) => `"/node" "/app/hooks/codewhale-hook.js" "${event}"`) {
+  return [
+    "[hooks]",
+    "enabled = true",
+    "",
+    ...events.flatMap((event) => [
+      "[[hooks.hooks]]",
+      "# managed by clawd-on-desk",
+      `event = "${event}"`,
+      `command = '''${commandForEvent(event)}'''`,
+      "background = true",
+      "",
+    ]),
+  ].join("\n");
 }
 
 function qwenHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/qwen-code-hook.js" ${event}`) {
@@ -177,6 +253,23 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.parentDirExists, false);
   });
 
+  it("reports not-managed before disabled for uninstalled agents", () => {
+    const descriptor = baseDescriptor({ agentId: "gemini-cli" });
+    const detail = runOne(descriptor, {
+      prefs: {
+        agents: {
+          "gemini-cli": {
+            integrationInstalled: false,
+            enabled: false,
+          },
+        },
+      },
+    });
+
+    assert.strictEqual(detail.status, "not-managed");
+    assert.strictEqual(detail.level, "info");
+  });
+
   it("keeps enabled Hermes missing install info-only when another integration is ok", () => {
     const okDescriptor = baseDescriptor({
       agentId: "ok-agent",
@@ -219,6 +312,83 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.level, "warning");
     assert.strictEqual(detail.configFileExists, false);
     assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "test-agent" });
+  });
+
+  it("explains Claude hook loss when the suspicious-shrink guard recently fired", () => {
+    const descriptor = baseDescriptor({
+      agentId: "claude-code",
+      agentName: "Claude Code",
+      marker: "clawd-hook.js",
+      nested: true,
+    });
+    writeJson(descriptor.configPath, { hooks: {} });
+
+    const detail = runOne(descriptor, {
+      server: suspiciousShrinkGuardServer(),
+    });
+
+    assert.strictEqual(detail.status, "not-connected");
+    assert.match(detail.detail, /paused automatic Claude hook repair/);
+    assert.strictEqual(detail.claudeHookGuard.type, "suspicious-shrink");
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "claude-code" });
+  });
+
+  it("does not show the Claude guard notice for other agents", () => {
+    const descriptor = baseDescriptor();
+    writeJson(descriptor.configPath, { hooks: {} });
+
+    const detail = runOne(descriptor, {
+      server: suspiciousShrinkGuardServer(),
+    });
+
+    assert.strictEqual(detail.status, "not-connected");
+    assert.match(detail.detail, /has no test-hook\.js command/);
+    assert.doesNotMatch(detail.detail, /paused automatic Claude hook repair/);
+    assert.strictEqual(detail.claudeHookGuard, undefined);
+  });
+
+  it("does not show the Claude guard notice when Claude hooks are connected", () => {
+    const descriptor = baseDescriptor({
+      agentId: "claude-code",
+      agentName: "Claude Code",
+      marker: "clawd-hook.js",
+      nested: true,
+    });
+    writeJson(descriptor.configPath, {
+      hooks: {
+        Stop: [{
+          matcher: "",
+          hooks: [{ command: '"/node" "/app/hooks/clawd-hook.js" Stop' }],
+        }],
+      },
+    });
+
+    const detail = runOne(descriptor, {
+      server: suspiciousShrinkGuardServer(),
+    });
+
+    assert.strictEqual(detail.status, "ok");
+    assert.doesNotMatch(detail.detail, /paused automatic Claude hook repair/);
+    assert.strictEqual(detail.claudeHookGuard, undefined);
+  });
+
+  it("keeps the original Claude hook loss detail when no guard status is available", () => {
+    const descriptor = baseDescriptor({
+      agentId: "claude-code",
+      agentName: "Claude Code",
+      marker: "clawd-hook.js",
+      nested: true,
+    });
+    writeJson(descriptor.configPath, { hooks: {} });
+
+    const detail = runOne(descriptor, {
+      server: {},
+    });
+
+    assert.strictEqual(detail.status, "not-connected");
+    assert.match(detail.detail, /has no clawd-hook\.js command/);
+    assert.doesNotMatch(detail.detail, /paused automatic Claude hook repair/);
+    assert.strictEqual(detail.claudeHookGuard, undefined);
   });
 
   it("returns config-corrupt when JSON parsing fails", () => {
@@ -623,6 +793,119 @@ describe("checkAgentIntegrations", () => {
       detail: "disableAllHooks is true",
     });
     assert.strictEqual(detail.fixAction, undefined);
+  });
+
+  it("validates Qoder state-only hooks through the generic file-mode path", () => {
+    const descriptor = qoderDescriptor();
+    writeJson(descriptor.configPath, { hooks: qoderHooksConfig() });
+
+    const seen = [];
+    const detail = runOne(descriptor, {
+      validateCommand: (command) => {
+        seen.push(command);
+        return { ok: true, nodeBin: "/node", scriptPath: "/app/hooks/qoder-hook.js" };
+      },
+    });
+
+    assert.strictEqual(detail.status, "ok");
+    assert.strictEqual(detail.commandCount, QODER_HOOK_EVENTS.length);
+    assert.ok(seen.every((command) => command.includes("qoder-hook.js")));
+  });
+
+  it("detects Windows EncodedCommand Qoder hooks even though the marker is base64-wrapped", () => {
+    const descriptor = qoderDescriptor();
+    const nodeBin = "C:\\Program Files\\nodejs\\node.exe";
+    const scriptPath = "D:/app/hooks/qoder-hook.js";
+    writeJson(descriptor.configPath, { hooks: qoderHooksConfig((event) =>
+      buildQoderHookCommand(nodeBin, scriptPath, event, {
+        platform: "win32",
+        powerShellBin: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      })
+    ) });
+
+    const seen = [];
+    const detail = runOne(descriptor, {
+      validateCommand: (command) => {
+        seen.push(command);
+        // Plain command text must not leak the marker — it lives in the base64 blob.
+        assert.strictEqual(command.includes("qoder-hook.js"), false);
+        return { ok: true, nodeBin, scriptPath };
+      },
+    });
+
+    assert.strictEqual(detail.status, "ok");
+    assert.strictEqual(detail.commandCount, QODER_HOOK_EVENTS.length);
+  });
+
+  it("warns and offers repair when Qoder has no Clawd hook", () => {
+    const descriptor = qoderDescriptor();
+    writeJson(descriptor.configPath, { hooks: {} });
+
+    const detail = runOne(descriptor);
+    assert.strictEqual(detail.status, "not-connected");
+    assert.match(detail.detail, /has no qoder-hook\.js command/);
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "qoder" });
+  });
+
+  it("validates CodeWhale TOML hooks", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml());
+
+    const seen = [];
+    const detail = runOne(descriptor, {
+      validateCommand: (command) => {
+        seen.push(command);
+        return { ok: true, nodeBin: "/node", scriptPath: "/app/hooks/codewhale-hook.js" };
+      },
+    });
+
+    assert.strictEqual(detail.status, "ok");
+    assert.strictEqual(detail.commandCount, CODEWHALE_HOOK_ENTRIES.length);
+    assert.ok(seen.every((command) => command.includes("codewhale-hook.js")));
+    assert.strictEqual(detail.scriptPath, "/app/hooks/codewhale-hook.js");
+  });
+
+  it("warns and offers repair when CodeWhale is missing managed hook events", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml(["session_start"]));
+
+    const detail = runOne(descriptor);
+
+    assert.strictEqual(detail.status, "not-connected");
+    assert.ok(detail.missingCodewhaleHookEvents.includes("session_end"));
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "codewhale" });
+  });
+
+  it("warns and offers repair when CodeWhale hooks are disabled", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml().replace("enabled = true", "enabled = false"));
+
+    const detail = runOne(descriptor);
+
+    assert.strictEqual(detail.status, "not-connected");
+    assert.deepStrictEqual(detail.supplementary, {
+      key: "codewhale_hooks",
+      value: "disabled",
+      detail: "[hooks].enabled is false",
+    });
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "codewhale" });
+  });
+
+  it("warns and offers repair when CodeWhale hook commands fail validation", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml());
+
+    const detail = runOne(descriptor, {
+      validateCommand: () => ({
+        ok: false,
+        reason: "missing-script",
+        scriptPath: "/missing/codewhale-hook.js",
+      }),
+    });
+
+    assert.strictEqual(detail.status, "broken-path");
+    assert.match(detail.detail, /parse-failed/);
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "codewhale" });
   });
 
   it("does not offer automatic repair when Antigravity Clawd hooks are disabled", () => {

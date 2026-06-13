@@ -3,6 +3,10 @@
 const path = require("path");
 const { sessionAliasKey } = require("./session-alias");
 const { getSessionFocusTarget } = require("./session-focus");
+const {
+  buildLatestLocalCodexProcessIds,
+  isSupersededLocalCodexProcessSession,
+} = require("./state-session-dedupe");
 const { readCodexThreadName } = require("../hooks/codex-session-index");
 
 const EVENT_LABEL_KEYS = {
@@ -28,7 +32,9 @@ const EVENT_LABEL_KEYS = {
   "stale-cleanup": "eventLabelStaleCleanup",
 };
 
-const DONE_EVENTS = new Set(["Stop", "PostCompact", "event_msg:task_complete"]);
+// PostCompact intentionally excluded (#406): compaction finishing is not turn
+// completion, so it must not raise the "done" badge.
+const DONE_EVENTS = new Set(["Stop", "event_msg:task_complete"]);
 
 function isDoneEvent(event) {
   return DONE_EVENTS.has(event);
@@ -168,7 +174,8 @@ function buildSessionSnapshotEntry(id, session, sessionAliases = {}, options = {
     ? options.getAgentIconUrl
     : () => null;
   const state = (session && session.state) || "idle";
-  const hiddenFromHud = shouldAutoClearDetachedSession(session, badge, options);
+  const hiddenFromHud = shouldAutoClearDetachedSession(session, badge, options)
+    || isSupersededLocalCodexProcessSession(id, session, options.latestLocalCodexProcessIds);
   const focusTarget = session && !session.headless && state !== "sleeping" && !hiddenFromHud
     ? getSessionFocusTarget({ ...(session || {}), id }, {
       osPlatform: options.focusHostPlatform || options.osPlatform,
@@ -198,6 +205,7 @@ function buildSessionSnapshotEntry(id, session, sessionAliases = {}, options = {
     provider: (session && session.provider) || null,
     codexOriginator: (session && session.codexOriginator) || null,
     codexSource: (session && session.codexSource) || null,
+    contextUsage: snapshotContextUsage(session),
     assistantLastOutput: (session && typeof session.assistantLastOutput === "string")
       ? session.assistantLastOutput
       : null,
@@ -213,6 +221,20 @@ function buildSessionSnapshotEntry(id, session, sessionAliases = {}, options = {
   };
 }
 
+function snapshotContextUsage(session) {
+  const usage = session && session.contextUsage;
+  if (!usage || typeof usage !== "object") return null;
+  const used = Number(usage.used);
+  if (!Number.isFinite(used) || used < 0) return null;
+  const out = { used };
+  const limit = Number(usage.limit);
+  if (Number.isFinite(limit) && limit > 0) out.limit = limit;
+  const percent = Number(usage.percent);
+  if (Number.isFinite(percent)) out.percent = Math.max(0, Math.min(100, Math.round(percent)));
+  if (usage.source === "claude" || usage.source === "codex") out.source = usage.source;
+  return out;
+}
+
 function normalizeSessionsIterable(sessions) {
   if (!sessions) return [];
   if (sessions instanceof Map) return sessions.entries();
@@ -225,8 +247,12 @@ function buildSessionSnapshot(sessions, options = {}) {
   const sessionAliases = options.sessionAliases && typeof options.sessionAliases === "object"
     ? options.sessionAliases
     : {};
+  const latestLocalCodexProcessIds = buildLatestLocalCodexProcessIds(sessions);
   for (const [id, session] of normalizeSessionsIterable(sessions)) {
-    entries.push(buildSessionSnapshotEntry(id, session, sessionAliases, options));
+    entries.push(buildSessionSnapshotEntry(id, session, sessionAliases, {
+      ...options,
+      latestLocalCodexProcessIds,
+    }));
   }
 
   const dashboardEntries = entries.slice().sort(sessionUpdatedAtComparator);
@@ -310,6 +336,7 @@ function sessionSnapshotSignature(snapshot) {
       provider: entry.provider,
       codexOriginator: entry.codexOriginator,
       codexSource: entry.codexSource,
+      contextUsage: entry.contextUsage,
       assistantLastOutput: entry.assistantLastOutput,
       assistantLastOutputTruncated: !!entry.assistantLastOutputTruncated,
       lastEventLabelKey: entry.lastEvent ? entry.lastEvent.labelKey : null,

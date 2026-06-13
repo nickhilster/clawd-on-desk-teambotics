@@ -18,8 +18,10 @@ function makeWindow(bounds = { x: 10, y: 20, width: 100, height: 100 }) {
     destroyed: false,
     visible: true,
     webContents: {
+      destroyed: false,
       on: (event, cb) => listeners.set(event, cb),
       reload: () => calls.push(["reload"]),
+      isDestroyed() { return this.destroyed; },
     },
     isDestroyed: () => win.destroyed,
     isVisible: () => win.visible,
@@ -167,6 +169,33 @@ describe("pet-window-runtime", () => {
       true,
       "pop-up-menu",
     ]);
+  });
+
+  it("reloadWindowWebContents ignores destroyed windows and webContents", () => {
+    const harness = createRuntime();
+    const live = makeWindow();
+    const destroyedWindow = makeWindow();
+    const destroyedContents = makeWindow();
+
+    destroyedWindow.destroyed = true;
+    destroyedContents.webContents.destroyed = true;
+
+    assert.equal(harness.runtime.reloadWindowWebContents(live), true);
+    assert.equal(harness.runtime.reloadWindowWebContents(destroyedWindow), false);
+    assert.equal(harness.runtime.reloadWindowWebContents(destroyedContents), false);
+    assert.deepStrictEqual(live.calls, [["reload"]]);
+    assert.deepStrictEqual(destroyedWindow.calls, []);
+    assert.deepStrictEqual(destroyedContents.calls, []);
+  });
+
+  it("uses safe reload helpers for pet render-process-gone handlers", () => {
+    const runtimeSource = fs.readFileSync(path.join(SRC_DIR, "pet-window-runtime.js"), "utf8");
+    const mainSource = fs.readFileSync(path.join(SRC_DIR, "main.js"), "utf8");
+
+    assert.match(runtimeSource, /reloadWindowWebContents\(hitWin\)/);
+    assert.match(mainSource, /petWindowRuntime\.reloadWindowWebContents\(ownedHitWin\)/);
+    assert.match(mainSource, /petWindowRuntime\.reloadWindowWebContents\(win\)/);
+    assert.doesNotMatch(mainSource, /ownedHitWin\.webContents\.reload\(\)/);
   });
 
   it("creates the render window as non-focusable and materializes the initial virtual bounds", () => {
@@ -429,5 +458,56 @@ describe("pet-window-runtime", () => {
     assert.ok(harness.calls.some((call) => call[0] === "reassertWinTopmost"));
     assert.ok(harness.calls.some((call) => call[0] === "scheduleHwndRecovery"));
     assert.ok(harness.calls.some((call) => call[0] === "flushRuntimeStateToPrefs"));
+  });
+});
+
+describe("pet-window-runtime setPetHidden contract (#416)", () => {
+  it("hides the pet and reports a real change", () => {
+    const h = createRuntime();
+    const r = h.runtime.setPetHidden(true);
+    assert.deepEqual(r, { applied: true, deferred: false, changed: true });
+    assert.equal(h.runtime.isPetHidden(), true);
+    assert.ok(h.renderWin.calls.some((c) => c[0] === "hide"));
+  });
+
+  it("is idempotent when already in the target state", () => {
+    const h = createRuntime();
+    h.runtime.setPetHidden(true);
+    const before = h.renderWin.calls.length;
+    const r = h.runtime.setPetHidden(true);
+    assert.deepEqual(r, { applied: true, deferred: false, changed: false });
+    assert.equal(h.renderWin.calls.length, before);
+  });
+
+  it("shows the pet again", () => {
+    const h = createRuntime();
+    h.runtime.setPetHidden(true);
+    const r = h.runtime.setPetHidden(false);
+    assert.deepEqual(r, { applied: true, deferred: false, changed: true });
+    assert.equal(h.runtime.isPetHidden(), false);
+    assert.ok(h.renderWin.calls.some((c) => c[0] === "showInactive"));
+  });
+
+  it("defers without changing state during a mini transition", () => {
+    const h = createRuntime({ miniTransitioning: true });
+    const r = h.runtime.setPetHidden(true);
+    assert.deepEqual(r, { applied: false, deferred: true, changed: false });
+    assert.equal(h.runtime.isPetHidden(), false);
+  });
+
+  it("reports not-applied when the render window is gone", () => {
+    const h = createRuntime();
+    h.renderWin.destroyed = true;
+    const r = h.runtime.setPetHidden(true);
+    assert.deepEqual(r, { applied: false, deferred: false, changed: false });
+  });
+
+  it("togglePetVisibility flips state through setPetHidden", () => {
+    const h = createRuntime();
+    assert.equal(h.runtime.isPetHidden(), false);
+    h.runtime.togglePetVisibility();
+    assert.equal(h.runtime.isPetHidden(), true);
+    h.runtime.togglePetVisibility();
+    assert.equal(h.runtime.isPetHidden(), false);
   });
 });

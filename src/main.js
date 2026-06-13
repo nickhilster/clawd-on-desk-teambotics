@@ -1,4 +1,5 @@
 const { app, BrowserWindow, screen, ipcMain, globalShortcut, nativeTheme, dialog, shell, nativeImage, powerSaveBlocker, clipboard } = require("electron");
+const { clampTextScale, scaleWidth, scaleHeight, resolveTextScaleForKey } = require("./text-scale");
 const path = require("path");
 const fs = require("fs");
 const { EventEmitter } = require("events");
@@ -14,6 +15,8 @@ const { registerSettingsIpc } = require("./settings-ipc");
 const createSettingsEffectRouter = require("./settings-effect-router");
 const { registerSessionIpc } = require("./session-ipc");
 const { registerPetInteractionIpc } = require("./pet-interaction-ipc");
+const { launchClaudeSession, openTerminalAt } = require("./launch-claude");
+const { dialog: electronDialog } = require("electron");
 const initPermission = require("./permission");
 const { registerPermissionIpc } = initPermission;
 const { createTelegramApprovalSidecar } = require("./telegram-approval-sidecar");
@@ -25,6 +28,7 @@ const {
   formatTelegramStatusDiagnostic,
 } = require("./telegram-approval-runtime-status");
 const { createTelegramMigrationController } = require("./telegram-migration-controller");
+const { createTelegramSidecarStatusBridge } = require("./telegram-sidecar-status-bridge");
 const initUpdateBubble = require("./update-bubble");
 const { registerUpdateBubbleIpc } = initUpdateBubble;
 const createSettingsAnimationOverridesMain = require("./settings-animation-overrides-main");
@@ -48,6 +52,7 @@ const createThemeRuntime = require("./theme-runtime");
 const createAgentRuntimeMain = require("./agent-runtime-main");
 const createFloatingWindowRuntime = require("./floating-window-runtime");
 const createPetWindowRuntime = require("./pet-window-runtime");
+const createMacHideController = require("./mac-hide");
 const { createHardwareBuddyAdapter } = require("./hardware-buddy-adapter");
 const {
   getFocusableLocalHudSessionIds: selectFocusableLocalHudSessionIds,
@@ -243,6 +248,7 @@ const _settingsController = createSettingsController({
   injectedDeps: {
     installAutoStart: _installAutoStartHook,
     uninstallAutoStart: _uninstallAutoStartHook,
+    resolveTextScaleDisplayKey: () => getSettingsDisplayKey(),
     syncClaudeHooksNow: () => {
       const { registerHooksAsync } = require("../hooks/install.js");
       return registerHooksAsync({ silent: true, autoStart: autoStartWithClaude, port: getHookServerPort() });
@@ -257,6 +263,7 @@ const _settingsController = createSettingsController({
     repairIntegrationForAgent: (id, options) =>
       agentRuntime ? agentRuntime.repairIntegrationForAgent(id, options) : false,
     stopIntegrationForAgent: (id) => agentRuntime ? agentRuntime.stopIntegrationForAgent(id) : false,
+    uninstallIntegrationForAgent: (id) => agentRuntime ? agentRuntime.uninstallIntegrationForAgent(id) : false,
     cleanupIntegrations: (options = {}) => {
       const { cleanupIntegrations } = require("../hooks/cleanup-integrations.js");
       return cleanupIntegrations({ ...options, backup: true, silent: true });
@@ -266,7 +273,7 @@ const _settingsController = createSettingsController({
       : false,
     restartClawd: _restartClawdNow,
     clearSessionsByAgent: (id) => agentRuntime ? agentRuntime.clearSessionsByAgent(id) : 0,
-    dismissPermissionsByAgent: (id) => agentRuntime ? agentRuntime.dismissPermissionsByAgent(id) : 0,
+    dismissPermissionsByAgent: (id, options) => agentRuntime ? agentRuntime.dismissPermissionsByAgent(id, options) : 0,
     resizePet: _deferredResizePet,
     getActiveSessionAliasKeys: () =>
       _state && typeof _state.getActiveSessionAliasKeys === "function"
@@ -444,11 +451,17 @@ const settingsWindowRuntime = createSettingsWindowRuntime({
   path,
   getPetWindowBounds: () => getPetWindowBounds(),
   getNearestWorkArea: (cx, cy) => getNearestWorkArea(cx, cy),
+  getTextScale: () => effectiveTextScaleForKey(getSettingsDisplayKey()),
   onBeforeCreate: () => bumpAnimationOverridePreviewPosterGeneration(),
   onBeforeClosed: () => {
     bumpAnimationOverridePreviewPosterGeneration();
     if (shortcutRuntime) shortcutRuntime.stopRecording();
     void settingsSizePreviewSession.cleanup();
+    // The renderer-side rollback (slider blur / control dispose) rides IPC
+    // and can't be trusted while the window is being torn down — without
+    // this, closing mid-drag leaves the transient preview scale applied to
+    // the display until the next commit or restart.
+    endTextScalePreview();
   },
   onAfterClosed: () => maybeDestroyIdleAnimationPreviewPosterWindow(),
 });
@@ -669,6 +682,7 @@ let bubbleFollowPet = _settingsController.get("bubbleFollowPet");
 let sessionHudEnabled = _settingsController.get("sessionHudEnabled");
 let sessionHudShowStateLabels = _settingsController.get("sessionHudShowStateLabels");
 let sessionHudShowElapsed = _settingsController.get("sessionHudShowElapsed");
+let sessionHudShowContextUsage = _settingsController.get("sessionHudShowContextUsage");
 let sessionHudCleanupDetached = _settingsController.get("sessionHudCleanupDetached");
 let sessionHudPinned = _settingsController.get("sessionHudPinned");
 let sessionStaleMs = _settingsController.get("sessionStaleMs");
@@ -679,7 +693,108 @@ let soundVolume = _settingsController.get("soundVolume");
 let lowPowerIdleMode = _settingsController.get("lowPowerIdleMode");
 let keepAwakeWhileWorking = _settingsController.get("keepAwakeWhileWorking");
 let allowEdgePinningCached = _settingsController.get("allowEdgePinning");
+let disableMiniModeCached = _settingsController.get("disableMiniMode");
 let keepSizeAcrossDisplaysCached = _settingsController.get("keepSizeAcrossDisplays");
+let textScale = _settingsController.get("textScale");
+let textScaleByDisplay = _settingsController.get("textScaleByDisplay");
+// Transient slider-drag override for ONE display — the one the settings
+// window sits on (what you see is what you tune). Applied to live windows but
+// never written to the store; cleared on commit (mirror setters) or rollback
+// (endTextScalePreview).
+let textScalePreview = null; // { key: string, value: number }
+
+function getDisplayKeyForBounds(bounds) {
+  if (!bounds) return null;
+  try {
+    const display = screen.getDisplayMatching(bounds);
+    return display && display.id != null ? String(display.id) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getPetDisplayKey() {
+  // Resolve from the pet's CENTER POINT, not the window rect: the pet windows
+  // use enableLargerThanScreen and can overhang display edges, which makes
+  // getDisplayMatching unstable. Nearest-point matches the same anchor the
+  // bubble/HUD geometry uses (getNearestWorkArea of the pet center), so the
+  // zoom value and the layout always agree on which display they are on.
+  try {
+    const bounds = getPetWindowBounds();
+    if (!bounds) return null;
+    const point = {
+      x: Math.round(bounds.x + bounds.width / 2),
+      y: Math.round(bounds.y + bounds.height / 2),
+    };
+    const display = screen.getDisplayNearestPoint(point);
+    return display && display.id != null ? String(display.id) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getWindowDisplayKey(win) {
+  if (!win || typeof win.isDestroyed !== "function" || win.isDestroyed()) return null;
+  try { return getDisplayKeyForBounds(win.getBounds()); } catch { return null; }
+}
+
+function getSettingsDisplayKey() {
+  return getWindowDisplayKey(settingsWindowRuntime.getWindow()) || getPetDisplayKey();
+}
+
+function effectiveTextScaleForKey(key) {
+  if (textScalePreview && key && textScalePreview.key === key) {
+    return clampTextScale(textScalePreview.value);
+  }
+  return resolveTextScaleForKey(textScaleByDisplay, textScale, key);
+}
+
+// Pet-anchored floating windows (permission bubbles, update bubble, session
+// HUD) all read the scale of whichever display the pet is on right now.
+function getTextScaleForPetWindows() {
+  return effectiveTextScaleForKey(getPetDisplayKey());
+}
+
+// textScale changed (commit, preview tick, or display change): the resizable
+// windows re-zoom themselves against their own display, and the pet-anchored
+// floating windows re-resolve scale + re-inject zoom inside their reposition
+// paths (applyZoomToWindow memoizes, so this is cheap to call broadly).
+function applyTextScaleNow() {
+  try {
+    if (settingsWindowRuntime && typeof settingsWindowRuntime.applyTextScaleToWindow === "function") {
+      settingsWindowRuntime.applyTextScaleToWindow();
+    }
+  } catch (err) {
+    console.warn("Clawd: settings window text scale failed:", err && err.message);
+  }
+  try {
+    if (_dashboard && typeof _dashboard.applyTextScaleToWindow === "function") {
+      _dashboard.applyTextScaleToWindow();
+    }
+  } catch (err) {
+    console.warn("Clawd: dashboard text scale failed:", err && err.message);
+  }
+  repositionAnchoredFloatingSurfaces();
+}
+
+function previewTextScale(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    textScalePreview = null;
+  } else {
+    const key = getSettingsDisplayKey();
+    textScalePreview = key ? { key, value: clampTextScale(n) } : null;
+  }
+  applyTextScaleNow();
+  return { status: "ok" };
+}
+
+function endTextScalePreview() {
+  if (!textScalePreview) return { status: "ok", noop: true };
+  textScalePreview = null;
+  applyTextScaleNow();
+  return { status: "ok" };
+}
 
 function getRuntimeBubblePolicy(kind) {
   return getBubblePolicy(_settingsController.getSnapshot(), kind);
@@ -689,8 +804,25 @@ function getAllBubblesHidden() {
   return isAllBubblesHidden(_settingsController.getSnapshot());
 }
 
-function togglePetVisibility() { return petWindowRuntime.togglePetVisibility(); }
-function bringPetToPrimaryDisplay() { return petWindowRuntime.bringPetToPrimaryDisplay(); }
+let macHideController = null; // macOS app-hidden ↔ pet visibility bridge (#416); created in whenReady
+// Shared mac prep for any manual "show / move the pet" entry point (tray,
+// shortcut, bring-to-primary): release OS-hide ownership so a later
+// activate/unhide won't falsely restore, and if the app is OS-hidden, unhide it
+// first to avoid a "window shown but app still hidden" limbo.
+function prepManualPetVisibility() {
+  if (macHideController) macHideController.noteManualChange();
+  if (isMac && petWindowRuntime.isPetHidden() && typeof app.isHidden === "function" && app.isHidden()) {
+    try { app.show(); } catch (_) {}
+  }
+}
+function togglePetVisibility() {
+  prepManualPetVisibility();
+  return petWindowRuntime.togglePetVisibility();
+}
+function bringPetToPrimaryDisplay() {
+  prepManualPetVisibility();
+  return petWindowRuntime.bringPetToPrimaryDisplay();
+}
 
 function sendToRenderer(channel, ...args) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
@@ -965,9 +1097,11 @@ const {
 const {
   isAgentEnabled: _isAgentEnabled,
   isAgentPermissionsEnabled: _isAgentPermissionsEnabled,
+  isAgentSubagentPermissionsEnabled: _isAgentSubagentPermissionsEnabled,
   isAgentNotificationHookEnabled: _isAgentNotificationHookEnabled,
   isCodexNativeNotificationSoundEnabled: _isCodexNativeNotificationSoundEnabled,
   isCodexPermissionInterceptEnabled: _isCodexPermissionInterceptEnabled,
+  shouldSyncAgentIntegration: _shouldSyncAgentIntegration,
 } = require("./agent-gate");
 const _permCtx = {
   get win() { return win; },
@@ -983,10 +1117,18 @@ const _permCtx = {
   getNearestWorkArea,
   getHitRectScreen,
   getHudReservedOffset: () => getSessionHudReservedOffset(),
+  getTextScale: () => getTextScaleForPetWindows(),
   guardAlwaysOnTop,
   reapplyMacVisibility,
   isAgentPermissionsEnabled: (agentId) =>
     _isAgentPermissionsEnabled({ agents: _settingsController.get("agents") }, agentId),
+  // DANGER "auto-pilot": when true, showPermissionBubble auto-approves every
+  // request instead of rendering a bubble. DND / per-agent / headless gates
+  // run earlier in the route, so they still win — this only fires once a
+  // bubble would otherwise show. Headless fallback stays agent-specific
+  // (no-decision/native fallback, opencode silent TUI fallback, or CC deny).
+  isAutoApproveAllEnabled: () =>
+    _settingsController.get("autoApproveAllPermissions") === true,
   focusTerminalForSession: (sessionId, options = {}) => {
     focusDashboardSession(sessionId, {
       requestSource: options.requestSource || "permission-bubble",
@@ -1047,6 +1189,7 @@ const _updateBubbleCtx = {
   getUpdateBubbleAnchorRect,
   getHitRectScreen,
   getHudReservedOffset: () => getSessionHudReservedOffset(),
+  getTextScale: () => getTextScaleForPetWindows(),
   guardAlwaysOnTop,
   reapplyMacVisibility,
 };
@@ -1149,6 +1292,7 @@ const _stateCtx = {
     if (telegramCompanion) {
       try { telegramCompanion.onSnapshot(snapshot); } catch {}
     }
+    if (_lanWss) { try { _lanWss.onSnapshot(); } catch {} }
   },
   // Phase 3b: 读 prefs.themeOverrides 判断某个 oneshot state 是否被用户禁用。
   // state.js gate 调这个做 early-return。不做白名单校验——settings-actions
@@ -1271,7 +1415,13 @@ const { startMainTick, resetIdleTimer } = _tick;
 
 // ── Terminal focus — delegated to src/focus.js ──
 const _focus = require("./focus")({ _allowSetForeground, focusLog });
-const { initFocusHelper, killFocusHelper, focusTerminalWindow, clearMacFocusCooldownTimer } = _focus;
+const {
+  initFocusHelper,
+  killFocusHelper,
+  focusTerminalWindow,
+  captureGhosttyTerminalId,
+  clearMacFocusCooldownTimer,
+} = _focus;
 
 function getFocusableLocalHudSessionIds() {
   if (!_state || typeof _state.buildSessionSnapshot !== "function") return [];
@@ -1286,6 +1436,7 @@ function focusTerminalSession(session, sessionId, requestSource) {
     cwd: session.cwd,
     editor: session.editor,
     pidChain: session.pidChain,
+    ghosttyTerminalId: session.ghosttyTerminalId,
     sessionId: String(sessionId),
     agentId: session.agentId,
     requestSource,
@@ -1350,6 +1501,9 @@ const _dashboard = require("./dashboard")({
   getPetWindowBounds,
   getNearestWorkArea,
   getSettingsWindow: () => settingsWindowRuntime.getWindow(),
+  getTextScale: () => effectiveTextScaleForKey(
+    getWindowDisplayKey(_dashboard ? _dashboard.getWindow() : null) || getPetDisplayKey()
+  ),
   iconPath: settingsWindowRuntime.getIconPath(),
 });
 showDashboard = _dashboard.showDashboard;
@@ -1362,6 +1516,7 @@ const _sessionHud = require("./session-hud")({
   get sessionHudEnabled() { return sessionHudEnabled; },
   get sessionHudShowStateLabels() { return sessionHudShowStateLabels; },
   get sessionHudShowElapsed() { return sessionHudShowElapsed; },
+  get sessionHudShowContextUsage() { return sessionHudShowContextUsage; },
   get sessionHudPinned() { return sessionHudPinned; },
   getMiniMode: () => _mini.getMiniMode(),
   getMiniTransitioning: () => _mini.getMiniTransitioning(),
@@ -1371,6 +1526,7 @@ const _sessionHud = require("./session-hud")({
   getHitRectScreen,
   getSessionHudAnchorRect,
   getNearestWorkArea,
+  getTextScale: () => getTextScaleForPetWindows(),
   guardAlwaysOnTop,
   reapplyMacVisibility,
   onReservedOffsetChange: () => repositionFloatingBubbles(),
@@ -1388,6 +1544,7 @@ agentRuntime = createAgentRuntimeMain({
   getPermissionRuntime: () => _perm,
   isAgentEnabled: (agentId) => _isAgentEnabled(_settingsController.getSnapshot(), agentId),
   updateSession: (sessionId, state, event, opts) => updateSession(sessionId, state, event, opts),
+  captureGhosttyTerminalId,
   showCodexNotifyBubble: (payload) => showCodexNotifyBubble(payload),
   clearCodexNotifyBubbles: (...args) => clearCodexNotifyBubbles(...args),
 });
@@ -1405,7 +1562,10 @@ const _serverCtx = {
   get STATE_SVGS() { return _state.STATE_SVGS; },
   get sessions() { return sessions; },
   isAgentEnabled: (agentId) => _isAgentEnabled({ agents: _settingsController.get("agents") }, agentId),
+  shouldSyncAgentIntegration: (agentId) =>
+    _shouldSyncAgentIntegration({ agents: _settingsController.get("agents") }, agentId),
   isAgentPermissionsEnabled: (agentId) => _isAgentPermissionsEnabled({ agents: _settingsController.get("agents") }, agentId),
+  isAgentSubagentPermissionsEnabled: (agentId) => _isAgentSubagentPermissionsEnabled({ agents: _settingsController.get("agents") }, agentId),
   isCodexNativeNotificationSoundEnabled: () => _isCodexNativeNotificationSoundEnabled({ agents: _settingsController.get("agents") }),
   isCodexPermissionInterceptEnabled: () => _isCodexPermissionInterceptEnabled({ agents: _settingsController.get("agents") }),
   codexSubagentClassifier: agentRuntime.getCodexSubagentClassifier(),
@@ -1422,6 +1582,17 @@ const _serverCtx = {
 };
 const _server = require("./server")(_serverCtx);
 const { startHttpServer, getHookServerPort } = _server;
+
+// ── LAN WebSocket bridge for PWA mobile clients (lazy-loaded) ──
+let _lanWss = null;
+if (_settingsController.get("mobilePreviewEnabled") === true) {
+  const { initMobilePreviewServer } = require("./network/mobile-preview-server");
+  _lanWss = initMobilePreviewServer({
+    sessions,
+    getSettingsSnapshot: () => _settingsController.getSnapshot(),
+    isEnabled: () => _settingsController.get("mobilePreviewEnabled") === true,
+  });
+}
 
 function updateLog(msg) {
   if (!updateDebugLog) return;
@@ -1763,6 +1934,26 @@ async function deleteTelegramApprovalTokenFile() {
   }
 }
 
+// Bridge a freshly-created legacy sidecar's status-changed stream into the
+// migration controller. A new bridge per instance keeps everReady/dedupe state
+// scoped to that process; the controller is referenced lazily because it may be
+// created after the first sidecar (init drives the first start).
+function attachTelegramSidecarStatusBridge(sidecar) {
+  if (!sidecar || typeof sidecar.on !== "function") return;
+  const bridge = createTelegramSidecarStatusBridge({
+    getSnapshot: () => (_telegramMigrationController
+      && typeof _telegramMigrationController.getSnapshot === "function"
+      ? _telegramMigrationController.getSnapshot()
+      : null),
+    dispatch: (event) => (_telegramMigrationController
+      && typeof _telegramMigrationController.dispatch === "function"
+      ? _telegramMigrationController.dispatch(event)
+      : Promise.resolve()),
+    log: telegramApprovalLog,
+  });
+  sidecar.on("status-changed", (status) => bridge.onStatusChanged(status));
+}
+
 async function startTelegramApprovalSidecar() {
   const config = getTelegramApprovalPrefs();
   const paths = getTelegramApprovalPaths();
@@ -1820,6 +2011,7 @@ async function startTelegramApprovalSidecar() {
     redactionSecrets: telegramApprovalSettings.redactionSecretsForTelegramApproval(config),
     log: telegramApprovalLog,
   });
+  attachTelegramSidecarStatusBridge(telegramApprovalSidecar);
   telegramApprovalConfigSignature = signature;
   const sidecar = telegramApprovalSidecar;
   try {
@@ -1866,6 +2058,7 @@ async function initTelegramMigrationController() {
     createWindowsPasteOnlyDeliveryAdapter,
   } = require("./telegram-direct-send");
   const { createTelegramNativeRunner } = require("./telegram-native-runner");
+  const { createTelegramFetchTransport } = require("./telegram-fetch-transport");
   const tokenStore = envFileTokenStore({ filePath: paths.tokenEnvFilePath });
   telegramDirectSend = createTelegramDirectSend({
     getSessionSnapshot: () => _state && typeof _state.buildSessionSnapshot === "function"
@@ -1873,7 +2066,10 @@ async function initTelegramMigrationController() {
       : { sessions: [] },
     getPendingPermissions: () => pendingPermissions,
     focusSession: (sessionId, options) => focusDashboardSession(sessionId, options),
-    deliveryAdapter: isWin ? createWindowsPasteOnlyDeliveryAdapter({ clipboard }) : undefined,
+    deliveryAdapter: createWindowsPasteOnlyDeliveryAdapter({
+      clipboard,
+      restoreClipboardOnSuccess: true,
+    }),
     fallbackAdapter: createClipboardFallbackDeliveryAdapter({ clipboard }),
     isEnabled: () => {
       const snap = _telegramMigrationController && typeof _telegramMigrationController.getSnapshot === "function"
@@ -1887,7 +2083,14 @@ async function initTelegramMigrationController() {
   });
   const nativeRunner = createTelegramNativeRunner({
     tokenStore,
-    transport: makeFetchTransport({ tokenStore }),
+    // issue #359: route the bot's HTTP through Electron's Chromium net stack so
+    // it follows the OS system proxy (and PAC/SOCKS), instead of Node's global
+    // fetch which ignores system/env proxy. Dedicated in-memory session.
+    transport: createTelegramFetchTransport({
+      tokenStore,
+      sessionFactory: () => require("electron").session.fromPartition("clawd-telegram", { cache: false }),
+      log: telegramApprovalLog,
+    }),
     getDispatch: () => _telegramMigrationController && _telegramMigrationController.dispatch,
     getChatId: () => {
       const cfg = getTelegramApprovalPrefs();
@@ -1926,7 +2129,7 @@ async function initTelegramMigrationController() {
   telegramCompanion = createTelegramCompanion({
     getClient: () => getTelegramCompanionClient(),
     getLang: () => _settingsController.get("lang") || lang || "en",
-    getCompletionOutputMode: () => getTelegramApprovalPrefs().completionOutputMode || "full",
+    getCompletionOutputMode: () => getTelegramApprovalPrefs().completionOutputMode || "off",
     getNotifyOnComplete: () => getTelegramApprovalPrefs().notifyOnComplete === true,
     // Native-active client present. The companion still advances its dedupe map
     // while native is inactive, and internally decides whether to send a bare
@@ -1964,46 +2167,6 @@ async function initTelegramMigrationController() {
 
   await _telegramMigrationController.init();
   return _telegramMigrationController;
-}
-
-// Minimal fetch-based transport for the native client. Closes over the token
-// (no per-call token argument) so logging or debug serialization of request
-// args cannot leak the secret.
-function makeFetchTransport({ tokenStore }) {
-  return async ({ method, payload, signal }) => {
-    const token = await tokenStore.getToken();
-    if (!token) {
-      return { ok: false, status: null, error_code: "TOKEN_MISSING", description: "no token" };
-    }
-    const url = `https://api.telegram.org/bot${token}/${method}`;
-    let res;
-    try {
-      res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload || {}),
-        signal,
-      });
-    } catch (err) {
-      if (err && err.name === "AbortError") throw err;
-      throw Object.assign(new Error(err && err.message ? err.message : String(err)), {
-        code: (err && (err.code || (err.cause && err.cause.code))) || undefined,
-        causeCode: err && err.cause && err.cause.code,
-      });
-    }
-    const status = res.status;
-    let body;
-    try { body = await res.json(); } catch { body = null; }
-    if (!body) return { ok: false, status, error_code: status, description: res.statusText || "" };
-    if (body.ok) return { ok: true, result: body.result };
-    return {
-      ok: false,
-      status,
-      error_code: body.error_code || status,
-      description: body.description || "",
-      parameters: body.parameters || {},
-    };
-  };
 }
 
 function stopTelegramApprovalSidecar() {
@@ -2332,6 +2495,109 @@ unsubscribeHardwareBuddySettings = _settingsController.subscribeKey("hardwareBud
 // effects that used to live inside setters (e.g.
 // `syncPermissionShortcuts()` for hideBubbles) are now reactive and live in
 // the subscriber too.
+
+async function confirmDangerousMode(t) {
+  const parent = win && !win.isDestroyed() ? win : null;
+  const result = await electronDialog.showMessageBox(parent, {
+    type: "warning",
+    buttons: [t("confirm") || "Confirm", t("cancel") || "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+    title: t("dangerousConfirmTitle") || "Confirm Dangerous Mode",
+    message: t("dangerousConfirmMessage") || "Dangerous mode skips ALL permission checks.",
+  });
+  return result.response === 0;
+}
+
+// Await launchClaudeSession and surface failures instead of swallowing them:
+// show a localized error dialog so the user knows nothing happened, and log
+// for diagnosis. Never throws.
+async function runLaunchClaudeSession(t, mode, cwd, sessionId) {
+  let res;
+  try {
+    res = await launchClaudeSession(mode, cwd, sessionId);
+  } catch (err) {
+    console.error("[launch-claude] launch threw:", err);
+    res = { ok: false, message: (err && err.message) || String(err) };
+  }
+  if (res && res.ok) return res;
+  console.error("[launch-claude] launch failed:", res && res.message);
+  try {
+    const parent = win && !win.isDestroyed() ? win : null;
+    await electronDialog.showMessageBox(parent, {
+      type: "error",
+      buttons: [t("dismiss") || "OK"],
+      title: t("newSession") || "New Session",
+      message: t("launchFailed") || "Failed to launch Claude Code.",
+      detail: (res && res.message) || "",
+    });
+  } catch (err) {
+    console.error("[launch-claude] failed to show error dialog:", err);
+  }
+  return res;
+}
+
+function showResumeInput(t) {
+  return new Promise((resolve) => {
+    // data: URL — outside the file:// zoom map, so the scale is baked into the
+    // window size and an inline body zoom instead.
+    const resumeScale = getTextScaleForPetWindows();
+    const inputWin = new BrowserWindow({
+      width: scaleWidth(420, resumeScale),
+      height: scaleHeight(180, resumeScale),
+      resizable: false,
+      alwaysOnTop: true,
+      frame: false,
+      transparent: true,
+      skipTaskbar: true,
+      parent: win && !win.isDestroyed() ? win : undefined,
+      modal: true,
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    });
+    const title = t("resumeSessionTitle") || "Resume Session";
+    const hint = t("resumeSessionHint") || "Enter Session ID";
+    const confirmLabel = t("confirm") || "OK";
+    const cancelLabel = t("dismiss") || "Cancel";
+    const html = `<!DOCTYPE html><html><head><style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{zoom:${resumeScale};font-family:system-ui,-apple-system,sans-serif;background:#1e1e2e;color:#cdd6f4;display:flex;flex-direction:column;height:calc(100vh / ${resumeScale});padding:16px;border-radius:12px;overflow:hidden}
+      .title{font-size:14px;font-weight:600;margin-bottom:12px}
+      input{width:100%;padding:8px 12px;border:1px solid #45475a;border-radius:6px;background:#313244;color:#cdd6f4;font-size:13px;outline:none}
+      input:focus{border-color:#89b4fa}
+      input::placeholder{color:#6c7086}
+      .btns{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+      button{padding:6px 16px;border:none;border-radius:6px;font-size:12px;cursor:pointer}
+      .ok{background:#89b4fa;color:#1e1e2e;font-weight:600}
+      .cancel{background:#45475a;color:#cdd6f4}
+    </style></head><body>
+      <div class="title">${title}</div>
+      <input id="sid" type="text" placeholder="${hint}" autofocus />
+      <div class="btns">
+        <button class="cancel" onclick="result(null)">${cancelLabel}</button>
+        <button class="ok" onclick="result(document.getElementById('sid').value)">${confirmLabel}</button>
+      </div>
+      <script>
+        function result(v){window._resolve(v)}
+        document.getElementById('sid').addEventListener('keydown',e=>{
+          if(e.key==='Enter')result(document.getElementById('sid').value);
+          if(e.key==='Escape')result(null);
+        });
+      </script>
+    </body></html>`;
+    inputWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    inputWin.webContents.on("did-finish-load", () => {
+      inputWin.webContents.executeJavaScript(
+        "new Promise(r=>{window._resolve=r})"
+      ).then((val) => {
+        const sessionId = typeof val === "string" ? val.trim() : "";
+        resolve(sessionId || null);
+        try { inputWin.close(); } catch {}
+      });
+    });
+    inputWin.on("closed", () => resolve(null));
+  });
+}
+
 const _menuCtx = {
   get win() { return win; },
   get sessions() { return sessions; },
@@ -2355,6 +2621,16 @@ const _menuCtx = {
   set hideBubbles(v) { _settingsController.applyCommand("setAllBubblesHidden", { hidden: !!v }).catch((err) => {
     console.warn("Clawd: setAllBubblesHidden failed:", err && err.message);
   }); },
+  get autoApproveAllPermissions() { return _settingsController.get("autoApproveAllPermissions") === true; },
+  // Route through the gated command. The menu shows its own native danger
+  // confirm before setting true, so it passes confirmed:true; disabling needs
+  // no confirmation. applyUpdate is intentionally NOT used — the field is
+  // gated so the confirm dialog is a real boundary, not UI-only.
+  set autoApproveAllPermissions(v) {
+    _settingsController.applyCommand("setAutoApproveAll", { enabled: !!v, confirmed: true }).catch((err) => {
+      console.warn("Clawd: setAutoApproveAll failed:", err && err.message);
+    });
+  },
   get soundMuted() { return soundMuted; },
   set soundMuted(v) { _settingsController.applyUpdate("soundMuted", v); },
   get soundVolume() { return soundVolume; },
@@ -2375,14 +2651,87 @@ const _menuCtx = {
   set contextMenu(v) { contextMenu = v; },
   enableDoNotDisturb: () => enableDoNotDisturb(),
   disableDoNotDisturb: () => disableDoNotDisturb(),
-  enterMiniViaMenu: () => enterMiniViaMenu(),
+  enterMiniViaMenu: () => {
+    if (!disableMiniModeCached) enterMiniViaMenu();
+  },
   exitMiniMode: () => exitMiniMode(),
+  getDisableMiniMode: () => disableMiniModeCached,
   getMiniMode: () => _mini.getMiniMode(),
   getMiniTransitioning: () => _mini.getMiniTransitioning(),
   miniHandleResize: (sizeKey) => _mini.handleResize(sizeKey),
   checkForUpdates: (...args) => checkForUpdates(...args),
   getUpdateMenuItem: () => getUpdateMenuItem(),
   openDashboard: () => showDashboard(),
+  launchClaudeSession: (mode, cwd, sessionId) => launchClaudeSession(mode, cwd, sessionId),
+  newSessionWithFolder: async (t) => {
+    const parent = win && !win.isDestroyed() ? win : null;
+    const result = await electronDialog.showOpenDialog(parent, {
+      title: t("selectFolder"),
+      properties: ["openDirectory"],
+    });
+    if (result.canceled || !result.filePaths.length) return;
+    const folder = result.filePaths[0];
+    const mode = await electronDialog.showMessageBox(parent, {
+      type: "question",
+      buttons: [t("newSessionNormal"), t("newSessionDangerous"), t("newSessionContinue"), t("newSessionResume"), t("dismiss")],
+      defaultId: 0,
+      cancelId: 4,
+      title: t("newSession"),
+      message: t("newSession"),
+      detail: folder,
+    });
+    if (mode.response === 4) return;
+    if (mode.response === 3) {
+      const sessionId = await showResumeInput(t);
+      if (!sessionId) return;
+      const resumeMode = await electronDialog.showMessageBox(parent, {
+        type: "question",
+        buttons: [t("modeNormal"), t("modeDangerous"), t("dismiss")],
+        defaultId: 0,
+        cancelId: 2,
+        title: t("newSessionResume"),
+        message: sessionId,
+      });
+      if (resumeMode.response === 2) return;
+      if (resumeMode.response === 1 && !(await confirmDangerousMode(t))) return;
+      await runLaunchClaudeSession(t, resumeMode.response === 1 ? "resume-dangerous" : "resume", folder, sessionId);
+      return;
+    }
+    if (mode.response === 1 && !(await confirmDangerousMode(t))) return;
+    const modes = ["normal", "dangerous", "continue"];
+    await runLaunchClaudeSession(t, modes[mode.response], folder);
+  },
+  newSessionInCurrentDir: async (t) => {
+    const parent = win && !win.isDestroyed() ? win : null;
+    const mode = await electronDialog.showMessageBox(parent, {
+      type: "question",
+      buttons: [t("newSessionNormal"), t("newSessionDangerous"), t("newSessionContinue"), t("newSessionResume"), t("dismiss")],
+      defaultId: 0,
+      cancelId: 4,
+      title: t("newSession"),
+      message: t("newSession"),
+    });
+    if (mode.response === 4) return;
+    if (mode.response === 3) {
+      const sessionId = await showResumeInput(t);
+      if (!sessionId) return;
+      const resumeMode = await electronDialog.showMessageBox(parent, {
+        type: "question",
+        buttons: [t("modeNormal"), t("modeDangerous"), t("dismiss")],
+        defaultId: 0,
+        cancelId: 2,
+        title: t("newSessionResume"),
+        message: sessionId,
+      });
+      if (resumeMode.response === 2) return;
+      if (resumeMode.response === 1 && !(await confirmDangerousMode(t))) return;
+      await runLaunchClaudeSession(t, resumeMode.response === 1 ? "resume-dangerous" : "resume", undefined, sessionId);
+      return;
+    }
+    if (mode.response === 1 && !(await confirmDangerousMode(t))) return;
+    const modes = ["normal", "dangerous", "continue"];
+    await runLaunchClaudeSession(t, modes[mode.response]);
+  },
   // The settings controller is the only writer of persisted prefs. Toggle
   // setters above route through it; resize/sendToDisplay use
   // flushRuntimeStateToPrefs to capture window bounds after movement.
@@ -2414,17 +2763,21 @@ const { t, buildContextMenu, buildTrayMenu, rebuildAllMenus, createTray,
 // ── Settings effect router ──
 const SETTINGS_MIRROR_SETTERS = {
   lang: (v) => { lang = v; }, size: (v) => { currentSize = v; }, showTray: (v) => { showTray = v; },
-  showDock: (v) => { showDock = v; }, manageClaudeHooksAutomatically: (v) => { manageClaudeHooksAutomatically = v; },
+  showDock: (v) => { showDock = v; if (macHideController) macHideController.noteManualChange(); }, manageClaudeHooksAutomatically: (v) => { manageClaudeHooksAutomatically = v; },
   autoStartWithClaude: (v) => { autoStartWithClaude = v; }, openAtLogin: (v) => { openAtLogin = v; },
   bubbleFollowPet: (v) => { bubbleFollowPet = v; }, sessionHudEnabled: (v) => { sessionHudEnabled = v; },
   sessionHudShowStateLabels: (v) => { sessionHudShowStateLabels = v; },
-  sessionHudShowElapsed: (v) => { sessionHudShowElapsed = v; }, sessionHudCleanupDetached: (v) => { sessionHudCleanupDetached = v; },
+  sessionHudShowElapsed: (v) => { sessionHudShowElapsed = v; },
+  sessionHudShowContextUsage: (v) => { sessionHudShowContextUsage = v; },
+  sessionHudCleanupDetached: (v) => { sessionHudCleanupDetached = v; },
   sessionHudPinned: (v) => { sessionHudPinned = v; },
   sessionStaleMs: (v) => { sessionStaleMs = v; }, workingStaleMs: (v) => { workingStaleMs = v; },
   detachedIdleStaleMs: (v) => { detachedIdleStaleMs = v; },
   soundMuted: (v) => { soundMuted = v; }, soundVolume: (v) => { soundVolume = v; }, lowPowerIdleMode: (v) => { lowPowerIdleMode = v; },
   keepAwakeWhileWorking: (v) => { keepAwakeWhileWorking = v; },
-  allowEdgePinning: (v) => { allowEdgePinningCached = v; }, keepSizeAcrossDisplays: (v) => { keepSizeAcrossDisplaysCached = v; },
+  allowEdgePinning: (v) => { allowEdgePinningCached = v; }, disableMiniMode: (v) => { disableMiniModeCached = v; }, keepSizeAcrossDisplays: (v) => { keepSizeAcrossDisplaysCached = v; },
+  textScale: (v) => { textScale = v; textScalePreview = null; },
+  textScaleByDisplay: (v) => { textScaleByDisplay = v; textScalePreview = null; },
 };
 
 function updateSettingsMirrors(changes) { for (const [key, value] of Object.entries(changes)) if (SETTINGS_MIRROR_SETTERS[key]) SETTINGS_MIRROR_SETTERS[key](value); }
@@ -2459,6 +2812,7 @@ const settingsEffectRouter = createSettingsEffectRouter({
   hideUpdateBubbleForPolicy: () => callRuntimeMethod(_updateBubble, "hideForPolicy"),
   refreshUpdateBubbleAutoClose: () => callRuntimeMethod(_updateBubble, "refreshAutoCloseForPolicy"),
   repositionFloatingBubbles,
+  applyTextScale: () => applyTextScaleNow(),
   syncSessionHudVisibility: () => syncSessionHudVisibility(),
   handleSessionHudPinnedChanged: (next) => {
     if (_sessionHud && typeof _sessionHud.handlePinnedChanged === "function") {
@@ -2466,6 +2820,8 @@ const settingsEffectRouter = createSettingsEffectRouter({
     }
   },
   reclampPetAfterEdgePinningChange,
+  exitMiniMode: () => exitMiniMode(),
+  getMiniMode: () => _mini.getMiniMode(),
   rebuildAllMenus,
   reconcilePowerSaveBlocker,
   logWarn: console.warn,
@@ -2474,6 +2830,21 @@ settingsEffectRouter.start();
 _settingsController.subscribeKey("tgApproval", () => {
   if (suppressTelegramApprovalSidecarSync > 0) return;
   queueTelegramApprovalSidecarSync("settings");
+});
+_settingsController.subscribeKey("mobilePreviewEnabled", async (enabled) => {
+  if (enabled) {
+    if (!_lanWss) {
+      const { initMobilePreviewServer } = require("./network/mobile-preview-server");
+      _lanWss = initMobilePreviewServer({
+        sessions,
+        getSettingsSnapshot: () => _settingsController.getSnapshot(),
+        isEnabled: () => _settingsController.get("mobilePreviewEnabled") === true,
+      });
+    }
+    await _lanWss.start();
+  } else if (_lanWss) {
+    _lanWss.cleanup();
+  }
 });
 
 animationOverridesMain = createSettingsAnimationOverridesMain({
@@ -2640,6 +3011,13 @@ registerSettingsIpc({
   getLang: () => lang,
   settingsSizePreviewSession,
   isValidSizePreviewKey,
+  previewTextScale,
+  endTextScalePreview,
+  getTextScaleContext: () => ({
+    percent: Math.round(
+      resolveTextScaleForKey(textScaleByDisplay, textScale, getSettingsDisplayKey()) * 100
+    ),
+  }),
   sendToRenderer,
   getDoNotDisturb: () => doNotDisturb,
   getSoundMuted: () => soundMuted,
@@ -2657,6 +3035,7 @@ registerSettingsIpc({
     : { status: "error", code: "quick_commands_unavailable", message: "Quick Commands are unavailable" },
   checkForUpdates,
   aboutHeroSvgPath: path.join(__dirname, "..", "assets", "svg", "clawd-about-hero.svg"),
+  getLanWsServer: () => _lanWss,
 });
 
 registerSessionIpc({
@@ -2680,6 +3059,7 @@ registerSessionIpc({
       console.warn("Clawd: failed to pin Session HUD:", result.message);
     }
   },
+  getLanWsServer: () => _lanWss,
 });
 
 function createWindow() {
@@ -2748,7 +3128,7 @@ function createWindow() {
     },
     onRenderProcessGone: (details, ownedHitWin) => {
       safeConsoleError("hitWin renderer crashed:", details.reason);
-      ownedHitWin.webContents.reload();
+      petWindowRuntime.reloadWindowWebContents(ownedHitWin);
     },
   });
 
@@ -2775,6 +3155,7 @@ function createWindow() {
     syncHitWin: () => syncHitWin(),
     isMiniMode: () => _mini.getMiniMode(),
     checkMiniModeSnap: () => checkMiniModeSnap(),
+    getDisableMiniMode: () => disableMiniModeCached,
     hasPetWindow: () => !!(win && !win.isDestroyed()),
     getPetWindowBounds: () => getPetWindowBounds(),
     getKeepSizeAcrossDisplays: () => keepSizeAcrossDisplaysCached,
@@ -2796,6 +3177,9 @@ function createWindow() {
         _sessionHud.revealFromPet();
       }
     },
+    statPath: (p) => fs.promises.stat(p),
+    openTerminalAt: (dir) => openTerminalAt(dir),
+    dropLog: (message) => console.log(`Clawd: ${message}`),
   });
 
   registerPermissionIpc({
@@ -2811,6 +3195,7 @@ function createWindow() {
   initFocusHelper();
   startMainTick();
   startHttpServer();
+  if (_settingsController.get("mobilePreviewEnabled") === true) _lanWss.start();
   startStaleCleanup();
   // Wait for renderer to be ready before sending initial state
   // If hooks arrived during startup, respect them instead of forcing idle
@@ -2832,7 +3217,7 @@ function createWindow() {
     petWindowRuntime.setDragLocked(false);
     idlePaused = false;
     mouseOverPet = false;
-    win.webContents.reload();
+    petWindowRuntime.reloadWindowWebContents(win);
   });
 
   guardAlwaysOnTop(win);
@@ -2841,6 +3226,21 @@ function createWindow() {
   screen.on("display-metrics-changed", () => petWindowRuntime.handleDisplayMetricsChanged());
   screen.on("display-removed", () => petWindowRuntime.handleDisplayRemoved());
   screen.on("display-added", () => petWindowRuntime.handleDisplayAdded());
+
+  // textScale is per-display: when the topology changes, window→display
+  // mappings (and therefore effective scales) can change wholesale. Debounced
+  // because these events arrive in bursts during reconnects.
+  let textScaleTopologyTimer = null;
+  const reapplyTextScaleAfterTopologyChange = () => {
+    if (textScaleTopologyTimer) clearTimeout(textScaleTopologyTimer);
+    textScaleTopologyTimer = setTimeout(() => {
+      textScaleTopologyTimer = null;
+      applyTextScaleNow();
+    }, 400);
+  };
+  screen.on("display-metrics-changed", reapplyTextScaleAfterTopologyChange);
+  screen.on("display-removed", reapplyTextScaleAfterTopologyChange);
+  screen.on("display-added", reapplyTextScaleAfterTopologyChange);
 }
 
 // Read primary display safely — getPrimaryDisplay() can also throw during
@@ -3010,6 +3410,19 @@ if (!gotTheLock) {
   }
 
   app.whenReady().then(() => {
+    // macOS: override the dock icon with a version padded to the macOS icon
+    // grid (~80.5% of the canvas, ~100px transparent margin per side) so the
+    // Dock tile matches neighbor apps. The build-time icon.png sits ~72.6%
+    // (looks small); the earlier full-bleed dock-icon.png looked oversized
+    // (issue #416). Source preserved at assets/source/dock-icon-fullbleed.png.
+    if (isMac && app.dock && _settingsController.get("showDock") !== false) {
+      try {
+        app.dock.setIcon(path.join(__dirname, "..", "assets", "dock-icon.png"));
+      } catch (_) {
+        // non-fatal: fall back to the bundled icon
+      }
+    }
+
     const protocolRegistered = codexPetMain.registerProtocolClient();
     if (process.argv.includes(REGISTER_PROTOCOL_DEV_ARG)) {
       console.log(`Clawd: clawd:// dev protocol registration ${protocolRegistered ? "succeeded" : "failed"}`);
@@ -3030,6 +3443,21 @@ if (!gotTheLock) {
       console.warn("Clawd: migration controller init failed:", err && err.message);
     });
     createWindow();
+    // macOS: bridge the OS app-hidden state (⌘H / Dock right-click → 隐藏) to the
+    // pet. Pet windows are setCanHide:NO, so the OS marks the app hidden but the
+    // windows refuse to vanish, and an inactive-app Dock Hide fires no
+    // did-resign-active — so we poll app.isHidden() and drive setPetHidden(). (#416)
+    if (isMac) {
+      macHideController = createMacHideController({
+        isMac,
+        app,
+        getShowDock: () => showDock,
+        isPetHidden: () => petWindowRuntime.isPetHidden(),
+        setPetHidden: (hidden) => petWindowRuntime.setPetHidden(hidden),
+      });
+      macHideController.start();
+      app.on("activate", () => { if (macHideController) macHideController.onActivate(); });
+    }
     if (shouldOpenSettingsWindowFromArgv(process.argv)) {
       settingsWindowRuntime.open();
     }
@@ -3085,10 +3513,12 @@ if (!gotTheLock) {
     if (hardwareBuddyAdapter) hardwareBuddyAdapter.stop();
     _perm.cleanup();
     _server.cleanup();
+    if (_lanWss) _lanWss.cleanup();
     _updateBubble.cleanup();
     _state.cleanup();
     _tick.cleanup();
     _mini.cleanup();
+    if (macHideController) macHideController.stop();
     _sessionHud.cleanup();
     agentRuntime.cleanup();
     topmostRuntime.cleanup();

@@ -7,8 +7,10 @@ function buildSettingsAgentOrderExports() {
     "gemini-cli",
     "kimi-cli",
     "qwen-code",
+    "codewhale",
     "opencode",
     "codebuddy",
+    "qoder",
   ];
 
   const NON_COLLAPSIBLE_AGENT_PRIORITY = [

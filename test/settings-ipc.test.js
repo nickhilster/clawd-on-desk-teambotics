@@ -188,12 +188,14 @@ function createHarness(overrides = {}) {
     getSoundMuted: overrides.getSoundMuted || (() => false),
     getSoundVolume: overrides.getSoundVolume || (() => 0.4),
     getAllAgents: overrides.getAllAgents || (() => []),
+    detectAgentInstallations: overrides.detectAgentInstallations,
     getHardwareBuddyStatus: overrides.getHardwareBuddyStatus || (() => null),
     testHardwareBuddyApproval: overrides.testHardwareBuddyApproval,
     getQuickCommandPresets: overrides.getQuickCommandPresets,
     sendQuickCommand: overrides.sendQuickCommand,
     checkForUpdates: (manual) => calls.push(["checkForUpdates", manual]),
     aboutHeroSvgPath: overrides.aboutHeroSvgPath || path.join(__dirname, "missing-about-hero.svg"),
+    getLanWsServer: overrides.getLanWsServer || (() => null),
     now: overrides.now || (() => 12345),
   });
   return { ipcMain, runtime, calls, activeTheme };
@@ -205,6 +207,7 @@ test("settings IPC registers owned channels and leaves animation override channe
   assert.ok(ipcMain.handlers.has("settings:get-snapshot"));
   assert.ok(ipcMain.handlers.has("settings:pick-sound-file"));
   assert.ok(ipcMain.handlers.has("settings:list-themes"));
+  assert.ok(ipcMain.handlers.has("settings:detect-agent-installations"));
   assert.ok(ipcMain.handlers.has("settings:test-hardware-buddy-approval"));
   assert.ok(ipcMain.handlers.has("settings:get-quick-command-presets"));
   assert.ok(ipcMain.handlers.has("settings:send-quick-command"));
@@ -228,6 +231,44 @@ test("settings IPC registers owned channels and leaves animation override channe
   assert.strictEqual(ipcMain.listeners.size, 0);
 });
 
+test("mobile connection info reports starting until the LAN bridge has a port", async () => {
+  const token = "0123456789abcdef0123456789abcdef";
+  const { ipcMain, runtime } = createHarness({
+    getLanWsServer: () => ({
+      getPort: () => null,
+      getToken: () => token,
+    }),
+  });
+
+  const result = await ipcMain.invoke("settings:mobile-connection-info");
+
+  assert.deepStrictEqual(result, {
+    status: "starting",
+    message: "LAN bridge is starting",
+  });
+  runtime.dispose();
+});
+
+test("mobile connection info returns a ready pair URL only when port and token are available", async () => {
+  const token = "0123456789abcdef0123456789abcdef";
+  const { ipcMain, runtime } = createHarness({
+    getLanWsServer: () => ({
+      getPort: () => 23334,
+      getToken: () => token,
+    }),
+  });
+
+  const result = await ipcMain.invoke("settings:mobile-connection-info");
+
+  assert.strictEqual(result.status, "ok");
+  assert.strictEqual(result.port, 23334);
+  assert.strictEqual(result.token, token);
+  assert.ok(result.pairUrl.includes("port=23334"));
+  assert.ok(result.pairUrl.includes(`token=${token}`));
+  assert.ok(!result.pairUrl.includes("port=null"));
+  runtime.dispose();
+});
+
 test("settings IPC delegates controller and size preview handlers", async () => {
   const { ipcMain, calls } = createHarness();
 
@@ -244,6 +285,10 @@ test("settings IPC delegates controller and size preview handlers", async () => 
   assert.deepStrictEqual(await ipcMain.invoke("settings:update", { key: "tgMigration", value: { transport: "native" } }), {
     status: "error",
     message: "tgMigration is internal; use telegramMigration.dispatch",
+  });
+  assert.deepStrictEqual(await ipcMain.invoke("settings:update", { key: "autoApproveAllPermissions", value: true }), {
+    status: "error",
+    message: "autoApproveAllPermissions is gated; use the setAutoApproveAll command",
   });
   assert.deepStrictEqual(await ipcMain.invoke("settings:command", { action: "resizePet", payload: "P:30" }), {
     status: "ok",
@@ -653,4 +698,31 @@ test("settings IPC serves agent/about/update/external and remove-theme dialog he
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("settings IPC exposes read-only agent installation detection", async () => {
+  let sawFs = false;
+  let sawPath = false;
+  const { ipcMain, runtime } = createHarness({
+    now: () => 777,
+    detectAgentInstallations: (options) => {
+      sawFs = !!options.fs;
+      sawPath = !!options.path;
+      return {
+        checkedAt: options.now(),
+        agents: [{ agentId: "qwen-code", detectedInstalled: true }],
+        skippedAgentIds: ["claude-code", "codex"],
+      };
+    },
+  });
+
+  assert.deepStrictEqual(await ipcMain.invoke("settings:detect-agent-installations"), {
+    checkedAt: 777,
+    agents: [{ agentId: "qwen-code", detectedInstalled: true }],
+    skippedAgentIds: ["claude-code", "codex"],
+  });
+  assert.strictEqual(sawFs, true);
+  assert.strictEqual(sawPath, true);
+
+  runtime.dispose();
 });

@@ -58,6 +58,7 @@ function createHarness(options = {}) {
     hideUpdateBubbleForPolicy: () => calls.push(["hideUpdateBubbleForPolicy"]),
     refreshUpdateBubbleAutoClose: () => calls.push(["refreshUpdateBubbleAutoClose"]),
     repositionFloatingBubbles: () => calls.push(["repositionFloatingBubbles"]),
+    applyTextScale: () => calls.push(["applyTextScale"]),
     syncSessionHudVisibility: () => calls.push(["syncSessionHudVisibility"]),
     handleSessionHudPinnedChanged: (next) => calls.push(["handleSessionHudPinnedChanged", next]),
     reclampPetAfterEdgePinningChange: () => calls.push(["reclampPetAfterEdgePinningChange"]),
@@ -141,6 +142,23 @@ describe("settings-effect-router", () => {
     ]);
   });
 
+  it("routes textScale and textScaleByDisplay changes to applyTextScale without a menu rebuild", () => {
+    const { calls, emit } = createHarness();
+
+    emit({ textScale: 1.25 });
+    assert.deepStrictEqual(calls, [
+      ["updateMirrors", { textScale: 1.25 }],
+      ["applyTextScale"],
+    ]);
+
+    calls.length = 0;
+    emit({ textScaleByDisplay: { "1": 1.35 } });
+    assert.deepStrictEqual(calls, [
+      ["updateMirrors", { textScaleByDisplay: { "1": 1.35 } }],
+      ["applyTextScale"],
+    ]);
+  });
+
   it("reconciles the power save blocker when keepAwakeWhileWorking changes", () => {
     const { calls, emit } = createHarness();
 
@@ -182,6 +200,14 @@ describe("settings-effect-router", () => {
     emit({ sessionHudShowStateLabels: false });
     assert.deepStrictEqual(calls, [
       ["updateMirrors", { sessionHudShowStateLabels: false }],
+      ["syncSessionHudVisibility"],
+      ["repositionFloatingBubbles"],
+    ]);
+
+    calls.length = 0;
+    emit({ sessionHudShowContextUsage: false });
+    assert.deepStrictEqual(calls, [
+      ["updateMirrors", { sessionHudShowContextUsage: false }],
       ["syncSessionHudVisibility"],
       ["repositionFloatingBubbles"],
     ]);
@@ -236,6 +262,39 @@ describe("settings-effect-router", () => {
     assert.deepStrictEqual(calls, [
       ["updateMirrors", { allowEdgePinning: false }],
       ["reclampPetAfterEdgePinningChange"],
+    ]);
+  });
+
+  it("exits current mini mode when mini mode is disabled", () => {
+    const { calls, emit } = createHarness({
+      routerOptions: {
+        getMiniMode: () => true,
+        exitMiniMode: () => calls.push(["exitMiniMode"]),
+      },
+    });
+
+    emit({ disableMiniMode: true });
+
+    assert.deepStrictEqual(calls, [
+      ["updateMirrors", { disableMiniMode: true }],
+      ["exitMiniMode"],
+      ["rebuildAllMenus"],
+    ]);
+  });
+
+  it("does not enter mini mode when mini mode is re-enabled", () => {
+    const { calls, emit } = createHarness({
+      routerOptions: {
+        getMiniMode: () => false,
+        exitMiniMode: () => calls.push(["exitMiniMode"]),
+      },
+    });
+
+    emit({ disableMiniMode: false });
+
+    assert.deepStrictEqual(calls, [
+      ["updateMirrors", { disableMiniMode: false }],
+      ["rebuildAllMenus"],
     ]);
   });
 

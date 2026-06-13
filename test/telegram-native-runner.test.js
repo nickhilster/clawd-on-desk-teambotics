@@ -463,6 +463,49 @@ test("native runner aborts an in-flight approval send before a late Telegram suc
   await runner.stop();
 });
 
+test("native runner strips approval keyboard when resolved on desktop (abort)", async () => {
+  const server = createFakeTelegramServer();
+  let releaseFirstPoll;
+
+  server.enqueue("getUpdates", () => new Promise((resolve) => { releaseFirstPoll = resolve; }));
+  server.enqueueOk("sendMessage", { message_id: 99, chat: { id: 123 } });
+  server.enqueueOk("editMessageReplyMarkup", { message_id: 99 });
+
+  const runner = createTelegramNativeRunner({
+    tokenStore: tokenStore(),
+    transport: server.transport,
+    getDispatch: () => async () => {},
+    getChatId: () => "123",
+    getAllowedUserId: () => "777",
+  });
+
+  await runner.start();
+  await tick();
+
+  const controller = new AbortController();
+  const decisionPromise = runner.requestApproval(
+    { title: "claude-code requests Bash", detail: "Summary: Run tests" },
+    { signal: controller.signal },
+  );
+  // Let the card send resolve so the entry records its message id.
+  await tick();
+  assert.equal(server.calls.filter((call) => call.method === "sendMessage").length, 1);
+
+  // Desktop answered the permission: the caller aborts the in-flight request.
+  controller.abort();
+  assert.equal(await decisionPromise, null);
+  await tick();
+
+  const editCalls = server.calls.filter((call) => call.method === "editMessageReplyMarkup");
+  assert.equal(editCalls.length, 1, "stale approval card must have its keyboard stripped");
+  assert.equal(editCalls[0].payload.chat_id, "123");
+  assert.equal(editCalls[0].payload.message_id, 99);
+  assert.deepEqual(editCalls[0].payload.reply_markup, { inline_keyboard: [] });
+
+  releaseFirstPoll({ ok: true, result: [] });
+  await runner.stop();
+});
+
 test("native runner requestApproval is disabled until polling with a valid payload", async () => {
   const runner = createTelegramNativeRunner({
     tokenStore: tokenStore(),

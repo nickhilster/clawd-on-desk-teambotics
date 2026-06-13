@@ -506,6 +506,17 @@ function createTelegramNativeRunner({
     }
   }
 
+  // Best-effort: strip the inline keyboard off an approval card whose decision
+  // landed somewhere other than this Telegram chat. Never throws.
+  function clearApprovalKeyboard(entry) {
+    if (!entry || !entry.messageId || !entry.chatId) return;
+    client.editMessageReplyMarkup({
+      chat_id: entry.chatId,
+      message_id: entry.messageId,
+      reply_markup: { inline_keyboard: [] },
+    }).catch(() => {});
+  }
+
   function finishApproval(id, decision) {
     const entry = pendingApprovals.get(id);
     if (!entry) return;
@@ -514,7 +525,14 @@ function createTelegramNativeRunner({
     if (entry.signal && entry.onAbort) {
       try { entry.signal.removeEventListener("abort", entry.onAbort); } catch {}
     }
-    entry.resolve(normalizeApprovalDecision(decision));
+    const normalized = normalizeApprovalDecision(decision);
+    // A Telegram-side decision already strips the keyboard in
+    // handleApprovalCallback before we get here. A null decision means the
+    // approval was resolved elsewhere — answered on the desktop, timed out, or
+    // polling stopped — leaving a still-clickable card that would later answer
+    // "Expired". Pull its buttons so the stale prompt can't be tapped.
+    if (!normalized) clearApprovalKeyboard(entry);
+    entry.resolve(normalized);
   }
 
   function clearAllApprovals() {

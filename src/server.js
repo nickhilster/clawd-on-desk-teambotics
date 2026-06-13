@@ -55,9 +55,11 @@ const clearRuntimeConfigFn = ctx.clearRuntimeConfig || clearRuntimeConfig;
 const getPortCandidatesFn = ctx.getPortCandidates || getPortCandidates;
 const readRuntimePortFn = ctx.readRuntimePort || readRuntimePort;
 const writeRuntimeConfigFn = ctx.writeRuntimeConfig || writeRuntimeConfig;
+const CLAUDE_HOOK_GUARD_NOTICE_TTL_MS = 30 * 60 * 1000;
 
 let httpServer = null;
 let activeServerPort = null;
+let lastClaudeHookGuardNotice = null;
 const codexOfficialTurns = new Map();
 const recentHookEvents = new Map();
 
@@ -96,6 +98,13 @@ function isAgentEnabled(agentId) {
   return ctx.isAgentEnabled(agentId) !== false;
 }
 
+function shouldSyncAgentIntegration(agentId) {
+  if (typeof ctx.shouldSyncAgentIntegration === "function") {
+    return ctx.shouldSyncAgentIntegration(agentId) !== false;
+  }
+  return isAgentEnabled(agentId);
+}
+
 function getHookServerPort() {
   return activeServerPort || readRuntimePortFn() || DEFAULT_SERVER_PORT;
 }
@@ -122,11 +131,24 @@ function getRuntimeStatus() {
   };
 }
 
+function getClaudeHookGuardStatus() {
+  if (!lastClaudeHookGuardNotice) return null;
+  if (nowFn() - lastClaudeHookGuardNotice.at > CLAUDE_HOOK_GUARD_NOTICE_TTL_MS) return null;
+  return { ...lastClaudeHookGuardNotice };
+}
+
+function clearClaudeHookGuardStatus() {
+  const hadNotice = !!lastClaudeHookGuardNotice;
+  lastClaudeHookGuardNotice = null;
+  return hadNotice;
+}
+
 const integrationSync = createIntegrationSyncRuntime({
   ctx,
   getHookServerPort,
   shouldManageClaudeHooks,
   isAgentEnabled,
+  shouldSyncAgentIntegration,
   startClaudeSettingsWatcher,
   stopClaudeSettingsWatcher,
 });
@@ -141,11 +163,44 @@ const {
   syncCodexHooks,
   syncOpencodePlugin,
   syncPiExtension,
-  syncIntegrationForAgent,
-  repairIntegrationForAgent,
+  syncIntegrationForAgent: syncIntegrationForAgentBase,
+  repairIntegrationForAgent: repairIntegrationForAgentBase,
   stopIntegrationForAgent,
+  uninstallIntegrationForAgent,
   syncEnabledStartupIntegrations,
 } = integrationSync;
+
+function notifySuspiciousShrink(before, after) {
+  lastClaudeHookGuardNotice = {
+    type: "suspicious-shrink",
+    at: nowFn(),
+    before: before ? { ...before } : null,
+    after: after ? { ...after } : null,
+  };
+  if (typeof ctx.notifySuspiciousShrink === "function") {
+    ctx.notifySuspiciousShrink(before, after, lastClaudeHookGuardNotice);
+  }
+}
+
+function shouldClearClaudeHookGuardAfterSync(agentId, result) {
+  if (agentId !== "claude-code") return false;
+  if (result === false) return false;
+  if (result && typeof result === "object" && result.status === "error") return false;
+  return true;
+}
+
+function clearClaudeHookGuardAfterClaudeSync(agentId, result) {
+  if (shouldClearClaudeHookGuardAfterSync(agentId, result)) clearClaudeHookGuardStatus();
+  return result;
+}
+
+function syncIntegrationForAgent(agentId) {
+  return clearClaudeHookGuardAfterClaudeSync(agentId, syncIntegrationForAgentBase(agentId));
+}
+
+function repairIntegrationForAgent(agentId, options = {}) {
+  return clearClaudeHookGuardAfterClaudeSync(agentId, repairIntegrationForAgentBase(agentId, options));
+}
 
 function repairRuntimeStatus() {
   const status = getRuntimeStatus();
@@ -169,8 +224,10 @@ const claudeSettingsWatcher = createClaudeSettingsWatcher({
   ...ctx,
   shouldManageClaudeHooks,
   isAgentEnabled,
+  shouldSyncAgentIntegration,
   getHookServerPort,
   syncClawdHooks,
+  notifySuspiciousShrink,
 });
 
 // Watch ~/.claude/ directory for settings.json overwrites (e.g. CC-Switch)
@@ -242,6 +299,7 @@ function startHttpServer() {
 
 function cleanup() {
   clearRuntimeConfigFn();
+  clearClaudeHookGuardStatus();
   stopClaudeSettingsWatcher();
   if (httpServer) httpServer.close();
 }
@@ -250,6 +308,8 @@ return {
   startHttpServer,
   getHookServerPort,
   getRuntimeStatus,
+  getClaudeHookGuardStatus,
+  clearClaudeHookGuardStatus,
   getRecentHookEvents,
   clearRecentHookEvents,
   syncClawdHooks,
@@ -264,6 +324,7 @@ return {
   syncPiExtension,
   syncIntegrationForAgent,
   repairIntegrationForAgent,
+  uninstallIntegrationForAgent,
   repairRuntimeStatus,
   stopIntegrationForAgent,
   startClaudeSettingsWatcher,

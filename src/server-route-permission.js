@@ -4,7 +4,10 @@ const {
   CLAWD_SERVER_HEADER,
   CLAWD_SERVER_ID,
 } = require("../hooks/server-config");
-const { CODEX_OFFICIAL_HOOK_SOURCE } = require("./server-codex-official-turns");
+const {
+  CODEX_OFFICIAL_HOOK_SOURCE,
+  CODEX_SESSION_ROLE_SUBAGENT,
+} = require("./server-codex-official-turns");
 const {
   truncateDeep,
   normalizePermissionSuggestions,
@@ -32,6 +35,21 @@ function shouldBypassCCBubble(ctx, toolName, agentId) {
   if (!arePermissionBubblesEnabled(ctx)) return true;
   if (typeof ctx.isAgentPermissionsEnabled !== "function") return false;
   return !ctx.isAgentPermissionsEnabled(agentId);
+}
+
+// #451: PermissionRequests fired from inside a Claude Code subagent (Task
+// tool) carry agent_id/agent_type in the common hook fields; resolveHookAgentId
+// surfaces that as source:"subagent". When the per-agent subagent sub-gate is
+// off, dropping the HTTP connection lets CC fall back to its native flow
+// (terminal chat prompt, or the background-subagent auto-deny) exactly as if
+// Clawd weren't installed — never answer allow/deny on the user's behalf.
+// ExitPlanMode / AskUserQuestion stay exempt for the same reason they're
+// exempt from shouldBypassCCBubble above.
+function shouldBypassCCSubagentBubble(ctx, toolName, agentId, hookIdentity) {
+  if (!hookIdentity || hookIdentity.source !== "subagent") return false;
+  if (toolName === "ExitPlanMode" || toolName === "AskUserQuestion") return false;
+  if (typeof ctx.isAgentSubagentPermissionsEnabled !== "function") return false;
+  return !ctx.isAgentSubagentPermissionsEnabled(agentId);
 }
 
 function shouldBypassOpencodeBubble(ctx) {
@@ -71,6 +89,17 @@ function shouldInterceptCodexPermission(ctx) {
 function shouldMuteCodexNativeNotificationSound(ctx) {
   if (typeof ctx.isCodexNativeNotificationSoundEnabled !== "function") return false;
   return ctx.isCodexNativeNotificationSoundEnabled() === false;
+}
+
+function isHeadlessPermissionRequest(ctx, sessionId, data) {
+  if (ctx && ctx.sessions && typeof ctx.sessions.get === "function") {
+    const session = ctx.sessions.get(sessionId);
+    if (session && session.headless) return true;
+  }
+  if (data && data.headless === true) return true;
+  return !!(data
+    && (data.agent_id === "codex" || data.hook_source === CODEX_OFFICIAL_HOOK_SOURCE)
+    && data.codex_session_role === CODEX_SESSION_ROLE_SUBAGENT);
 }
 
 function arePermissionBubblesEnabled(ctx) {
@@ -278,7 +307,8 @@ function handlePermissionPost(req, res, options) {
       return;
     }
     const recordRequestHookEvent = createRequestHookRecorder(data, "permission");
-    const { agentId } = resolveHookAgentId(data);
+    const hookIdentity = resolveHookAgentId(data);
+    const { agentId } = hookIdentity;
 
     try {
       // ── opencode branch ──
@@ -336,6 +366,12 @@ function handlePermissionPost(req, res, options) {
         if (ctx.doNotDisturb) {
           recordRequestHookEvent.droppedByDnd();
           ctx.permLog(`opencode DND → silent drop, TUI fallback — request=${requestId}`);
+          return;
+        }
+
+        if (isHeadlessPermissionRequest(ctx, sessionId, data)) {
+          recordRequestHookEvent.accepted();
+          ctx.permLog(`opencode headless session=${sessionId} → silent drop, TUI fallback — request=${requestId}`);
           return;
         }
 
@@ -438,6 +474,13 @@ function handlePermissionPost(req, res, options) {
         if (ctx.doNotDisturb) {
           recordRequestHookEvent.droppedByDnd();
           ctx.permLog(`codex DND -> no decision, native prompt fallback (tool=${toolName})`);
+          sendCodexPermissionNoDecision(res);
+          return;
+        }
+
+        if (isHeadlessPermissionRequest(ctx, sessionId, data)) {
+          recordRequestHookEvent.accepted();
+          ctx.permLog(`codex headless session=${sessionId} -> no decision, native prompt fallback (tool=${toolName})`);
           sendCodexPermissionNoDecision(res);
           return;
         }
@@ -547,6 +590,13 @@ function handlePermissionPost(req, res, options) {
           return;
         }
 
+        if (isHeadlessPermissionRequest(ctx, sessionId, data)) {
+          recordRequestHookEvent.accepted();
+          ctx.permLog(`qwen headless session=${sessionId} -> no decision, native prompt fallback (tool=${toolName})`);
+          sendQwenCodePermissionNoDecision(res);
+          return;
+        }
+
         if (typeof ctx.isAgentEnabled === "function" && !ctx.isAgentEnabled("qwen-code")) {
           recordRequestHookEvent.droppedByDisabled();
           ctx.permLog(`qwen disabled -> no decision, native prompt fallback (tool=${toolName})`);
@@ -642,6 +692,13 @@ function handlePermissionPost(req, res, options) {
         if (ctx.doNotDisturb) {
           recordRequestHookEvent.droppedByDnd();
           ctx.permLog(`copilot DND -> no decision, native prompt fallback (tool=${toolName})`);
+          sendCopilotPermissionNoDecision(res);
+          return;
+        }
+
+        if (isHeadlessPermissionRequest(ctx, sessionId, data)) {
+          recordRequestHookEvent.accepted();
+          ctx.permLog(`copilot headless session=${sessionId} -> no decision, native prompt fallback (tool=${toolName})`);
           sendCopilotPermissionNoDecision(res);
           return;
         }
@@ -750,6 +807,13 @@ function handlePermissionPost(req, res, options) {
         if (ctx.doNotDisturb) {
           recordRequestHookEvent.droppedByDnd();
           ctx.permLog(`hermes DND -> no decision, native fallback (tool=${toolName})`);
+          sendHermesPermissionNoDecision(res);
+          return;
+        }
+
+        if (isHeadlessPermissionRequest(ctx, sessionId, data)) {
+          recordRequestHookEvent.accepted();
+          ctx.permLog(`hermes headless session=${sessionId} -> no decision, native fallback (tool=${toolName})`);
           sendHermesPermissionNoDecision(res);
           return;
         }
@@ -918,6 +982,11 @@ function handlePermissionPost(req, res, options) {
       // dismissPermissionsByAgent() clean up the right ones when the user
       // disables an agent mid-flight.
       const permAgentId = agentId;
+      // CC subagent origin (#451): stamped on the permEntry so the settings
+      // side effect can dismiss exactly the subagent bubbles when the
+      // sub-gate flips off, without touching main-thread ones.
+      const subagentId = hookIdentity.source === "subagent" ? hookIdentity.subagentId : null;
+      const subagentType = hookIdentity.source === "subagent" ? hookIdentity.subagentType : null;
       const rawSuggestions = Array.isArray(data.permission_suggestions) ? data.permission_suggestions : [];
       const suggestions = normalizePermissionSuggestions(rawSuggestions);
 
@@ -946,6 +1015,13 @@ function handlePermissionPost(req, res, options) {
         return;
       }
 
+      if (shouldBypassCCSubagentBubble(ctx, toolName, permAgentId, hookIdentity)) {
+        recordRequestHookEvent.accepted();
+        ctx.permLog(`${permAgentId} subagent bubbles disabled → destroy connection, chat fallback (tool=${toolName} subagent=${subagentType || subagentId})`);
+        res.destroy();
+        return;
+      }
+
       // Elicitation (AskUserQuestion) — show notification bubble, not permission bubble.
       // User clicks "Go to Terminal" → deny → Claude Code falls back to terminal.
       if (toolName === "AskUserQuestion") {
@@ -968,6 +1044,8 @@ function handlePermissionPost(req, res, options) {
           createdAt: Date.now(),
           isElicitation: true,
           agentId: permAgentId,
+          subagentId,
+          subagentType,
         };
         const abortHandler = () => {
           if (res.writableFinished) return;
@@ -1009,6 +1087,8 @@ function handlePermissionPost(req, res, options) {
         resolvedSuggestion: null,
         createdAt: Date.now(),
         agentId: permAgentId,
+        subagentId,
+        subagentType,
       };
       const abortHandler = () => {
         if (res.writableFinished) return;
@@ -1069,6 +1149,7 @@ function handlePermissionPost(req, res, options) {
 module.exports = {
   MAX_PERMISSION_BODY_BYTES,
   shouldBypassCCBubble,
+  shouldBypassCCSubagentBubble,
   shouldBypassCodexBubble,
   shouldBypassQwenCodeBubble,
   shouldBypassCopilotBubble,

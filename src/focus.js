@@ -242,7 +242,7 @@ function psSingleQuotedString(value) {
   return `'${String(value || "").replace(/'/g, "''")}'`;
 }
 
-function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = null, focusToken = "") {
+function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = null, focusToken = "", cacheCwdCandidates = cwdCandidates) {
   // Walk up the process tree (same proven logic as before).
   // Windows Terminal needs title matching because one WT process can represent
   // multiple tabs/windows. Other parent windows keep direct PID focus.
@@ -254,6 +254,10 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
       }).join(",")
     : "";
   const titleNames = psNames ? `@(${psNames})` : "@()";
+  const psCacheNames = Array.isArray(cacheCwdCandidates) && cacheCwdCandidates.length
+    ? cacheCwdCandidates.map(c => psUtf8Expression(c)).join(",")
+    : "";
+  const cacheTitleNames = psCacheNames ? `@(${psCacheNames})` : "@()";
   const cacheKey = focusCacheKey ? psUtf8Expression(focusCacheKey) : "$null";
   const wtHwndLiteral = normalizeHwndString(wtHwnd) || "0";
   const tokenLiteral = psSingleQuotedString(focusToken);
@@ -273,7 +277,6 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
                 if ($pidWindows.Count -eq 1) {
                     [WinFocus]::Focus($pidWindows[0])
                     $selectedTargetHwnd = $pidWindows[0]
-                    Save-ClawdFocusCache $pidWindows[0]
                     $focused = $true
                     $reason = 'wt-parent-pid-window'
                 } elseif ($pidWindows.Count -gt 1) {
@@ -281,6 +284,19 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
                 } else {
                     $reason = 'wt-parent-no-pid-window'
                 }
+            }
+        } elseif ($editorProcessNames -contains $proc.ProcessName) {
+            $matches = @([WinFocus]::FindByPidTitles([uint32]$curPid, [string[]]$cacheTitleNames))
+            if ($matches.Count -eq 1) {
+                [WinFocus]::Focus($matches[0])
+                $selectedTargetHwnd = $matches[0]
+                Save-ClawdFocusCache $matches[0]
+                $focused = $true
+                $reason = 'editor-parent-title-match'
+            } elseif ($matches.Count -gt 1) {
+                $reason = 'editor-parent-title-ambiguous'
+            } else {
+                $reason = 'editor-parent-no-title-match'
             }
         } else {
             [WinFocus]::Focus($proc.MainWindowHandle)
@@ -290,7 +306,9 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
             $reason = 'parent-direct'
         }
         break` : `
-        if ($wtProcessNames -notcontains $proc.ProcessName) {
+        if ($editorProcessNames -contains $proc.ProcessName) {
+            $reason = 'editor-parent-no-title'
+        } elseif ($wtProcessNames -notcontains $proc.ProcessName) {
             [WinFocus]::Focus($proc.MainWindowHandle)
             $selectedTargetHwnd = $proc.MainWindowHandle
             Save-ClawdFocusCache $proc.MainWindowHandle
@@ -330,7 +348,6 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
         if ($pidWindows.Count -eq 1) {
             [WinFocus]::Focus($pidWindows[0])
             $selectedTargetHwnd = $pidWindows[0]
-            Save-ClawdFocusCache $pidWindows[0]
             $focused = $true
             $reason = 'wt-title-mismatch-pid-window'
         } elseif ($pidWindows.Count -gt 1) {
@@ -340,7 +357,6 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
             if ($singleWtWindows.Count -eq 1) {
                 [WinFocus]::Focus($singleWtWindows[0])
                 $selectedTargetHwnd = $singleWtWindows[0]
-                Save-ClawdFocusCache $singleWtWindows[0]
                 $focused = $true
                 $reason = 'wt-title-mismatch-single-wt-window'
             } elseif ($singleWtWindows.Count -gt 1) {
@@ -355,29 +371,72 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
   return `
 $focusToken = ${tokenLiteral}
 $titleNames = ${titleNames}
+$cacheTitleNames = ${cacheTitleNames}
 $wtProcessNames = @('WindowsTerminal', 'WindowsTerminalPreview')
+$editorProcessNames = @('Code', 'Cursor')
 $chainWindowsTerminalPids = @()
 $focusCacheKey = ${cacheKey}
+$focusCacheSourcePid = [int64]${sourcePid}
 $wtHwndFromHook = [IntPtr]([int64]${wtHwndLiteral})
 if ($null -eq $global:ClawdFocusWindowCache) {
     $global:ClawdFocusWindowCache = @{}
 }
+function Test-ClawdWindowTitleMatch([IntPtr]$hwnd, [string[]]$names) {
+    if ($hwnd -eq [IntPtr]::Zero -or -not $names -or $names.Count -eq 0) { return $false }
+    $len = [WinFocus]::GetWindowTextLength($hwnd)
+    if ($len -le 0) { return $false }
+    $sb = New-Object System.Text.StringBuilder -ArgumentList ($len + 1)
+    [void][WinFocus]::GetWindowText($hwnd, $sb, $sb.Capacity)
+    $title = $sb.ToString()
+    foreach ($name in @($names)) {
+        if (-not [string]::IsNullOrWhiteSpace($name) -and $title.IndexOf($name, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            return $true
+        }
+    }
+    return $false
+}
 function Save-ClawdFocusCache([IntPtr]$hwnd) {
     if (-not $focusCacheKey -or $hwnd -eq [IntPtr]::Zero) { return }
-    $global:ClawdFocusWindowCache[$focusCacheKey] = $hwnd.ToInt64()
+    if (-not $cacheTitleNames -or $cacheTitleNames.Count -eq 0) { return }
+    $global:ClawdFocusWindowCache[$focusCacheKey] = @{
+        hwnd = $hwnd.ToInt64()
+        sourcePid = $focusCacheSourcePid
+        titleNames = @($cacheTitleNames)
+    }
 }
 function Get-ClawdCachedWindow() {
     if (-not $focusCacheKey) { return [IntPtr]::Zero }
     if (-not $global:ClawdFocusWindowCache.ContainsKey($focusCacheKey)) { return [IntPtr]::Zero }
+    $rawEntry = $global:ClawdFocusWindowCache[$focusCacheKey]
+    $rawHwnd = $rawEntry
+    $entrySourcePid = 0
+    if ($rawEntry -is [System.Collections.IDictionary]) {
+        $rawHwnd = $rawEntry['hwnd']
+        try { $entrySourcePid = [int64]$rawEntry['sourcePid'] } catch { $entrySourcePid = 0 }
+    }
     try {
-        $hwnd = [IntPtr]([int64]$global:ClawdFocusWindowCache[$focusCacheKey])
+        $hwnd = [IntPtr]([int64]$rawHwnd)
     } catch {
         $global:ClawdFocusWindowCache.Remove($focusCacheKey)
         return [IntPtr]::Zero
     }
-    if ([WinFocus]::IsUsableWindow($hwnd)) { return $hwnd }
-    $global:ClawdFocusWindowCache.Remove($focusCacheKey)
-    return [IntPtr]::Zero
+    if (-not [WinFocus]::IsUsableWindow($hwnd)) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    if ($entrySourcePid -gt 0 -and $focusCacheSourcePid -gt 0 -and $entrySourcePid -ne $focusCacheSourcePid) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    if (-not $cacheTitleNames -or $cacheTitleNames.Count -eq 0) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    if (-not (Test-ClawdWindowTitleMatch $hwnd ([string[]]$cacheTitleNames))) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    return $hwnd
 }
 function Get-ClawdVisiblePidWindows([int[]]$pids) {
     $windows = @()
@@ -469,7 +528,6 @@ if (-not $focused -and $pendingConsoleHwnd -ne [IntPtr]::Zero) {
         $reason -eq 'wt-title-mismatch-no-pid-window') {
         [WinFocus]::Focus($pendingConsoleHwnd)
         $selectedTargetHwnd = $pendingConsoleHwnd
-        Save-ClawdFocusCache $pendingConsoleHwnd
         $focused = $true
         $reason = 'legacy-conhost-window'
     }
@@ -505,12 +563,18 @@ let psProc = null;
 // macOS Accessibility/System Events calls can pile up fast, so serialize focus attempts.
 const MAC_FOCUS_THROTTLE_MS = 1500;
 const MAC_FOCUS_TIMEOUT_MS = 1500;
+// The generic frontmost fallback can block on the macOS Automation consent
+// dialog on first use; killing it early dismisses the dialog before the user
+// can answer (#465), so that one script gets a human-scale timeout.
+const MAC_FOCUS_CONSENT_TIMEOUT_MS = 15000;
+const MAC_OPEN_TIMEOUT_MS = 3000;
 const WINDOWS_FOCUS_DEDUP_MS = 400;
 const WINDOWS_FOCUS_RESULT_TIMEOUT_MS = 3000;
 const WINDOWS_FOCUS_POSITIVE_REASONS = new Set([
   "legacy-conhost-window",
   "parent-direct",
   "parent-direct-no-title",
+  "editor-parent-title-match",
   "wt-parent-title-match",
   "wt-title-match",
 ]);
@@ -537,6 +601,14 @@ function normalizePidChain(value) {
   return out.length ? out : null;
 }
 
+function normalizeGhosttyTerminalId(value) {
+  if (value === null || value === undefined) return null;
+  const text = String(value).replace(/[\r\n\t]+/g, " ").trim();
+  if (!text || text.length > 160) return null;
+  if (/^(error|unsupported|missing|miss)([-:]|$)/i.test(text)) return null;
+  return text;
+}
+
 function normalizeFocusRequest(sourcePidOrRequest, cwd, editor, pidChain, meta = {}) {
   if (sourcePidOrRequest && typeof sourcePidOrRequest === "object" && !Array.isArray(sourcePidOrRequest)) {
     const request = sourcePidOrRequest;
@@ -549,6 +621,7 @@ function normalizeFocusRequest(sourcePidOrRequest, cwd, editor, pidChain, meta =
       sessionId: typeof request.sessionId === "string" ? request.sessionId : null,
       agentId: typeof request.agentId === "string" ? request.agentId : null,
       requestSource: typeof request.requestSource === "string" ? request.requestSource : null,
+      ghosttyTerminalId: normalizeGhosttyTerminalId(request.ghosttyTerminalId ?? request.ghostty_terminal_id),
     };
   }
 
@@ -561,6 +634,7 @@ function normalizeFocusRequest(sourcePidOrRequest, cwd, editor, pidChain, meta =
     sessionId: meta && typeof meta.sessionId === "string" ? meta.sessionId : null,
     agentId: meta && typeof meta.agentId === "string" ? meta.agentId : null,
     requestSource: meta && typeof meta.requestSource === "string" ? meta.requestSource : null,
+    ghosttyTerminalId: normalizeGhosttyTerminalId(meta && (meta.ghosttyTerminalId ?? meta.ghostty_terminal_id)),
   };
 }
 
@@ -579,6 +653,12 @@ function summarizeCwd(cwd) {
 
 function formatPidChain(pidChain) {
   return Array.isArray(pidChain) && pidChain.length ? `[${pidChain.join(">")}]` : "[]";
+}
+
+function summarizeOpaqueId(value) {
+  const text = normalizeGhosttyTerminalId(value);
+  if (!text) return "-";
+  return crypto.createHash("sha1").update(text).digest("hex").slice(0, 8);
 }
 
 function buildFocusCacheKey(request) {
@@ -718,6 +798,7 @@ function logFocusRequest(request) {
     `cwdHash=${safeLogValue(cwd.hash)}`,
     `chain=${formatPidChain(request.pidChain)}`,
     `wtHwnd=${request.wtHwnd ? "1" : "-"}`,
+    `ghosttyId=${summarizeOpaqueId(request.ghosttyTerminalId)}`,
   ].join(" "));
 }
 
@@ -806,6 +887,179 @@ function findFirstValidTty(psOutput) {
     }
   }
   return null;
+}
+
+function escapeAppleScriptString(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function buildAppleScriptStringList(values) {
+  return values.map((value) => `"${escapeAppleScriptString(value)}"`).join(", ");
+}
+
+function normalizeGhosttyTtyName(value) {
+  const tty = typeof value === "string" ? value.trim() : "";
+  if (!tty || tty === "??" || tty === "?") return null;
+  return tty.replace(/^\/dev\//, "");
+}
+
+function buildGhosttyTtyCandidates(ttyName) {
+  const normalized = normalizeGhosttyTtyName(ttyName);
+  if (!normalized) return [];
+  const withDev = `/dev/${normalized}`;
+  return normalized === ttyName ? [normalized, withDev] : [normalized, ttyName];
+}
+
+function sanitizeGhosttyPidCandidates(pidCandidates, sourcePid = null) {
+  if (!Array.isArray(pidCandidates)) return [];
+  const source = Number(sourcePid);
+  const sourceCandidate = Number.isFinite(source) && source > 0 ? Math.floor(source) : null;
+  const out = [];
+  for (const candidate of pidCandidates) {
+    const pid = Number(candidate);
+    if (!Number.isFinite(pid) || pid <= 0) continue;
+    const normalizedPid = Math.floor(pid);
+    if (normalizedPid <= 0 || normalizedPid === sourceCandidate || out.includes(normalizedPid)) continue;
+    out.push(normalizedPid);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+function buildGhosttyPidCandidates(sourcePid, pidChain) {
+  return sanitizeGhosttyPidCandidates(pidChain, sourcePid);
+}
+
+function buildGhosttyCwdCandidates(cwd) {
+  const candidates = [];
+  if (typeof cwd !== "string" || !cwd) return candidates;
+  candidates.push(cwd);
+  try {
+    const real = fs.realpathSync(cwd);
+    if (real && real !== cwd) candidates.push(real);
+  } catch {}
+  return candidates;
+}
+
+function buildGhosttyCwdFocusScript(cwdCandidates) {
+  const literalList = buildAppleScriptStringList(cwdCandidates);
+  return `
+      tell application "Ghostty"
+        set targetCwds to {${literalList}}
+        repeat with cwdLiteral in targetCwds
+          set matches to every terminal whose working directory is (contents of cwdLiteral)
+          if (count of matches) > 0 then
+            focus (item 1 of matches)
+            return "ok-cwd"
+          end if
+        end repeat
+        return "miss-cwd"
+      end tell`;
+}
+
+function buildGhosttyIdFocusScript(terminalId) {
+  const id = normalizeGhosttyTerminalId(terminalId);
+  if (!id) return null;
+  return `
+      tell application "Ghostty"
+        set targetId to "${escapeAppleScriptString(id)}"
+        repeat with terminalRef in terminals
+          try
+            if ((id of terminalRef) as text) is targetId then
+              focus terminalRef
+              return "ok-id"
+            end if
+          on error errMsg number errNum
+            return "unsupported-id:" & errNum
+          end try
+        end repeat
+        return "miss-id"
+      end tell`;
+}
+
+function buildGhosttyFocusedTerminalIdScript(cwdCandidates = []) {
+  const requireCwdMatch = Array.isArray(cwdCandidates) && cwdCandidates.length > 0;
+  const cwdCheck = requireCwdMatch
+    ? `
+          set targetCwds to {${buildAppleScriptStringList(cwdCandidates)}}
+          set terminalCwd to working directory of terminalRef
+          set cwdMatched to false
+          repeat with cwdLiteral in targetCwds
+            if terminalCwd is (contents of cwdLiteral) then
+              set cwdMatched to true
+              exit repeat
+            end if
+          end repeat
+          if cwdMatched is false then return "miss-cwd"`
+    : "";
+  return `
+      tell application "Ghostty"
+        try
+          if frontmost is false then return "missing-frontmost"
+          set terminalRef to focused terminal of selected tab of front window
+${cwdCheck}
+          return (id of terminalRef) as text
+        on error errMsg number errNum
+          return "error:" & errNum
+        end try
+      end tell`;
+}
+
+function buildGhosttyTtyFocusScript(ttyName) {
+  const ttyCandidates = buildGhosttyTtyCandidates(ttyName);
+  if (!ttyCandidates.length) return null;
+  return `
+      tell application "Ghostty"
+        set targetTtys to {${buildAppleScriptStringList(ttyCandidates)}}
+        repeat with ttyLiteral in targetTtys
+          try
+            set matches to every terminal whose tty ends with (contents of ttyLiteral)
+            if (count of matches) > 0 then
+              focus (item 1 of matches)
+              return "ok-tty"
+            end if
+          on error errMsg number errNum
+            return "unsupported-tty:" & errNum
+          end try
+        end repeat
+        return "miss-tty"
+      end tell`;
+}
+
+function buildGhosttyPidFocusScript(pidCandidates) {
+  const pids = sanitizeGhosttyPidCandidates(pidCandidates);
+  if (!pids.length) return null;
+  return `
+      tell application "Ghostty"
+        set targetPids to {${pids.join(", ")}}
+        repeat with pidLiteral in targetPids
+          try
+            set matches to every terminal whose pid is (contents of pidLiteral)
+            if (count of matches) > 0 then
+              focus (item 1 of matches)
+              return "ok-pid"
+            end if
+          on error errMsg number errNum
+            return "unsupported-pid:" & errNum
+          end try
+        end repeat
+        return "miss-pid"
+      end tell`;
+}
+
+function normalizeGhosttyScriptStatus(label, osaErr, osaOut) {
+  if (osaErr) {
+    const code = safeLogValue(osaErr.code || osaErr.name || "error");
+    return `osascript-failed-${label}:${code}`;
+  }
+  const out = String(osaOut || "").trim();
+  if (!out) return `miss-${label}`;
+  if (out === "miss") return `miss-${label}`;
+  return safeLogValue(out);
+}
+
+function logGhosttyFocusResult(reason) {
+  logFocusResult(`branch=ghostty reason=${safeLogValue(reason)}`);
 }
 
 function buildCmuxBinPath(appPath) {
@@ -1063,7 +1317,7 @@ function executeMacFocusRequest(request) {
   scheduleITermTabFocus(request.sourcePid, request.pidChain);
   scheduleCmuxWorkspaceSwitch(request.pidChain);
   scheduleSupersetFocus(request.sourcePid, request.cwd);
-  scheduleGhosttyFocus(request.sourcePid, request.cwd);
+  scheduleGhosttyFocus(request.sourcePid, request.cwd, request.pidChain, request.ghosttyTerminalId);
 }
 
 function scheduleSupersetFocus(sourcePid, cwd) {
@@ -1101,41 +1355,117 @@ function scheduleSupersetFocus(sourcePid, cwd) {
   });
 }
 
-function scheduleGhosttyFocus(sourcePid, cwd) {
+function scheduleGhosttyFocus(sourcePid, cwd, pidChain, ghosttyTerminalId = null) {
   // Mirror scheduleITermTabFocus: detect Ghostty by the source process
-  // command name, then ask Ghostty's scripting dictionary to focus the
-  // terminal whose `working directory` matches cwd. `focus` selects the
-  // surface and raises its window, so no separate System Events activate is
-  // needed.
-  if (!isMac || !sourcePid || !cwd) return;
+  // command name, then try a captured terminal id or per-terminal tty/pid
+  // match before falling back to cwd. `focus` selects the surface and raises
+  // its window, so no separate System Events activate is needed.
+  if (!isMac || !sourcePid || (!cwd && !ghosttyTerminalId)) return;
   execFile("ps", ["-o", "comm=", "-p", String(sourcePid)], { encoding: "utf8", timeout: 500 }, (err, stdout) => {
-    if (err) return;
+    if (err) {
+      logGhosttyFocusResult("source-lookup-failed");
+      return;
+    }
     const name = path.basename(stdout.trim()).toLowerCase();
-    if (name !== "ghostty") return;
+    if (name !== "ghostty") {
+      logGhosttyFocusResult("source-not-ghostty");
+      return;
+    }
 
-    const candidates = [cwd];
-    try {
-      const real = fs.realpathSync(cwd);
-      if (real && real !== cwd) candidates.push(real);
-    } catch {}
-    const escapeAS = (s) => s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    const literalList = candidates.map((c) => `"${escapeAS(c)}"`).join(", ");
-    const script = `
-      tell application "Ghostty"
-        set targetCwds to {${literalList}}
-        repeat with cwdLiteral in targetCwds
-          set matches to every terminal whose working directory is (contents of cwdLiteral)
-          if (count of matches) > 0 then
-            focus (item 1 of matches)
-            return "ok"
-          end if
-        end repeat
-        return "miss"
-      end tell`;
-    setTimeout(() => {
-      execFile("osascript", ["-e", script], { timeout: MAC_FOCUS_TIMEOUT_MS }, () => {});
-    }, 400);
+    const cwdCandidates = buildGhosttyCwdCandidates(cwd);
+
+    const runGhosttyScript = (script, label, onMiss) => {
+      if (!script) {
+        logGhosttyFocusResult(label === "tty" ? "no-tty" : `no-${label}-script`);
+        if (onMiss) onMiss();
+        return;
+      }
+      setTimeout(() => {
+        execFile("osascript", ["-e", script], { timeout: MAC_FOCUS_TIMEOUT_MS }, (osaErr, osaOut) => {
+          const status = normalizeGhosttyScriptStatus(label, osaErr, osaOut);
+          logGhosttyFocusResult(status);
+          if (String(status || "").startsWith("ok-")) return;
+          if (onMiss) onMiss();
+        });
+      }, 400);
+    };
+    const runFallback = () => {
+      if (!cwdCandidates.length) {
+        logGhosttyFocusResult("no-cwd-fallback");
+        return;
+      }
+      const script = buildGhosttyCwdFocusScript(cwdCandidates);
+      logGhosttyFocusResult("cwd-fallback");
+      runGhosttyScript(script, "cwd", null);
+    };
+
+    const pidCandidates = buildGhosttyPidCandidates(sourcePid, pidChain);
+    const runPidOrFallback = () => {
+      const pidScript = buildGhosttyPidFocusScript(pidCandidates);
+      if (!pidScript) {
+        logGhosttyFocusResult("no-pid-candidates");
+        runFallback();
+        return;
+      }
+      runGhosttyScript(pidScript, "pid", runFallback);
+    };
+    const runPreciseOrFallback = (ttyName) => {
+      const ttyScript = buildGhosttyTtyFocusScript(ttyName);
+      runGhosttyScript(ttyScript, "tty", runPidOrFallback);
+    };
+    const runPrecisePath = () => {
+      if (!pidCandidates.length) {
+        logGhosttyFocusResult("no-pid-candidates");
+        runFallback();
+        return;
+      }
+
+      const pidsArg = pidCandidates.join(",");
+      execFile("ps", ["-o", "pid=,tty=", "-p", pidsArg], { encoding: "utf8", timeout: 500 }, (psErr, psOut) => {
+        if (psErr || !psOut) logGhosttyFocusResult("tty-lookup-failed");
+        const ttyName = psErr || !psOut ? null : findFirstValidTty(psOut);
+        runPreciseOrFallback(ttyName);
+      });
+    };
+    const runIdOrPrecise = () => {
+      const idScript = buildGhosttyIdFocusScript(ghosttyTerminalId);
+      if (!idScript) {
+        runPrecisePath();
+        return;
+      }
+      runGhosttyScript(idScript, "id", runPrecisePath);
+    };
+
+    runIdOrPrecise();
   });
+}
+
+function captureGhosttyTerminalId(sourcePidOrRequest, callback) {
+  const request = normalizeFocusRequest(sourcePidOrRequest);
+  const done = typeof callback === "function" ? callback : () => {};
+  if (!isMac || !request.sourcePid) return false;
+  execFile("ps", ["-o", "comm=", "-p", String(request.sourcePid)], { encoding: "utf8", timeout: 500 }, (err, stdout) => {
+    if (err) return done(null);
+    const name = path.basename(stdout.trim()).toLowerCase();
+    if (name !== "ghostty") return done(null);
+    const cwdCandidates = buildGhosttyCwdCandidates(request.cwd);
+    execFile("osascript", ["-e", buildGhosttyFocusedTerminalIdScript(cwdCandidates)], { timeout: MAC_FOCUS_TIMEOUT_MS }, (osaErr, osaOut) => {
+      if (osaErr) {
+        logFocusResult(`branch=ghostty-capture reason=osascript-failed:${safeLogValue(osaErr.code || osaErr.name || "error")}`);
+        done(null);
+        return;
+      }
+      const id = normalizeGhosttyTerminalId(osaOut);
+      if (!id) {
+        logFocusResult("branch=ghostty-capture reason=missing-id");
+        done(null);
+        return;
+      }
+      logFocusResult(`branch=ghostty-capture reason=ok-id idHash=${summarizeOpaqueId(id)}`);
+      done(id);
+    });
+  });
+  return true;
 }
 
 function requestMacFocus(request) {
@@ -1195,6 +1525,66 @@ function focusTerminalWindow(sourcePidOrRequest, cwd, editor, pidChain, meta) {
   return result;
 }
 
+// macOS generic window focus (#465). Prefer LaunchServices activation
+// (`open <bundle>`) over System Events `set frontmost`: `open` carries
+// Dock-click reopen semantics, so it also restores minimized windows —
+// `set frontmost` activates the app but leaves them in the Dock — and it
+// needs no Automation consent. System Events stays as the fallback for
+// source processes that don't live inside an .app bundle.
+
+function extractMacAppBundlePath(commPath) {
+  const text = typeof commPath === "string" ? commPath.trim() : "";
+  if (!text.startsWith("/")) return null;
+  // Match the outermost bundle: helpers live at
+  // <bundle>.app/Contents/Frameworks/<helper>.app/Contents/MacOS/<bin>.
+  const idx = text.indexOf(".app/Contents/");
+  return idx > 0 ? text.slice(0, idx + 4) : null;
+}
+
+function resolveMacAppBundle(pidCandidates, callback) {
+  execFile("ps", ["-o", "pid=,comm=", "-p", pidCandidates.join(",")], { encoding: "utf8", timeout: 1000 }, (_err, stdout) => {
+    // ps exits non-zero when any pid in the list is already gone but still
+    // prints the live rows, so parse stdout regardless of the exit code.
+    const commByPid = new Map();
+    for (const line of String(stdout || "").split("\n")) {
+      const match = line.match(/^\s*(\d+)\s+(.+)$/);
+      if (match) commByPid.set(Number(match[1]), match[2]);
+    }
+    for (const pid of pidCandidates) {
+      const bundlePath = extractMacAppBundlePath(commByPid.get(pid));
+      if (bundlePath) return callback(bundlePath);
+    }
+    callback(null);
+  });
+}
+
+function focusMacAppViaSystemEvents(pidCandidates, onDone) {
+  const applePidList = pidCandidates.join(", ");
+  const script = `
+    tell application "System Events"
+      repeat with targetPid in {${applePidList}}
+        set pidValue to contents of targetPid
+        set pList to every process whose unix id is pidValue
+        if (count of pList) > 0 then
+          set frontmost of item 1 of pList to true
+          exit repeat
+        end if
+      end repeat
+    end tell`;
+  execFile("osascript", ["-e", script], { timeout: MAC_FOCUS_CONSENT_TIMEOUT_MS }, (err, _stdout, stderr) => {
+    if (err) {
+      const detail = String(stderr || err.message || "").split("\n")[0].slice(0, 160);
+      const reason = detail.includes("-1743")
+        ? "automation-denied"
+        : `osascript-failed:${safeLogValue(err.signal || err.code || "error")}`;
+      logFocusResult(`branch=mac-frontmost reason=${reason} detail=${safeLogValue(detail)}`);
+    } else {
+      logFocusResult("branch=mac-frontmost reason=ok");
+    }
+    if (onDone) onDone();
+  });
+}
+
 function focusTerminalWindowLegacy(request, onDone) {
   const { sourcePid } = request;
   const cwd = request.cwd;
@@ -1214,21 +1604,20 @@ function focusTerminalWindowLegacy(request, onDone) {
         if (pidCandidates.length >= 3) break;
       }
     }
-    const applePidList = pidCandidates.join(", ");
-    const script = `
-      tell application "System Events"
-        repeat with targetPid in {${applePidList}}
-          set pidValue to contents of targetPid
-          set pList to every process whose unix id is pidValue
-          if (count of pList) > 0 then
-            set frontmost of item 1 of pList to true
-            exit repeat
-          end if
-        end repeat
-      end tell`;
-    execFile("osascript", ["-e", script], { timeout: MAC_FOCUS_TIMEOUT_MS }, (err) => {
-      if (err) console.warn("focusTerminal macOS failed:", err.message);
-      if (onDone) onDone();
+    resolveMacAppBundle(pidCandidates, (bundlePath) => {
+      if (!bundlePath) {
+        focusMacAppViaSystemEvents(pidCandidates, onDone);
+        return;
+      }
+      execFile("/usr/bin/open", [bundlePath], { timeout: MAC_OPEN_TIMEOUT_MS }, (openErr) => {
+        if (!openErr) {
+          logFocusResult(`branch=mac-open reason=ok bundle=${safeLogValue(path.basename(bundlePath))}`);
+          if (onDone) onDone();
+          return;
+        }
+        logFocusResult(`branch=mac-open reason=open-failed bundle=${safeLogValue(path.basename(bundlePath))} error=${safeLogValue(openErr.signal || openErr.code || "error")}`);
+        focusMacAppViaSystemEvents(pidCandidates, onDone);
+      });
     });
     return true;
   }
@@ -1277,7 +1666,7 @@ function focusTerminalWindowLegacy(request, onDone) {
 
   // Windows: send command to persistent PowerShell process (near-instant)
   const titleCandidates = buildWindowsTitleCandidates(request, cwdCandidates);
-  const cmd = makeFocusCmd(sourcePid, titleCandidates, buildFocusCacheKey(request), request.wtHwnd, request.focusToken);
+  const cmd = makeFocusCmd(sourcePid, titleCandidates, buildFocusCacheKey(request), request.wtHwnd, request.focusToken, cwdCandidates);
   if (psProc && psProc.stdin.writable) {
     psProc.stdin.write(cmd + "\n");
     return true;
@@ -1312,19 +1701,30 @@ return {
   initFocusHelper,
   killFocusHelper,
   focusTerminalWindow,
+  captureGhosttyTerminalId,
   clearMacFocusCooldownTimer,
   cleanup,
   __test: {
     makeFocusCmd,
+    extractMacAppBundlePath,
     buildWindowsTitleCandidates,
     confirmForeground,
     isPositiveFocusReason,
     normalizeFocusRequest,
+    normalizeGhosttyTerminalId,
     normalizeFocusResultPayload,
     parseFocusHelperResult,
     summarizeCwd,
     handleFocusHelperCompleteOutput,
     PS_FOCUS_ADDTYPE,
+    findFirstValidTty,
+    buildGhosttyIdFocusScript,
+    buildGhosttyFocusedTerminalIdScript,
+    buildGhosttyPidCandidates,
+    buildGhosttyTtyCandidates,
+    buildGhosttyTtyFocusScript,
+    buildGhosttyPidFocusScript,
+    buildGhosttyCwdFocusScript,
   },
 };
 

@@ -292,6 +292,12 @@ function buildPermissionBody(payload, resolve) {
     body.transcript_path = payload.transcript_path;
   }
   if (typeof payload.model === "string" && payload.model) body.model = payload.model;
+  // Carry the session role so the /permission route's headless gate
+  // (isHeadlessPermissionRequest) can identify subagent requests even when
+  // no state event has populated the sessions map yet. Before PR #448
+  // subagent permissions deliberately bubbled, so the role was state-only.
+  const codexRole = resolveCodexSessionRole(payload, sessionMeta);
+  if (codexRole !== ROLE_UNKNOWN) body.codex_session_role = codexRole;
   applyCodexSessionMetaFields(body, payload, sessionMeta);
 
   const toolUseId = normalizeToolUseId(payload.tool_use_id ?? payload.toolUseId ?? payload.toolUseID);
@@ -397,20 +403,22 @@ function main() {
     platformConfig: config,
   });
 
-  readStdinJson().then((payload) => {
-    const permissionBody = buildPermissionBody(payload || {}, resolve);
-    if (permissionBody) {
-      requestCodexPermission(permissionBody, (output) => {
-        process.stdout.write(`${output}\n`);
-        process.exit(0);
-      });
-      return;
-    }
+  readStdinJson()
+    .then((payload) => {
+      const permissionBody = buildPermissionBody(payload || {}, resolve);
+      if (permissionBody) {
+        requestCodexPermission(permissionBody, (output) => {
+          process.stdout.write(`${output}\n`);
+          process.exit(0);
+        });
+        return;
+      }
 
-    const body = buildStateBody(payload || {}, resolve);
-    if (!body) process.exit(0);
-    postStateToRunningServer(JSON.stringify(body), { timeoutMs: 100 }, () => process.exit(0));
-  });
+      const body = buildStateBody(payload || {}, resolve);
+      if (!body) process.exit(0);
+      postStateToRunningServer(JSON.stringify(body), { timeoutMs: 100 }, () => process.exit(0));
+    })
+    .catch(() => process.exit(0));
 }
 
 if (require.main === module) main();

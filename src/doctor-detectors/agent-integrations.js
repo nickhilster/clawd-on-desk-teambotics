@@ -3,7 +3,11 @@
 const fs = require("fs");
 const path = require("path");
 
-const { isAgentEnabled, isAgentPermissionsEnabled } = require("../agent-gate");
+const {
+  isAgentEnabled,
+  isAgentIntegrationInstalled,
+  isAgentPermissionsEnabled,
+} = require("../agent-gate");
 const { getAgent } = require("../../agents/registry");
 const { findHookCommands } = require("../../hooks/json-utils");
 const { GEMINI_HOOK_EVENTS } = require("../../hooks/gemini-install");
@@ -15,6 +19,7 @@ const {
   isCopilotPermissionRegistrable,
 } = require("../../hooks/copilot-install");
 const { findKimiHookCommands } = require("../../hooks/kimi-install");
+const { parseTomlSections: parseCodewhaleTomlSections } = require("../../hooks/codewhale-install");
 const { getAgentDescriptors } = require("./agent-descriptors");
 const { commandContainsFragment, validateHookCommand } = require("./agent-node-bin-parser");
 const { checkCodexHookTrust, checkCodexHooksFeature } = require("./codex-features-check");
@@ -26,6 +31,7 @@ const INFO_ONLY_STATUSES = new Set([
   "disabled",
   "manual-managed",
   "manual-only",
+  "not-managed",
   "not-installed",
 ]);
 const REPAIRABLE_AGENT_STATUSES = new Set(["not-connected", "broken-path"]);
@@ -79,6 +85,33 @@ function withAgentBubbleNote(detail, prefs, agentId) {
     };
   }
   return detail;
+}
+
+function getClaudeHookGuardStatus(options) {
+  const server = options && options.server;
+  if (!server || typeof server.getClaudeHookGuardStatus !== "function") return null;
+  try {
+    return server.getClaudeHookGuardStatus();
+  } catch {
+    return null;
+  }
+}
+
+function withClaudeHookGuardNotice(detail, descriptor, options) {
+  if (descriptor.agentId !== "claude-code") return detail;
+  if (!detail || detail.status !== "not-connected") return detail;
+  const guard = getClaudeHookGuardStatus(options);
+  if (!guard || guard.type !== "suspicious-shrink") return detail;
+  return {
+    ...detail,
+    detail: "Clawd paused automatic Claude hook repair after settings.json shrank during an external rewrite. Use Fix or restart Clawd to reinstall Clawd hooks.",
+    claudeHookGuard: {
+      type: guard.type,
+      at: guard.at || null,
+      before: guard.before || null,
+      after: guard.after || null,
+    },
+  };
 }
 
 function withAgentFixAction(detail, descriptor) {
@@ -876,6 +909,186 @@ function checkTomlTextMode(descriptor, options) {
   };
 }
 
+function unescapeTomlDoubleQuotedValue(value) {
+  return String(value || "")
+    .replace(/\\"/g, "\"")
+    .replace(/\\\\/g, "\\");
+}
+
+function parseTomlScalarValue(raw) {
+  const value = String(raw || "").trim();
+  if (value.startsWith("'''")) {
+    const end = value.indexOf("'''", 3);
+    return end >= 0 ? value.slice(3, end) : null;
+  }
+  if (value.startsWith('"""')) {
+    const end = value.indexOf('"""', 3);
+    return end >= 0 ? unescapeTomlDoubleQuotedValue(value.slice(3, end)) : null;
+  }
+  if (value.startsWith("'")) {
+    const end = value.indexOf("'", 1);
+    return end >= 0 ? value.slice(1, end) : null;
+  }
+  if (value.startsWith("\"")) {
+    let escaped = false;
+    for (let i = 1; i < value.length; i++) {
+      const ch = value[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === "\"") {
+        return unescapeTomlDoubleQuotedValue(value.slice(1, i));
+      }
+    }
+    return null;
+  }
+  const bare = value.replace(/\s+#.*$/, "").trim();
+  return bare || null;
+}
+
+function tomlAssignmentValue(lines, key) {
+  const pattern = new RegExp(`^\\s*${key}\\s*=\\s*(.+)$`);
+  for (const line of lines) {
+    const match = String(line || "").match(pattern);
+    if (!match) continue;
+    return parseTomlScalarValue(match[1]);
+  }
+  return null;
+}
+
+function findCodewhaleHookCommandsForEvent(text, eventName, descriptor) {
+  if (typeof text !== "string" || !text) return [];
+  const sectionMarker = descriptor.marker;
+  const commandMarker = descriptor.commandMarker || "codewhale-hook.js";
+  return parseCodewhaleTomlSections(text)
+    .filter((section) => section.header === "hooks.hooks")
+    .filter((section) => section.lines.some((line) => commandContainsFragment(line, sectionMarker)))
+    .filter((section) => tomlAssignmentValue(section.lines, "event") === eventName)
+    .map((section) => tomlAssignmentValue(section.lines, "command"))
+    .filter((command) => typeof command === "string" && commandContainsFragment(command, commandMarker));
+}
+
+function codewhaleHooksExplicitlyDisabled(text) {
+  const hooksSection = parseCodewhaleTomlSections(text)
+    .find((section) => section.header === "hooks");
+  if (!hooksSection) return false;
+  return tomlAssignmentValue(hooksSection.lines, "enabled") === "false";
+}
+
+function validateCodewhaleHookEvents(descriptor, text, options) {
+  const events = Array.isArray(descriptor.hookEvents) ? descriptor.hookEvents : [];
+  const missingEvents = [];
+  let commandCount = 0;
+  let firstOk = null;
+  let firstFailure = null;
+
+  if (codewhaleHooksExplicitlyDisabled(text)) {
+    return makeDetail(descriptor, "not-connected", {
+      level: "warning",
+      detail: "CodeWhale hooks are disabled in config.toml; Clawd will not receive hook events",
+      supplementary: {
+        key: "codewhale_hooks",
+        value: "disabled",
+        detail: "[hooks].enabled is false",
+      },
+      commandCount: 0,
+    });
+  }
+
+  for (const eventName of events) {
+    const commands = findCodewhaleHookCommandsForEvent(text, eventName, descriptor);
+    commandCount += commands.length;
+    if (!commands.length) {
+      missingEvents.push(eventName);
+      continue;
+    }
+
+    const results = commands.map((command) => options.validateCommand(command, {
+      platform: options.platform,
+      fs: options.fs,
+    }));
+    const ok = results.find((result) => result.ok);
+    if (ok) {
+      if (!firstOk) firstOk = ok;
+      continue;
+    }
+    if (!firstFailure) {
+      firstFailure = {
+        eventName,
+        result: results[0] || { issue: "parse-failed" },
+        command: commands[0],
+      };
+    }
+  }
+
+  if (missingEvents.length) {
+    return makeDetail(descriptor, "not-connected", {
+      level: "warning",
+      detail: `${descriptor.configPath} missing CodeWhale hook event(s): ${missingEvents.join(", ")}`,
+      commandCount,
+      missingCodewhaleHookEvents: missingEvents,
+    });
+  }
+
+  if (firstFailure) {
+    const first = firstFailure.result;
+    return makeDetail(descriptor, "broken-path", {
+      level: "warning",
+      detail: `CodeWhale hook command failed validation for ${firstFailure.eventName}: ${first.issue || "parse-failed"}`,
+      commandCount,
+      hookCommandIssue: first.issue || "parse-failed",
+      nodeBin: first.nodeBin || null,
+      scriptPath: first.scriptPath || null,
+      commandFragment: first.fragment || String(firstFailure.command || "").slice(0, 128),
+      brokenCodewhaleHookEvent: firstFailure.eventName,
+    });
+  }
+
+  return makeDetail(descriptor, "ok", {
+    level: null,
+    detail: `${descriptor.configPath} CodeWhale hooks registered for ${events.length} events, scriptPath verified`,
+    commandCount,
+    scriptPath: firstOk && firstOk.scriptPath ? firstOk.scriptPath : null,
+  });
+}
+
+function checkCodewhaleHooksTomlMode(descriptor, options) {
+  if (!fileExists(options.fs, descriptor.configPath)) {
+    return makeDetail(descriptor, "not-connected", {
+      level: "warning",
+      parentDirExists: true,
+      configFileExists: false,
+      configPath: descriptor.configPath,
+      detail: `${descriptor.configPath} missing`,
+    });
+  }
+
+  let text;
+  try {
+    text = options.fs.readFileSync(descriptor.configPath, "utf8");
+  } catch (err) {
+    return makeDetail(descriptor, "config-corrupt", {
+      level: "warning",
+      parentDirExists: true,
+      configFileExists: true,
+      configPath: descriptor.configPath,
+      detail: err && err.message ? err.message : "CodeWhale config read failed",
+    });
+  }
+
+  return {
+    ...validateCodewhaleHookEvents(descriptor, text, options),
+    parentDirExists: true,
+    configFileExists: true,
+    configPath: descriptor.configPath,
+  };
+}
+
 function checkKiroDirMode(descriptor, options) {
   const agentsDir = descriptor.configPath;
   if (!dirExists(options.fs, agentsDir)) {
@@ -1216,6 +1429,25 @@ function findOpenClawPluginEntry(pluginPaths, marker) {
   return null;
 }
 
+function describeOpencodeEntryIssue(reason) {
+  switch (reason) {
+    case "not-absolute":
+      return "the plugin path is not absolute";
+    case "directory-missing":
+      return "the plugin directory does not exist";
+    case "not-a-directory":
+      return "the plugin entry is not a directory";
+    case "index-mjs-missing":
+      return "the plugin directory has no index.mjs";
+    case "index-mjs-unreadable":
+      return "the plugin index.mjs could not be read";
+    case "extra-module-exports":
+      return "the module exports more than the default function, so opencode rejects it and loads nothing (#413)";
+    default:
+      return reason;
+  }
+}
+
 function checkOpencodeSettings(descriptor, settings, options) {
   const entry = findOpencodePluginEntry(settings && settings.plugin, descriptor.marker);
   if (!entry) {
@@ -1235,7 +1467,7 @@ function checkOpencodeSettings(descriptor, settings, options) {
       parentDirExists: true,
       configFileExists: true,
       configPath: descriptor.configPath,
-      detail: `opencode plugin entry is invalid: ${validation.reason}`,
+      detail: `opencode plugin entry is invalid: ${describeOpencodeEntryIssue(validation.reason)}`,
       opencodeEntryIssue: validation.reason,
       opencodeEntry: entry,
     });
@@ -1420,6 +1652,13 @@ function checkPiExtensionMode(descriptor, options) {
 
 function checkAgent(descriptor, options) {
   const prefs = options.prefs || {};
+  if (!isAgentIntegrationInstalled(prefs, descriptor.agentId)) {
+    return makeDetail(descriptor, "not-managed", {
+      level: "info",
+      detail: "This integration is not installed in Settings",
+    });
+  }
+
   if (!isAgentEnabled(prefs, descriptor.agentId)) {
     return makeDetail(descriptor, "disabled", {
       level: "info",
@@ -1460,6 +1699,8 @@ function checkAgent(descriptor, options) {
     detail = checkCopilotHooksMode(descriptor, options);
   } else if (descriptor.configMode === "toml-text") {
     detail = checkTomlTextMode(descriptor, options);
+  } else if (descriptor.configMode === "codewhale-hooks-toml") {
+    detail = checkCodewhaleHooksTomlMode(descriptor, options);
   } else if (descriptor.configMode === "dir") {
     detail = checkKiroDirMode(descriptor, options);
   } else if (descriptor.configMode === "pi-extension") {
@@ -1477,6 +1718,7 @@ function checkAgent(descriptor, options) {
     });
   }
 
+  detail = withClaudeHookGuardNotice(detail, descriptor, options);
   return withAgentFixAction(withAgentBubbleNote(detail, prefs, descriptor.agentId), descriptor);
 }
 
@@ -1504,6 +1746,7 @@ function checkAgentIntegrations(options = {}) {
     fs: options.fs || fs,
     platform: options.platform || process.platform,
     prefs: options.prefs || {},
+    server: options.server || null,
     validateCommand: options.validateCommand || validateHookCommand,
   };
   const descriptors = options.descriptors || getAgentDescriptors();
@@ -1531,6 +1774,7 @@ module.exports = {
     checkAntigravityHooksMode,
     findAntigravityHookCommandsForEvent,
     parseYamlPluginEnabled,
+    codewhaleHooksExplicitlyDisabled,
     checkTomlTextMode,
     validateCommandList,
   },
