@@ -29,6 +29,7 @@ const AUTO_REPAIRABLE_AGENT_IDS = new Set([
   "opencode",
   "hermes",
   "qoder",
+  "reasonix"
 ]);
 
 const INSTALLABLE_AGENT_IDS = new Set([
@@ -48,6 +49,7 @@ const INSTALLABLE_AGENT_IDS = new Set([
   "openclaw",
   "hermes",
   "qoder",
+  "reasonix",
 ]);
 const SETTABLE_AGENT_FLAGS = AGENT_FLAGS.filter((flag) => flag !== "integrationInstalled");
 

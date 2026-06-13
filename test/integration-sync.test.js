@@ -233,6 +233,13 @@ describe("integration sync runtime", () => {
         exportName: "registerQoderHooks",
         reason: "qoder-not-installed",
       },
+      {
+        agentId: "reasonix",
+        ctxKey: "syncReasonixHooksImpl",
+        modulePath: "../hooks/reasonix-install.js",
+        exportName: "registerReasonixHooks",
+        reason: "reasonix-not-installed",
+      },
     ];
 
     for (const entry of cases) {

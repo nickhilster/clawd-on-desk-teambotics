@@ -44,6 +44,8 @@
     "uninstall:hermes-plugin": "node hooks/hermes-install.js --uninstall",
     "install:qoder-hooks": "node hooks/qoder-install.js",
     "uninstall:qoder-hooks": "node hooks/qoder-install.js --uninstall",
+    "install:reasonix-hooks": "node hooks/reasonix-install.js",
+    "uninstall:reasonix-hooks": "node hooks/reasonix-install.js --uninstall",
     "cleanup:integrations": "node hooks/cleanup-integrations.js --apply",
     "register-protocol:dev": "node launch.js --register-protocol"
   },

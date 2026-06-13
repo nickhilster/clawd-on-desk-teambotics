@@ -400,6 +400,21 @@ function createIntegrationSyncRuntime(options = {}) {
     }
   }
 
+  function syncReasonixHooks() {
+    try {
+      if (typeof ctx.syncReasonixHooksImpl === "function") return ctx.syncReasonixHooksImpl();
+      const { registerReasonixHooks } = require("../hooks/reasonix-install.js");
+      const result = registerReasonixHooks({ silent: true });
+      if (hasPositiveCount(result.added) || hasPositiveCount(result.updated)) {
+        console.log(`Clawd: synced Reasonix hooks (added ${result.added}, updated ${result.updated})`);
+      }
+      return normalizeCountSyncResult(result, "Reasonix", "reasonix-not-installed");
+    } catch (err) {
+      console.warn("Clawd: failed to sync Reasonix hooks:", err.message);
+      return { status: "error", message: err && err.message ? err.message : "Failed to sync Reasonix hooks" };
+    }
+  }
+
   const AGENT_INTEGRATION_SYNCERS = Object.freeze({
     "gemini-cli": syncGeminiHooks,
     "antigravity-cli": syncAntigravityHooks,
@@ -416,6 +431,7 @@ function createIntegrationSyncRuntime(options = {}) {
     openclaw: syncOpenClawPlugin,
     hermes: syncHermesPlugin,
     qoder: syncQoderHooks,
+    reasonix: syncReasonixHooks,
   });
 
   const AGENT_INTEGRATION_REPAIRERS = Object.freeze({
@@ -514,6 +530,7 @@ function createIntegrationSyncRuntime(options = {}) {
     syncOpenClawPlugin,
     syncHermesPlugin,
     syncQoderHooks,
+    syncReasonixHooks,
     repairCodexHooks,
     repairOpenClawPlugin,
     syncIntegrationForAgent,

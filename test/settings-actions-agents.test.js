@@ -136,6 +136,35 @@ test("settings agent actions install an integration and enable ingress", async (
   assert.deepStrictEqual(result.commit.dismissedAgentCleanupHints, {});
 });
 
+test("settings agent actions install reasonix integration and enable ingress", async () => {
+  const snapshot = prefs.getDefaults();
+  snapshot.agents.reasonix = {
+    integrationInstalled: false,
+    enabled: false,
+    permissionsEnabled: false,
+    notificationHookEnabled: true,
+  };
+  const calls = [];
+  const deps = {
+    snapshot,
+    syncIntegrationForAgent: async (agentId) => {
+      calls.push(agentId);
+      return { status: "ok", message: "Reasonix hooks installed" };
+    },
+    startMonitorForAgent: (agentId) => calls.push(`monitor:${agentId}`),
+  };
+
+  const result = await agentCommands.installAgentIntegration({ agentId: "reasonix" }, deps);
+
+  assert.strictEqual(result.status, "ok");
+  assert.strictEqual(result.message, "Reasonix hooks installed");
+  assert.deepStrictEqual(calls, ["reasonix", "monitor:reasonix"]);
+  assert.strictEqual(result.commit.agents.reasonix.integrationInstalled, true);
+  assert.strictEqual(result.commit.agents.reasonix.enabled, true);
+  assert.deepStrictEqual(result.commit.dismissedAgentInstallHints, {});
+  assert.deepStrictEqual(result.commit.dismissedAgentCleanupHints, {});
+});
+
 test("settings agent actions clear hint dismissals after a manual install", async () => {
   const snapshot = prefs.getDefaults();
   snapshot.dismissedAgentInstallHints = { "qwen-code": true, hermes: true };

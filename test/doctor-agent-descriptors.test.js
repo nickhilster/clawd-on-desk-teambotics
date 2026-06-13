@@ -29,6 +29,7 @@ describe("doctor agent descriptors", () => {
         "openclaw",
         "hermes",
         "qoder",
+        "reasonix",
       ]
     );
   });
@@ -113,6 +114,12 @@ describe("doctor agent descriptors", () => {
     assert.strictEqual(getAgentDescriptor("qoder").configPath, qoder.DEFAULT_CONFIG_PATH);
     assert.strictEqual(getAgentDescriptor("qoder").marker, qoder.MARKER);
     assert.deepStrictEqual(getAgentDescriptor("qoder").hookEvents, qoder.QODER_HOOK_EVENTS);
+
+    const reasonix = require("../hooks/reasonix-install");
+    assert.strictEqual(getAgentDescriptor("reasonix").parentDir, reasonix.DEFAULT_PARENT_DIR);
+    assert.strictEqual(getAgentDescriptor("reasonix").configPath, reasonix.DEFAULT_CONFIG_PATH);
+    assert.strictEqual(getAgentDescriptor("reasonix").marker, reasonix.MARKER);
+    assert.deepStrictEqual(getAgentDescriptor("reasonix").hookEvents, reasonix.REASONIX_HOOK_EVENTS);
   });
 
   it("returns copies from public accessors", () => {
@@ -239,5 +246,17 @@ describe("doctor agent descriptors", () => {
     assert.strictEqual(descriptor.autoInstall, true);
     assert.strictEqual(descriptor.marker, qoder.MARKER);
     assert.deepStrictEqual(descriptor.hookEvents, qoder.QODER_HOOK_EVENTS);
+  });
+
+  it("checks Reasonix hooks as a state-only nested settings file", () => {
+    const reasonix = require("../hooks/reasonix-install");
+    const descriptor = getAgentDescriptor("reasonix");
+
+    assert.strictEqual(descriptor.eventSource, "hook");
+    assert.strictEqual(descriptor.configMode, "file");
+    assert.strictEqual(descriptor.nested, true);
+    assert.strictEqual(descriptor.autoInstall, true);
+    assert.strictEqual(descriptor.marker, reasonix.MARKER);
+    assert.deepStrictEqual(descriptor.hookEvents, reasonix.REASONIX_HOOK_EVENTS);
   });
 });

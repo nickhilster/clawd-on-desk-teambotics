@@ -23,6 +23,7 @@ describe("Agent Registry", () => {
       "openclaw",
       "hermes",
       "qoder",
+      "reasonix",
     ]);
   });
 
@@ -41,6 +42,7 @@ describe("Agent Registry", () => {
     assert.strictEqual(registry.getAgent("openclaw").name, "OpenClaw");
     assert.strictEqual(registry.getAgent("hermes").name, "Hermes Agent");
     assert.strictEqual(registry.getAgent("qoder").name, "Qoder");
+    assert.strictEqual(registry.getAgent("reasonix").name, "Reasonix CLI");
     assert.strictEqual(registry.getAgent("nonexistent"), undefined);
   });
 
@@ -82,6 +84,9 @@ describe("Agent Registry", () => {
 
     const qoder = registry.getAgent("qoder");
     assert.deepStrictEqual(qoder.processNames.win, ["qoder.exe", "qodercli.exe", "qoder-cli.exe"]);
+
+    const reasonix = registry.getAgent("reasonix");
+    assert.deepStrictEqual(reasonix.processNames.win, ["reasonix.exe"]);
   });
 
   it("should include explicit Linux process names", () => {
@@ -123,6 +128,9 @@ describe("Agent Registry", () => {
 
     const qoder = registry.getAgent("qoder");
     assert.deepStrictEqual(qoder.processNames.linux, ["qoder", "qodercli", "qoder-cli"]);
+
+    const reasonix = registry.getAgent("reasonix");
+    assert.deepStrictEqual(reasonix.processNames.linux, ["reasonix"]);
   });
 
   it("should keep Kiro CLI process names narrowed to kiro-cli only", () => {
@@ -246,6 +254,14 @@ describe("Agent Registry", () => {
     assert.strictEqual(qoder.capabilities.notificationHook, true);
     assert.strictEqual(qoder.capabilities.sessionEnd, true);
     assert.strictEqual(qoder.capabilities.subagent, false);
+
+    const reasonix = registry.getAgent("reasonix");
+    assert.strictEqual(reasonix.capabilities.httpHook, false);
+    assert.strictEqual(reasonix.capabilities.permissionApproval, false);
+    assert.strictEqual(reasonix.capabilities.interactiveBubble, false);
+    assert.strictEqual(reasonix.capabilities.notificationHook, true);
+    assert.strictEqual(reasonix.capabilities.sessionEnd, true);
+    assert.strictEqual(reasonix.capabilities.subagent, true);
   });
 
   it("should have eventMap for hook-based agents", () => {
@@ -325,6 +341,18 @@ describe("Agent Registry", () => {
     assert.strictEqual(qoder.eventMap.PermissionRequest, "notification");
     assert.strictEqual(qoder.eventMap.PermissionDenied, "notification");
     assert.strictEqual(qoder.eventMap.SessionEnd, "sleeping");
+
+    const reasonix = registry.getAgent("reasonix");
+    assert.strictEqual(reasonix.eventSource, "hook");
+    assert.strictEqual(reasonix.eventMap.SessionStart, "idle");
+    assert.strictEqual(reasonix.eventMap.UserPromptSubmit, "thinking");
+    assert.strictEqual(reasonix.eventMap.PreToolUse, "working");
+    assert.strictEqual(reasonix.eventMap.PostToolUse, "working");
+    assert.strictEqual(reasonix.eventMap.Stop, "attention");
+    assert.strictEqual(reasonix.eventMap.SubagentStop, "working");
+    assert.strictEqual(reasonix.eventMap.Notification, "notification");
+    assert.strictEqual(reasonix.eventMap.PreCompact, "sweeping");
+    assert.strictEqual(reasonix.eventMap.SessionEnd, "sleeping");
   });
 
   it("treats Gemini CLI as a hook-only agent", () => {

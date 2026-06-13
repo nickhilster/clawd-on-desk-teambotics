@@ -19,6 +19,7 @@ const pi = require("../../hooks/pi-install");
 const openclaw = require("../../hooks/openclaw-install");
 const hermes = require("../../hooks/hermes-install");
 const qoder = require("../../hooks/qoder-install");
+const reasonix = require("../../hooks/reasonix-install");
 
 function agentName(agentId) {
   const agent = getAgent(agentId);
@@ -220,6 +221,18 @@ const AGENT_DESCRIPTORS = Object.freeze([
     marker: qoder.MARKER,
     nested: true,
     hookEvents: qoder.QODER_HOOK_EVENTS,
+  }),
+  Object.freeze({
+    agentId: "reasonix",
+    agentName: agentName("reasonix"),
+    eventSource: agentEventSource("reasonix"),
+    parentDir: reasonix.DEFAULT_PARENT_DIR,
+    configPath: reasonix.DEFAULT_CONFIG_PATH,
+    configMode: "file",
+    autoInstall: true,
+    marker: reasonix.MARKER,
+    nested: true,
+    hookEvents: reasonix.REASONIX_HOOK_EVENTS,
   }),
 ]);
 

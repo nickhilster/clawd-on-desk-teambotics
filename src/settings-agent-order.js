@@ -21,6 +21,7 @@ function buildSettingsAgentOrderExports() {
     "pi",
     "openclaw",
     "hermes",
+    "reasonix",
   ];
 
   const COLLAPSIBLE_AGENT_PRIORITY_MAP = new Map(
