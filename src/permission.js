@@ -515,11 +515,9 @@ function hotkeyResolve(behavior, message) {
     resolvePermissionEntry(perm, behavior, message);
     if (appName) {
       setTimeout(() => restoreFrontApp(appName), RESTORE_FOCUS_DELAY_MS);
-    } else if (isMac) {
-      // macOS only: osascript failed — fall back to terminal focus
-      setTimeout(() => ctx.focusTerminalForSession(perm.sessionId), RESTORE_FOCUS_DELAY_MS);
     }
-    // non-macOS: no focus change (matches pre-PR behavior)
+    // If macOS frontmost-app capture fails, leave focus untouched. Hotkeys are
+    // meant to answer without pulling the user back to the agent terminal.
   });
 }
 
