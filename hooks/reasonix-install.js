@@ -43,14 +43,24 @@ function buildReasonixHookEntry(command) {
 
 function buildReasonixHookCommand(nodeBin, hookScript, options = {}) {
   // Reasonix wraps commands with `cmd /c` on Windows (see hook.go shellInvocation).
-  // cmd /c cannot handle a quoted first token or forward-slash paths, so use
-  // bare `node` + unquoted backslash path when the node binary path has spaces.
+  // cmd /c cannot handle a quoted first token (node) or paths with spaces.
+  // When the node binary path has spaces, copy hook scripts to ~/.clawd/hooks/
+  // (a space-free path) and use that for the command.
   const platform = options.platform || process.platform;
   if (platform === "win32" && typeof nodeBin === "string" && nodeBin.includes(" ")) {
-    const winPath = hookScript.replace(/\//g, "\\");
-    return `node ${winPath}`;
-  }
-  return formatNodeHookCommand(nodeBin, hookScript, { ...options, windowsWrapper: "none" });
+    // Copy hook scripts to ~/.clawd/hooks/ (no spaces) and use that path.
+    const deployDir = path.join(os.homedir(), ".clawd", "hooks");
+    try { fs.mkdirSync(deployDir, { recursive: true }); } catch {}
+    for (const file of ["reasonix-hook.js", "server-config.js", "shared-process.js"]) {
+      const src = path.resolve(__dirname, file);
+      const dst = path.join(deployDir, file);
+      if (fs.existsSync(src)) {
+        try { fs.copyFileSync(src, dst); } catch {}
+      }
+    }
+    const deployedScript = path.join(deployDir, "reasonix-hook.js").replace(/\//g, "\\");
+    return `node ${deployedScript}`;
+  }  return formatNodeHookCommand(nodeBin, hookScript, { ...options, windowsWrapper: "none" });
 }
 
 function isDesiredReasonixHookEntry(entry, desiredCommand) {
