@@ -827,7 +827,14 @@ function swapToFile(file, state, useObjectChannel, options = {}) {
     };
 
     next.addEventListener("load", swap, { once: true });
-    next.data = url;
+    // Same cache-bust as the <img> channel below. Chromium reuses the SVG
+    // document (and its CSS animation timeline) across loads of the same
+    // URL on the object channel too, so one-shot animations for scripted /
+    // eye-tracking SVGs would stall on their last frame on re-entry. A fresh
+    // query each swap forces a fresh document. Bookkeeping (currentDisplayed
+    // /pendingAssetUrl) stays keyed on the base `url`, not the busted one.
+    const cacheBust = `${Date.now()}-${++_imgCacheBustSeq}`;
+    next.data = `${url}${url.includes("?") ? "&" : "?"}_t=${cacheBust}`;
     container.appendChild(next);
     pendingNext = next;
     scheduleSwapVisibilityRescue(swapToken, file, state);
