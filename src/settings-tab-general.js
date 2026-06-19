@@ -92,6 +92,7 @@
     subtitle.className = "subtitle";
     subtitle.textContent = t("settingsSubtitle");
     parent.appendChild(subtitle);
+    parent.appendChild(buildTutorialReplayHint());
 
     parent.appendChild(helpers.buildSection(t("sectionAppearance"), [
       buildLanguageRow(),
@@ -197,6 +198,36 @@
         onToggle: ({ nextRaw }) => confirmAutoApproveAll(nextRaw),
       }),
     ]));
+  }
+
+  function buildTutorialReplayHint() {
+    const wrap = document.createElement("p");
+    wrap.className = "general-tutorial-hint";
+
+    const button = document.createElement("button");
+    button.className = "general-tutorial-link";
+    button.type = "button";
+    button.textContent = t("settingsTutorialReplayLink");
+    button.addEventListener("click", () => {
+      if (!window.settingsAPI || typeof window.settingsAPI.showTutorial !== "function") return;
+      button.disabled = true;
+      window.settingsAPI.showTutorial()
+        .then((result) => {
+          if (!result || result.status !== "ok") {
+            throw new Error((result && result.message) || t("settingsTutorialReplayFailed"));
+          }
+        })
+        .catch((err) => {
+          const message = t("settingsTutorialReplayFailed") + (err && err.message ? ": " + err.message : "");
+          ops.showToast(message, { ttl: 5000 });
+        })
+        .finally(() => {
+          button.disabled = false;
+        });
+    });
+
+    wrap.appendChild(button);
+    return wrap;
   }
 
   // DANGER "auto-pilot": enabling auto-approves every agent permission request

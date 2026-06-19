@@ -191,6 +191,30 @@ html, body {
   font-size: 12px;
   color: var(--text-secondary);
 }
+.general-tutorial-hint {
+  margin: -16px 0 24px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.general-tutorial-link {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+}
+.general-tutorial-link:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.general-tutorial-link:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
 
 .section {
   margin-bottom: 28px;
@@ -2952,14 +2976,14 @@ html, body {
   margin-top: 8px;
   border-top: 1px solid var(--row-border);
 }
-.about-cleanup-wrap {
+.about-footer-action-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 0 0 14px;
+  padding: 0 0 10px;
 }
-.about-cleanup-button {
+.about-footer-action-button {
   appearance: none;
   background: transparent;
   border: none;
@@ -2970,13 +2994,14 @@ html, body {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.about-cleanup-button:hover:not(:disabled) {
+.about-footer-action-button:hover:not(:disabled) {
   color: var(--accent);
 }
-.about-cleanup-button:disabled {
+.about-footer-action-button:disabled {
   cursor: default;
   opacity: 0.6;
 }
+.about-footer-action-status,
 .about-cleanup-status {
   color: var(--text-tertiary);
   font-size: 11px;

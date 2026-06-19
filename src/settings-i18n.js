@@ -5,6 +5,8 @@
     en: {
       settingsTitle: "Settings",
       settingsSubtitle: "Configure how Clawd behaves on your desktop.",
+      settingsTutorialReplayLink: "Show getting started guide",
+      settingsTutorialReplayFailed: "Couldn't open the guide",
       sidebarGeneral: "General",
       sidebarAgents: "Agents",
       sidebarTheme: "Theme",
@@ -651,6 +653,8 @@
     zh: {
       settingsTitle: "设置",
       settingsSubtitle: "配置 Clawd 在桌面上的行为。",
+      settingsTutorialReplayLink: "重新打开新手指南",
+      settingsTutorialReplayFailed: "无法打开新手指南",
       sidebarGeneral: "通用",
       sidebarAgents: "Agent 管理",
       sidebarTheme: "主题",
@@ -1295,6 +1299,8 @@
     "zh-TW": {
       settingsTitle: "設定",
       settingsSubtitle: "設定 Clawd 在桌面上怎麼動作。",
+      settingsTutorialReplayLink: "重新開啟新手指南",
+      settingsTutorialReplayFailed: "無法開啟新手指南",
       sidebarGeneral: "一般",
       sidebarAgents: "Agent 管理",
       sidebarTheme: "主題",
@@ -1939,6 +1945,8 @@
     ko: {
       settingsTitle: "설정",
       settingsSubtitle: "데스크톱에서 Clawd의 동작 방식을 설정합니다.",
+      settingsTutorialReplayLink: "시작 가이드 다시 보기",
+      settingsTutorialReplayFailed: "가이드를 열 수 없습니다",
       sidebarGeneral: "일반",
       sidebarAgents: "에이전트",
       sidebarTheme: "테마",
@@ -2583,6 +2591,8 @@
     ja: {
       settingsTitle: "設定",
       settingsSubtitle: "Clawd のデスクトップでの動作を設定します。",
+      settingsTutorialReplayLink: "はじめにガイドを開く",
+      settingsTutorialReplayFailed: "ガイドを開けませんでした",
       sidebarGeneral: "一般",
       sidebarAgents: "エージェント",
       sidebarTheme: "テーマ",

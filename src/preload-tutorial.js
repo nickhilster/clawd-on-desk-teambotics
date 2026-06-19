@@ -17,6 +17,12 @@ contextBridge.exposeInMainWorld("tutorialAPI", {
   // tutorial:state push so the list re-renders with the new install state.
   installAgent: (agentId) => ipcRenderer.invoke("tutorial:install-agent", agentId),
   uninstallAgent: (agentId) => ipcRenderer.invoke("tutorial:uninstall-agent", agentId),
+  // Step 3 shortcut edits use the same command path as Settings, including
+  // validation and conflict reporting.
+  registerShortcut: (payload) => ipcRenderer.invoke("tutorial:register-shortcut", payload),
+  resetShortcut: (payload) => ipcRenderer.invoke("tutorial:reset-shortcut", payload),
+  // Override the wizard (and app) language from the welcome screen.
+  setLang: (lang) => ipcRenderer.send("tutorial:set-lang", lang),
   // Deep-links into Settings (e.g. the Agents or Shortcuts tab).
   openSettingsTab: (tab) => ipcRenderer.send("tutorial:open-settings-tab", tab),
   openShortcuts: () => ipcRenderer.send("tutorial:open-shortcuts"),

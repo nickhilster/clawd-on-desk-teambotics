@@ -208,7 +208,7 @@ const SIZES = {
 // `_settingsController.applyUpdate()`, which auto-persists.
 const prefsModule = require("./prefs");
 const { createSettingsController } = require("./settings-controller");
-const { createTranslator, i18n } = require("./i18n");
+const { createTranslator, i18n, SUPPORTED_LANGS } = require("./i18n");
 const {
   getBubblePolicy,
   isAllBubblesHidden,
@@ -1601,6 +1601,115 @@ showDashboard = _dashboard.showDashboard;
 broadcastDashboardSessionSnapshot = _dashboard.broadcastSessionSnapshot;
 sendDashboardI18n = _dashboard.sendI18n;
 
+// ── First-run onboarding tutorial ──
+// Buckets the installable agents for the tutorial's step 2. We call the
+// detector with skipDefaultIntegrations:false so the default integrations
+// (claude-code, codex) are checked too — that's the only way to flag the
+// marquee "default Codex hook but Codex isn't installed → recommend removing"
+// case, which the Settings UI doesn't surface.
+function buildTutorialAgentOnboardingState() {
+  const { detectAgentInstallations } = require("./agent-installation-detector");
+  const { INSTALLABLE_AGENT_IDS } = require("./settings-actions-agents");
+  const { bucketAgentsForTutorial } = require("./tutorial-agent-buckets");
+  let detection = { agents: [] };
+  try {
+    detection = detectAgentInstallations({ skipDefaultIntegrations: false }) || detection;
+  } catch (err) {
+    console.warn("Clawd: tutorial agent detection failed:", err && err.message);
+  }
+  return bucketAgentsForTutorial({
+    detectionAgents: detection.agents,
+    agentsPref: _settingsController.get("agents") || {},
+    installableIds: INSTALLABLE_AGENT_IDS,
+  });
+}
+
+// The editable shortcuts the tutorial teaches. Reflects the user's current
+// binding (null when they've unassigned it) and falls back to the shipped
+// default only when the key has never been touched.
+function buildTutorialShortcutsSummary() {
+  const { SHORTCUT_ACTIONS, SHORTCUT_ACTION_IDS } = require("./shortcut-actions");
+  const userShortcuts = _settingsController.get("shortcuts") || {};
+  return SHORTCUT_ACTION_IDS.map((id) => {
+    const action = SHORTCUT_ACTIONS[id] || {};
+    const accelerator = Object.prototype.hasOwnProperty.call(userShortcuts, id)
+      ? userShortcuts[id]
+      : action.defaultAccelerator;
+    return {
+      id,
+      label: translate(action.labelKey),
+      accelerator,
+      defaultAccelerator: action.defaultAccelerator,
+      persistent: !!action.persistent,
+    };
+  });
+}
+
+// The welcome screen uses the app icon so first run feels like product setup.
+// Read once, lazily, and pass a data URL to keep the renderer CSP simple.
+let _tutorialHeroSrcCache = null;
+function getTutorialHeroSrc() {
+  if (_tutorialHeroSrcCache != null) return _tutorialHeroSrcCache;
+  try {
+    const icon = fs.readFileSync(path.join(__dirname, "..", "assets", "icon.png"));
+    _tutorialHeroSrcCache = "data:image/png;base64," + icon.toString("base64");
+  } catch (err) {
+    console.warn("Clawd: failed to read tutorial icon:", err && err.message);
+    _tutorialHeroSrcCache = "";
+  }
+  return _tutorialHeroSrcCache;
+}
+
+let _tutorialDoneHeroSvgCache = null;
+function getTutorialDoneHeroSvg() {
+  if (_tutorialDoneHeroSvgCache != null) return _tutorialDoneHeroSvgCache;
+  try {
+    _tutorialDoneHeroSvgCache = fs.readFileSync(
+      path.join(__dirname, "..", "assets", "svg", "clawd-about-hero.svg"),
+      "utf8"
+    );
+  } catch (err) {
+    console.warn("Clawd: failed to read tutorial done hero:", err && err.message);
+    _tutorialDoneHeroSvgCache = "";
+  }
+  return _tutorialDoneHeroSvgCache;
+}
+
+const _tutorial = require("./tutorial")({
+  t: (key) => translate(key),
+  getI18n: () => getDashboardI18nPayload().translations,
+  getLang: () => lang,
+  getLangs: () => SUPPORTED_LANGS.slice(),
+  // Let the user override the (system-seeded) language right from the wizard.
+  // Persists as their chosen language; the set-lang IPC re-pushes state so the
+  // whole wizard re-localizes immediately.
+  setLang: (value) => {
+    if (typeof value === "string" && SUPPORTED_LANGS.includes(value)) {
+      _settingsController.applyUpdate("lang", value);
+    }
+  },
+  getHeroSrc: () => getTutorialHeroSrc(),
+  getDoneHeroSvg: () => getTutorialDoneHeroSvg(),
+  iconPath: settingsWindowRuntime.getIconPath(),
+  getAgentOnboardingState: () => buildTutorialAgentOnboardingState(),
+  // install/uninstall route through the controller's command API so the commit
+  // (integrationInstalled flag, hint cleanup, monitor start/stop) persists and
+  // validates exactly as the Settings → Agents path does.
+  installAgent: (agentId) => _settingsController.applyCommand("installAgentIntegration", { agentId }),
+  uninstallAgent: (agentId) => _settingsController.applyCommand("uninstallAgentIntegration", { agentId }),
+  registerShortcut: (payload) => _settingsController.applyCommand("registerShortcut", payload),
+  resetShortcut: (payload) => _settingsController.applyCommand("resetShortcut", payload),
+  // v1: deep-link to a specific tab is deferred — open Settings to its default tab.
+  openSettingsTab: () => settingsWindowRuntime.open(),
+  markTutorialSeen: () => {
+    _settingsController.applyUpdate("tutorialSeen", true);
+  },
+  getShortcutsSummary: () => buildTutorialShortcutsSummary(),
+  getTextScale: () => effectiveTextScaleForKey(
+    getWindowDisplayKey(_tutorial ? _tutorial.getWindow() : null) || getPetDisplayKey()
+  ),
+});
+
 const _sessionHud = require("./session-hud")({
   get win() { return win; },
   get petHidden() { return petWindowRuntime.isPetHidden(); },
@@ -2845,6 +2954,7 @@ const _menuCtx = {
   getActiveThemeCapabilities: () => themeRuntime.getActiveThemeCapabilities(),
   ensureUserThemesDir: () => themeLoader.ensureUserThemesDir(),
   openSettingsWindow: () => settingsWindowRuntime.open(),
+  showTutorial: () => _tutorial.open(),
 };
 const _menu = require("./menu")(_menuCtx);
 const { t, buildContextMenu, buildTrayMenu, rebuildAllMenus, createTray,
@@ -3126,6 +3236,10 @@ registerSettingsIpc({
     ? hardwareBuddyAdapter.createQuickCommand(payload)
     : { status: "error", code: "quick_commands_unavailable", message: "Quick Commands are unavailable" },
   checkForUpdates,
+  showTutorial: () => {
+    _tutorial.open();
+    return { status: "ok" };
+  },
   aboutHeroSvgPath: path.join(__dirname, "..", "assets", "svg", "clawd-about-hero.svg"),
   getLanWsServer: () => _lanWss,
 });
@@ -3586,6 +3700,15 @@ if (!gotTheLock) {
     }
     if (shouldOpenSettingsWindowFromArgv(process.argv)) {
       settingsWindowRuntime.open();
+    }
+    // First-run onboarding: anyone who has never seen the tutorial gets it once.
+    // `tutorialSeen` is persisted but deliberately NOT migration-backfilled, so
+    // existing users who update also see it once on their next launch, then the
+    // flag flips to true forever (any dismissal counts). See prefs.js SCHEMA.
+    try {
+      if (!_settingsController.get("tutorialSeen")) _tutorial.open();
+    } catch (err) {
+      console.warn("Clawd: failed to open first-run tutorial:", err && err.message);
     }
     codexPetMain.enqueueImportUrlsFromArgv(process.argv);
     codexPetMain.flushPendingImportUrls().catch((err) => {

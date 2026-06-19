@@ -9,10 +9,10 @@
 const path = require("path");
 const { BrowserWindow, nativeTheme, ipcMain, screen } = require("electron");
 
-const DEFAULT_WIDTH = 580;
-const DEFAULT_HEIGHT = 640;
-const MIN_WIDTH = 480;
-const MIN_HEIGHT = 540;
+const DEFAULT_WIDTH = 720;
+const DEFAULT_HEIGHT = 700;
+const MIN_WIDTH = 560;
+const MIN_HEIGHT = 600;
 
 function getBackgroundColor() {
   // Match tutorial.html's dark-mode palette to avoid a white flash before the
@@ -63,6 +63,9 @@ module.exports = function initTutorial(ctx = {}) {
     return {
       i18n: typeof ctx.getI18n === "function" ? ctx.getI18n() : {},
       lang: typeof ctx.getLang === "function" ? ctx.getLang() : "en",
+      langs: typeof ctx.getLangs === "function" ? ctx.getLangs() : [],
+      heroSrc: typeof ctx.getHeroSrc === "function" ? ctx.getHeroSrc() : "",
+      doneHeroSvg: typeof ctx.getDoneHeroSvg === "function" ? ctx.getDoneHeroSvg() : "",
       platform: process.platform,
       shortcuts: typeof ctx.getShortcutsSummary === "function" ? ctx.getShortcutsSummary() : [],
       agents,
@@ -111,11 +114,38 @@ module.exports = function initTutorial(ctx = {}) {
       return result;
     });
 
+    ipcMain.removeHandler("tutorial:register-shortcut");
+    ipcMain.handle("tutorial:register-shortcut", async (_e, payload) => {
+      const result = typeof ctx.registerShortcut === "function"
+        ? await ctx.registerShortcut(payload)
+        : { status: "error", message: "register shortcut not wired" };
+      sendState();
+      return result;
+    });
+
+    ipcMain.removeHandler("tutorial:reset-shortcut");
+    ipcMain.handle("tutorial:reset-shortcut", async (_e, payload) => {
+      const result = typeof ctx.resetShortcut === "function"
+        ? await ctx.resetShortcut(payload)
+        : { status: "error", message: "reset shortcut not wired" };
+      sendState();
+      return result;
+    });
+
     ipcMain.removeAllListeners("tutorial:open-settings-tab");
     ipcMain.on("tutorial:open-settings-tab", (_e, tab) => {
       try { if (typeof ctx.openSettingsTab === "function") ctx.openSettingsTab(tab); } catch (err) {
         console.warn("Clawd: tutorial openSettingsTab failed:", err && err.message);
       }
+    });
+
+    ipcMain.removeAllListeners("tutorial:set-lang");
+    ipcMain.on("tutorial:set-lang", (_e, value) => {
+      try { if (typeof ctx.setLang === "function") ctx.setLang(value); } catch (err) {
+        console.warn("Clawd: tutorial setLang failed:", err && err.message);
+      }
+      // Re-push so the wizard re-renders in the newly chosen language.
+      sendState();
     });
 
     ipcMain.removeAllListeners("tutorial:open-shortcuts");

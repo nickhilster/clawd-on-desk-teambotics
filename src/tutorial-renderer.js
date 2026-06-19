@@ -1,27 +1,40 @@
 "use strict";
 
 // Renderer for the first-run onboarding tutorial window (tutorial.html). Receives
-// a state payload from main (i18n, platform, detected agents, shortcuts), draws a
-// 5-step wizard, and routes step-2 install/cleanup actions back through
-// window.tutorialAPI. No inline scripts (CSP: script-src 'self').
+// a state payload from main (i18n, language list, product icon, detected
+// agents, shortcuts), draws a 5-step wizard, and routes selected
+// actions back through window.tutorialAPI. No inline scripts (CSP).
 
 (function () {
   const api = window.tutorialAPI || {};
 
   const STEPS = ["welcome", "agents", "shortcuts", "features", "done"];
-  let STATE = { i18n: {}, lang: "en", platform: "", agents: { install: [], cleanup: [], active: [] }, shortcuts: [] };
+  let STATE = {
+    i18n: {}, lang: "en", langs: [], heroSrc: "", doneHeroSvg: "", platform: "",
+    agents: { install: [], cleanup: [], active: [] }, shortcuts: [],
+  };
   let step = 0;
-  let installSel = new Set();
-  let cleanupSel = new Set();
-  let applying = false;
+  // agentIds with an in-flight connect/disconnect action, so we can show a
+  // scoped busy state and block double-clicks.
+  const busy = new Set();
+  const selected = { install: new Set(), cleanup: new Set() };
+  const knownSelectableIds = { install: new Set(), cleanup: new Set() };
+  let agentNotice = null;
+  let shortcutRecordingActionId = null;
+  let shortcutRecordingPartial = [];
+  let shortcutRecordingError = "";
+  let shortcutSavingActionId = null;
+  let shortcutFeedback = null;
 
-  const PET_SVG =
-    '<svg class="pet" viewBox="0 0 64 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-    '<path d="M14 24 L18 7 L31 19 Z" fill="#EF9F27"/><path d="M50 24 L46 7 L33 19 Z" fill="#EF9F27"/>' +
-    '<ellipse cx="32" cy="36" rx="22" ry="20" fill="#FAC775"/>' +
-    '<circle cx="24" cy="34" r="2.6" fill="#412402"/><circle cx="40" cy="34" r="2.6" fill="#412402"/>' +
-    '<path d="M27 41 Q32 45 37 41" stroke="#854F0B" stroke-width="2" fill="none" stroke-linecap="round"/>' +
-    '<circle cx="19" cy="40" r="2.4" fill="#F0997B" opacity="0.7"/><circle cx="45" cy="40" r="2.4" fill="#F0997B" opacity="0.7"/></svg>';
+  const shortcutActions = window.ClawdShortcutActions || {};
+
+  // Native language names — never translated, so a user who can't read the
+  // current UI language can still find their own.
+  const LANG_LABELS = { en: "English", zh: "简体中文", "zh-TW": "繁體中文", ko: "한국어", ja: "日本語" };
+
+  // Fallback mark only used if main couldn't read the icon file.
+  const FALLBACK_ICON =
+    '<span class="hero-fallback" aria-hidden="true">&lt;&gt;</span>';
 
   function i18n(key, fallback) {
     const v = STATE.i18n && STATE.i18n[key];
@@ -48,15 +61,12 @@
 
   function agentLabel(a) { return (a && (a.label || a.agentId)) || ""; }
 
-  function syncSelectionDefaults() {
-    const ag = STATE.agents || {};
-    installSel = new Set((ag.install || []).map((a) => a.agentId));
-    cleanupSel = new Set((ag.cleanup || []).map((a) => a.agentId));
-  }
-
   function normalizeState(s) {
     const out = s && typeof s === "object" ? s : {};
     out.i18n = out.i18n || {};
+    out.langs = out.langs || [];
+    out.heroSrc = typeof out.heroSrc === "string" ? out.heroSrc : "";
+    out.doneHeroSvg = typeof out.doneHeroSvg === "string" ? out.doneHeroSvg : "";
     out.agents = out.agents || { install: [], cleanup: [], active: [] };
     out.agents.install = out.agents.install || [];
     out.agents.cleanup = out.agents.cleanup || [];
@@ -74,93 +84,257 @@
 
   function finish() { try { if (api.finish) api.finish(); } catch (_) {} }
 
-  async function applyAgentsAndAdvance() {
-    if (applying) { return; }
-    const installs = [...installSel];
-    const cleanups = [...cleanupSel];
-    if (installs.length === 0 && cleanups.length === 0) { setStep(step + 1); return; }
-    applying = true;
-    render();
-    for (const id of installs) {
-      try { if (api.installAgent) await api.installAgent(id); } catch (_) {}
+  // ── Agent batch actions (selected, immediate, visible) ──
+  function reconcileSelection(kind, list) {
+    const live = new Set();
+    for (const a of list || []) {
+      if (!a || !a.agentId) continue;
+      live.add(a.agentId);
+      // New recommendations are selected by default. If the user manually
+      // unchecks one, state refreshes do not silently re-check it.
+      if (!knownSelectableIds[kind].has(a.agentId)) {
+        knownSelectableIds[kind].add(a.agentId);
+        selected[kind].add(a.agentId);
+      }
     }
-    for (const id of cleanups) {
-      try { if (api.uninstallAgent) await api.uninstallAgent(id); } catch (_) {}
+    for (const id of Array.from(knownSelectableIds[kind])) {
+      if (!live.has(id)) knownSelectableIds[kind].delete(id);
     }
-    applying = false;
-    // main re-pushes tutorial:state after each action; advance regardless.
-    setStep(step + 1);
+    for (const id of Array.from(selected[kind])) {
+      if (!live.has(id)) selected[kind].delete(id);
+    }
   }
 
-  // ── Step renderers → return a DOM node for the body ──
+  function selectedIds(kind) {
+    const list = kind === "cleanup" ? STATE.agents.cleanup : STATE.agents.install;
+    return (list || [])
+      .map((a) => a && a.agentId)
+      .filter((id) => id && selected[kind].has(id));
+  }
+
+  function setAgentNotice(kind, tone, key, fallback, values) {
+    let text = i18n(key, fallback);
+    const repl = values || {};
+    for (const k of Object.keys(repl)) {
+      text = text.replace(new RegExp("\\{" + k + "\\}", "g"), String(repl[k]));
+    }
+    agentNotice = { kind, tone, text };
+  }
+
+  async function runAgentBatch(kind) {
+    const ids = selectedIds(kind);
+    if (!ids.length) {
+      setAgentNotice(kind, "warn", "tutorialAgentsSelectNone", "Select at least one item first.");
+      render();
+      return;
+    }
+    if (ids.some((id) => busy.has(id))) return;
+
+    agentNotice = null;
+    for (const id of ids) busy.add(id);
+    render();
+
+    let ok = 0;
+    let failed = 0;
+    let firstError = "";
+    try {
+      for (const id of ids) {
+        let result = null;
+        try {
+          result = kind === "cleanup"
+            ? (api.uninstallAgent ? await api.uninstallAgent(id) : { status: "error", message: "uninstall not wired" })
+            : (api.installAgent ? await api.installAgent(id) : { status: "error", message: "install not wired" });
+        } catch (err) {
+          result = { status: "error", message: err && err.message };
+        }
+        if (result && result.status === "ok") {
+          ok++;
+        } else {
+          failed++;
+          if (!firstError) firstError = (result && result.message) || "unknown error";
+        }
+      }
+      if (failed > 0) {
+        setAgentNotice(kind, "error", "tutorialAgentsActionFailed",
+          "Could not update every selected item: {message}", { message: firstError || "unknown error" });
+      } else if (kind === "cleanup") {
+        setAgentNotice(kind, "ok", "tutorialAgentsCleanupDone",
+          "Done. The selected Clawd connections were disconnected.", { count: ok });
+      } else {
+        setAgentNotice(kind, "ok", "tutorialAgentsInstallDone",
+          "Done. Clawd is listening to the selected tools.", { count: ok });
+      }
+    } finally {
+      for (const id of ids) busy.delete(id);
+      render();
+    }
+  }
+
+  // ── Hero art ──
+  function heroNode(cls, kind) {
+    const wrap = el("div", { class: cls || "hero-art" });
+    if (kind === "done" && STATE.doneHeroSvg && STATE.doneHeroSvg.length) {
+      wrap.innerHTML = STATE.doneHeroSvg;
+    } else if (STATE.heroSrc && STATE.heroSrc.length) {
+      wrap.appendChild(el("img", { class: "hero-icon", src: STATE.heroSrc, alt: "" }));
+    } else {
+      wrap.innerHTML = FALLBACK_ICON;
+    }
+    return wrap;
+  }
+
+  // ── Step renderers ──
+
+  function renderLangPicker() {
+    const langs = (STATE.langs && STATE.langs.length) ? STATE.langs : ["en"];
+    const row = el("div", { class: "lang-picker" });
+    row.appendChild(el("span", { class: "lang-label" }, i18n("tutorialWelcomeLangLabel", "Language")));
+    const sel = el("select", {
+      class: "lang-select",
+      onchange: (e) => { if (api.setLang) api.setLang(e.target.value); },
+    });
+    for (const code of langs) sel.appendChild(el("option", { value: code }, LANG_LABELS[code] || code));
+    sel.value = STATE.lang;
+    row.appendChild(sel);
+    return row;
+  }
 
   function renderWelcome() {
-    return el("div", { class: "welcome" },
-      el("div", { html: PET_SVG }),
-      el("h2", { class: "step-title" }, i18n("tutorialWelcomeTitle", "Welcome to Clawd")),
-      el("p", { class: "step-sub" }, i18n("tutorialWelcomeBody",
-        "Your desktop companion reacts to your coding agent — it moves, sleeps, and celebrates along with your AI. Take a minute to get set up.")),
-      el("div", { class: "lang-note" }, i18n("tutorialWelcomeLangNote", "Shown in your system language")),
-    );
+    const wrap = el("div", { class: "welcome" });
+    wrap.appendChild(heroNode("hero-art hero-lg"));
+    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialWelcomeTitle", "Welcome to Clawd on Desk")));
+    wrap.appendChild(el("p", { class: "step-sub" }, i18n("tutorialWelcomeBody",
+      "Clawd follows the AI tools you choose, then reacts on your desktop when they work, wait for approval, or finish.")));
+    wrap.appendChild(renderLangPicker());
+    return wrap;
   }
 
-  function agentRow(a, kind) {
-    // kind: "active" (fixed check), "install" (info), "cleanup" (danger)
+  function initials(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  function statusBadge(kind) {
+    if (kind === "active") return el("span", { class: "ag-tag ok" }, i18n("tutorialAgentsActiveTag", "On"));
+    if (kind === "install") return el("span", { class: "ag-tag info" }, i18n("tutorialAgentsInstallTag", "Found"));
+    return el("span", { class: "ag-tag warn" }, i18n("tutorialAgentsCleanupTag", "Tool not found"));
+  }
+
+  function rowDesc(kind) {
+    if (kind === "active") return i18n("tutorialAgentsActiveRowDesc", "Clawd can listen when this tool sends activity.");
+    if (kind === "install") return i18n("tutorialAgentsInstallRowDesc", "Found on this computer. Let Clawd follow its activity.");
+    return i18n("tutorialAgentsCleanupRowDesc", "A Clawd connection exists, but the tool was not found.");
+  }
+
+  function agentAvatar(a, kind) {
+    return el("span", { class: "ag-avatar " + kind }, initials(agentLabel(a)));
+  }
+
+  function selectableAgentRow(a, kind) {
     const id = a.agentId;
-    const selected = kind === "install" ? installSel.has(id) : kind === "cleanup" ? cleanupSel.has(id) : false;
-    const fixed = kind === "active";
-    const cls = ["ag-row", fixed ? "fixed" : "selectable", (!fixed && selected) ? "checked" : ""].join(" ").trim();
-    const tag = kind === "active"
-      ? el("span", { class: "ag-tag ok" }, i18n("tutorialAgentsActiveTag", "Connected"))
-      : kind === "install"
-        ? el("span", { class: "ag-tag info" }, i18n("tutorialAgentsInstallTag", "Detected"))
-        : el("span", { class: "ag-tag danger" }, i18n("tutorialAgentsCleanupTag", "Remove"));
-    const box = fixed
-      ? el("span", { class: "ag-box", html: "&#10003;" })
-      : el("span", { class: "ag-box", html: selected ? "&#10003;" : "" });
-    const row = el("div", { class: cls }, box, el("span", { class: "ag-name" }, agentLabel(a)), tag);
-    if (!fixed) {
-      row.addEventListener("click", () => {
-        const set = kind === "install" ? installSel : cleanupSel;
-        if (set.has(id)) set.delete(id); else set.add(id);
+    const isBusy = busy.has(id);
+    const checkbox = el("input", {
+      type: "checkbox",
+      class: "ag-check",
+      checked: selected[kind].has(id) ? "" : null,
+      disabled: isBusy ? "" : null,
+      onchange: (e) => {
+        if (e.target.checked) selected[kind].add(id);
+        else selected[kind].delete(id);
+        agentNotice = null;
         render();
-      });
-    }
+      },
+    });
+    const row = el("label", { class: "ag-row selectable " + kind },
+      checkbox,
+      agentAvatar(a, kind),
+      el("span", { class: "ag-main" },
+        el("span", { class: "ag-titleline" },
+          el("span", { class: "ag-name" }, agentLabel(a)),
+          statusBadge(kind)),
+        el("span", { class: "ag-desc" }, rowDesc(kind))));
+    if (isBusy) row.appendChild(el("span", { class: "ag-row-busy" }, i18n("tutorialWorking", "Working…")));
     return row;
+  }
+
+  function activeAgentRow(a) {
+    return el("div", { class: "ag-row active" },
+      el("span", { class: "ag-ok", html: "&#10003;" }),
+      agentAvatar(a, "active"),
+      el("span", { class: "ag-main" },
+        el("span", { class: "ag-titleline" },
+          el("span", { class: "ag-name" }, agentLabel(a)),
+          statusBadge("active")),
+        el("span", { class: "ag-desc" }, rowDesc("active"))));
+  }
+
+  function agentNoticeNode(kind) {
+    if (!agentNotice || agentNotice.kind !== kind || !agentNotice.text) return null;
+    return el("div", { class: "ag-notice " + agentNotice.tone }, agentNotice.text);
+  }
+
+  function actionPanel(kind, entries, labelKey, labelFb, descKey, descFb, actionKey, actionFb, busyFb) {
+    const count = selectedIds(kind).length;
+    const isBusy = entries.some((a) => a && busy.has(a.agentId));
+    const panel = el("section", { class: "ag-panel " + kind },
+      el("div", { class: "ag-panel-head" },
+        el("div", { class: "ag-panel-copy" },
+          el("h3", { class: "ag-panel-title" }, i18n(labelKey, labelFb)),
+          el("p", { class: "ag-panel-desc" }, i18n(descKey, descFb))),
+        el("button", {
+          class: "ag-panel-action " + kind,
+          disabled: isBusy ? "" : null,
+          onclick: () => runAgentBatch(kind),
+        }, isBusy ? busyFb : i18n(actionKey, actionFb))));
+    for (const a of entries) panel.appendChild(selectableAgentRow(a, kind));
+    const notice = agentNoticeNode(kind);
+    if (notice) panel.appendChild(notice);
+    if (!isBusy && count === 0) panel.classList.add("none-selected");
+    return panel;
   }
 
   function renderAgents() {
     const ag = STATE.agents;
     const wrap = el("div", {});
-    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialAgentsTitle", "Connect your agents")));
+    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialAgentsTitle", "Let Clawd follow your AI tools")));
     wrap.appendChild(el("p", { class: "step-sub" }, i18n("tutorialAgentsSub",
-      "Clawd checked your machine. Confirm what to connect — and clean up any leftover hooks.")));
+      "This only changes Clawd's connection. It won't install or remove the tools themselves.")));
 
     const hasAny = ag.active.length || ag.install.length || ag.cleanup.length;
     if (!hasAny) {
       wrap.appendChild(el("div", { class: "empty-note" },
-        i18n("tutorialAgentsEmpty", "No agents detected yet. You can connect them anytime in Settings → Agents."),
-      ));
+        i18n("tutorialAgentsEmpty", "No agents detected yet. You can connect them anytime in Settings → Agents.")));
       wrap.appendChild(el("div", { style: "margin-top:12px" },
         el("span", { class: "inline-link", onclick: () => api.openSettingsTab && api.openSettingsTab("agents") },
-          i18n("tutorialAgentsOpenSettings", "Open Settings → Agents")),
-      ));
+          i18n("tutorialAgentsOpenSettings", "Open Settings → Agents"))));
       return wrap;
     }
 
-    if (ag.active.length) {
-      wrap.appendChild(el("div", { class: "group-label" }, i18n("tutorialAgentsActiveLabel", "Connected and working")));
-      for (const a of ag.active) wrap.appendChild(agentRow(a, "active"));
-    }
+    // Actionable recommendations first (enable, then cleanup), confirmation last.
     if (ag.install.length) {
-      wrap.appendChild(el("div", { class: "group-label" }, i18n("tutorialAgentsInstallLabel", "Detected — connect (installs the hook)")));
-      for (const a of ag.install) wrap.appendChild(agentRow(a, "install"));
+      wrap.appendChild(actionPanel("install", ag.install,
+        "tutorialAgentsInstallLabel", "Recommended to enable",
+        "tutorialAgentsInstallDesc", "Clawd found these tools on this computer. Select the ones it should follow.",
+        "tutorialAgentsInstallAction", "Enable selected",
+        i18n("tutorialAgentsInstallingSelected", "Enabling…")));
     }
     if (ag.cleanup.length) {
-      wrap.appendChild(el("div", { class: "group-label" }, i18n("tutorialAgentsCleanupLabel", "Hook installed, but this agent isn't on your machine — recommend removing")));
-      for (const a of ag.cleanup) wrap.appendChild(agentRow(a, "cleanup"));
-      wrap.appendChild(el("div", { class: "ag-note" }, i18n("tutorialAgentsCleanupNote",
-        "These were set up by default but the agent wasn't found — the leftover hook does nothing, so it's safe to remove.")));
+      wrap.appendChild(actionPanel("cleanup", ag.cleanup,
+        "tutorialAgentsCleanupLabel", "Recommended cleanup",
+        "tutorialAgentsCleanupDesc", "These Clawd connections still exist, but the tools were not found. Disconnect the ones you no longer use.",
+        "tutorialAgentsCleanupAction", "Disconnect selected",
+        i18n("tutorialAgentsDisconnectingSelected", "Disconnecting…")));
+    }
+    if (ag.active.length) {
+      const panel = el("section", { class: "ag-panel active" },
+        el("div", { class: "ag-panel-head" },
+          el("div", { class: "ag-panel-copy" },
+            el("h3", { class: "ag-panel-title" }, i18n("tutorialAgentsActiveLabel", "Already on")),
+            el("p", { class: "ag-panel-desc" }, i18n("tutorialAgentsActiveDesc", "Clawd is set up to listen to these tools.")))));
+      for (const a of ag.active) panel.appendChild(activeAgentRow(a));
+      wrap.appendChild(panel);
     }
     return wrap;
   }
@@ -177,33 +351,294 @@
     });
   }
 
-  function renderShortcuts() {
-    const wrap = el("div", {});
-    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialShortcutsTitle", "Keyboard shortcuts")));
-    wrap.appendChild(el("p", { class: "step-sub" }, i18n("tutorialShortcutsSub",
-      "Respond to permission requests without reaching for the mouse:")));
+  function isMac() {
+    return STATE.platform === "darwin";
+  }
 
-    const list = (STATE.shortcuts && STATE.shortcuts.length) ? STATE.shortcuts : [
-      { label: i18n("tutorialShortcutsAllow", "Approve current request"), accelerator: "CommandOrControl+Shift+Y" },
-      { label: i18n("tutorialShortcutsDeny", "Deny current request"), accelerator: "CommandOrControl+Shift+N" },
-    ];
-    for (const s of list) {
-      const keys = el("span", { class: "keys" });
-      for (const k of formatAccel(s.accelerator)) keys.appendChild(el("span", { class: "kbd" }, k));
-      wrap.appendChild(el("div", { class: "sc-row" },
-        el("span", { class: "sc-name" }, s.label || s.id || ""), keys));
+  function shortcutMeta(actionId) {
+    const actions = shortcutActions.SHORTCUT_ACTIONS || {};
+    return actions[actionId] || {};
+  }
+
+  function shortcutLabel(actionId, fallback) {
+    const meta = shortcutMeta(actionId);
+    return i18n(meta.labelKey, fallback || actionId);
+  }
+
+  function defaultEditableShortcuts() {
+    const ids = ["togglePet", "permissionAllow", "permissionDeny"];
+    return ids.map((id) => {
+      const meta = shortcutMeta(id);
+      return {
+        id,
+        label: shortcutLabel(id),
+        accelerator: meta.defaultAccelerator,
+        defaultAccelerator: meta.defaultAccelerator,
+        persistent: !!meta.persistent,
+      };
+    });
+  }
+
+  function editableShortcuts() {
+    return (STATE.shortcuts && STATE.shortcuts.length)
+      ? STATE.shortcuts
+      : defaultEditableShortcuts();
+  }
+
+  function formatShortcutValue(accelerator) {
+    const unassigned = i18n("shortcutUnassigned", "— unassigned —");
+    if (shortcutActions.formatAcceleratorLabel) {
+      return shortcutActions.formatAcceleratorLabel(accelerator, {
+        isMac: isMac(),
+        unassignedLabel: unassigned,
+      });
+    }
+    if (!accelerator) return unassigned;
+    return formatAccel(accelerator).join("+");
+  }
+
+  function translateShortcutError(message) {
+    if (!message) return "";
+    const conflictMatch = /^conflict: already bound to (.+)$/.exec(message);
+    if (conflictMatch) {
+      const otherId = conflictMatch[1];
+      return i18n("shortcutErrorConflict", "Conflict with {other}. Try another key.")
+        .replace("{other}", shortcutLabel(otherId, otherId));
+    }
+    if (message === "reserved accelerator") {
+      return i18n("shortcutErrorReserved", "That shortcut is reserved. Try another key.");
+    }
+    if (message === "invalid accelerator format") {
+      return i18n("shortcutErrorInvalid", "That shortcut is not valid.");
+    }
+    if (message === "must include modifier") {
+      return i18n("shortcutErrorNeedsModifier", "Use at least one modifier key.");
+    }
+    if (message.includes("unregister of old accelerator failed") || message.includes("system conflict")) {
+      return i18n("shortcutErrorSystemConflict", "Already in use by system or another app.");
+    }
+    return message;
+  }
+
+  function finishShortcutRecording() {
+    shortcutRecordingActionId = null;
+    shortcutRecordingPartial = [];
+    shortcutRecordingError = "";
+    render();
+  }
+
+  function beginShortcutRecording(actionId) {
+    if (shortcutSavingActionId) return;
+    shortcutRecordingActionId = actionId;
+    shortcutRecordingPartial = [];
+    shortcutRecordingError = "";
+    shortcutFeedback = null;
+    render();
+  }
+
+  async function handleShortcutCommit(actionId, accelerator) {
+    if (!api.registerShortcut) {
+      shortcutRecordingError = "tutorial shortcut API unavailable";
+      render();
+      return;
+    }
+    shortcutSavingActionId = actionId;
+    shortcutRecordingError = "";
+    render();
+    try {
+      const result = await api.registerShortcut({ actionId, accelerator });
+      if (result && result.status === "ok") {
+        shortcutFeedback = {
+          actionId,
+          tone: "ok",
+          text: i18n("shortcutToastSaved", "Saved."),
+        };
+        shortcutRecordingActionId = null;
+        shortcutRecordingPartial = [];
+        shortcutRecordingError = "";
+        return;
+      }
+      shortcutRecordingError = translateShortcutError(result && result.message);
+    } catch (err) {
+      shortcutRecordingError = (err && err.message) || "unknown error";
+    } finally {
+      shortcutSavingActionId = null;
+      render();
+    }
+  }
+
+  function handleShortcutRecordKey(event) {
+    if (!shortcutRecordingActionId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (shortcutSavingActionId) return;
+    if (!shortcutActions.buildAcceleratorFromEvent) {
+      shortcutRecordingError = "shortcut recorder unavailable";
+      render();
+      return;
+    }
+    const built = shortcutActions.buildAcceleratorFromEvent(event, { isMac: isMac() });
+    if (!built) return;
+    if (built.action === "pending") {
+      shortcutRecordingPartial = Array.isArray(built.modifiers) ? built.modifiers : [];
+      shortcutRecordingError = "";
+      render();
+      return;
+    }
+    if (built.action === "cancel") {
+      finishShortcutRecording();
+      return;
+    }
+    if (built.action === "reject") {
+      shortcutRecordingPartial = [];
+      shortcutRecordingError = translateShortcutError(built.reason);
+      render();
+      return;
+    }
+    if (built.action === "commit") {
+      handleShortcutCommit(shortcutRecordingActionId, built.accelerator);
+    }
+  }
+
+  async function resetShortcut(actionId) {
+    if (!api.resetShortcut || shortcutRecordingActionId || shortcutSavingActionId) return;
+    shortcutFeedback = null;
+    shortcutSavingActionId = actionId;
+    render();
+    try {
+      const result = await api.resetShortcut({ actionId });
+      if (result && result.status === "ok") {
+        shortcutFeedback = {
+          actionId,
+          tone: "ok",
+          text: i18n("shortcutToastSaved", "Saved."),
+        };
+      } else {
+        shortcutFeedback = {
+          actionId,
+          tone: "error",
+          text: translateShortcutError(result && result.message),
+        };
+      }
+    } catch (err) {
+      shortcutFeedback = {
+        actionId,
+        tone: "error",
+        text: (err && err.message) || "unknown error",
+      };
+    } finally {
+      shortcutSavingActionId = null;
+      render();
+    }
+  }
+
+  function shortcutValueNode(text) {
+    return el("span", { class: "shortcut-value-pill" }, text);
+  }
+
+  function fixedKeyNode(keysText) {
+    const keys = el("span", { class: "keys fixed-keys" });
+    for (const part of String(keysText || "").split(/\s*\/\s*/).filter(Boolean)) {
+      keys.appendChild(el("span", { class: "kbd" }, part));
+    }
+    return keys;
+  }
+
+  function renderEditableShortcutRow(item) {
+    const actionId = item.id;
+    const isRecording = shortcutRecordingActionId === actionId;
+    const isSaving = shortcutSavingActionId === actionId;
+    const anyRecording = !!shortcutRecordingActionId;
+    let valueText = formatShortcutValue(item.accelerator);
+    let statusText = "";
+    let tone = "";
+
+    if (isRecording) {
+      valueText = shortcutRecordingPartial.length && shortcutActions.formatAcceleratorPartial
+        ? shortcutActions.formatAcceleratorPartial(shortcutRecordingPartial, { isMac: isMac() })
+        : i18n("shortcutRecordingHint", "Press keys (Esc)");
+      statusText = isSaving
+        ? i18n("tutorialShortcutChecking", "Checking…")
+        : (shortcutRecordingError || i18n("tutorialShortcutRecordingHelp", "Press a new shortcut. Esc cancels."));
+      tone = shortcutRecordingError ? "error" : "recording";
+    } else if (shortcutFeedback && shortcutFeedback.actionId === actionId) {
+      statusText = shortcutFeedback.text;
+      tone = shortcutFeedback.tone;
     }
 
-    wrap.appendChild(el("div", { style: "margin-top:14px" },
-      el("span", { class: "inline-link", onclick: () => api.openShortcuts && api.openShortcuts() },
-        i18n("tutorialShortcutsChange", "Change these in Settings → Shortcuts"))));
+    const isDefault = item.accelerator === item.defaultAccelerator;
+    return el("div", {
+      class: "sc-row editable" + (isRecording ? " recording" : ""),
+      "data-shortcut-action-id": actionId,
+    },
+      el("span", { class: "sc-copy" },
+        el("span", { class: "sc-name" }, item.label || shortcutLabel(actionId, actionId)),
+        statusText ? el("span", { class: "sc-status " + tone }, statusText) : null),
+      shortcutValueNode(valueText),
+      el("span", { class: "sc-actions" },
+        el("button", {
+          class: "sc-btn",
+          disabled: anyRecording || shortcutSavingActionId ? "" : null,
+          onclick: () => beginShortcutRecording(actionId),
+        }, i18n("shortcutRecordButton", "Change")),
+        el("button", {
+          class: "sc-btn",
+          disabled: anyRecording || shortcutSavingActionId || isDefault ? "" : null,
+          onclick: () => resetShortcut(actionId),
+        }, i18n("shortcutResetButton", "Reset"))));
+  }
+
+  function fixedShortcuts() {
+    return [
+      { key: "shortcutLabelBubbleNextOption", fallback: "Next approval option", keys: "Tab / ↓" },
+      { key: "shortcutLabelBubblePrevOption", fallback: "Previous approval option", keys: "Shift+Tab / ↑" },
+      { key: "shortcutLabelBubbleToggleOption", fallback: "Toggle selected option", keys: "Space" },
+      { key: "shortcutLabelBubbleSubmit", fallback: "Submit approval choice", keys: "Enter" },
+      { key: "shortcutLabelPetReveal", fallback: "Bring Clawd forward", keys: i18n("tutorialShortcutClickPet", "Click pet") },
+      {
+        key: "shortcutLabelOpenDashboard",
+        fallback: "Open session dashboard",
+        keys: isMac() ? "⌘ + Click pet" : "Ctrl + Click pet",
+      },
+    ];
+  }
+
+  function renderFixedShortcutRow(item) {
+    return el("div", { class: "sc-row fixed" },
+      el("span", { class: "sc-copy" },
+        el("span", { class: "sc-name" }, i18n(item.key, item.fallback))),
+      fixedKeyNode(item.keys));
+  }
+
+  function renderShortcutSection(titleKey, titleFb, descKey, descFb, children) {
+    return el("section", { class: "shortcut-section" },
+      el("div", { class: "shortcut-section-head" },
+        el("h3", { class: "shortcut-section-title" }, i18n(titleKey, titleFb)),
+        el("p", { class: "shortcut-section-desc" }, i18n(descKey, descFb))),
+      children);
+  }
+
+  function renderShortcuts() {
+    const wrap = el("div", {});
+    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialShortcutsTitle", "Set your shortcuts")));
+    wrap.appendChild(el("p", { class: "step-sub" }, i18n("tutorialShortcutsSub",
+      "Change the shortcuts you will actually use. Built-in keys are listed below for reference.")));
+
+    wrap.appendChild(renderShortcutSection(
+      "tutorialShortcutsEditableTitle", "Can change now",
+      "tutorialShortcutsEditableDesc", "Pick the shortcuts you want. Clawd checks conflicts when you save.",
+      editableShortcuts().map(renderEditableShortcutRow)));
+    wrap.appendChild(renderShortcutSection(
+      "tutorialShortcutsFixedTitle", "Built in",
+      "tutorialShortcutsFixedDesc", "These keys and gestures work as-is, so there is nothing to configure.",
+      fixedShortcuts().map(renderFixedShortcutRow)));
     wrap.appendChild(el("div", { class: "hint" }, i18n("tutorialShortcutsHint",
-      "Tip: “Auto-approve all requests” is a right-click menu switch — handy, but it approves everything, so use it deliberately.")));
+      "You can always click the bubble with the mouse too. Shortcuts are just there when you want to stay in the keyboard.")));
     return wrap;
   }
 
-  function featureCard(titleKey, titleFb, descKey, descFb, plat) {
-    const card = el("div", { class: "fcard" },
+  function featureCard(titleKey, titleFb, descKey, descFb, plat, extraClass) {
+    const card = el("div", { class: "fcard" + (extraClass ? " " + extraClass : "") },
       el("h3", {}, i18n(titleKey, titleFb)),
       el("p", {}, i18n(descKey, descFb)));
     if (plat) card.appendChild(el("span", { class: "plat" }, plat));
@@ -212,32 +647,33 @@
 
   function renderFeatures() {
     const wrap = el("div", {});
-    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialFeaturesTitle", "More to explore")));
+    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialFeaturesTitle", "Useful things to try later")));
     wrap.appendChild(el("p", { class: "step-sub" }, i18n("tutorialFeaturesSub",
-      "A few things people love once they find them:")));
+      "Nothing here is required for setup. These are handy once Clawd is running.")));
     const grid = el("div", { class: "features" },
-      featureCard("tutorialFeatureDrag", "Drag a folder onto the pet",
-        "tutorialFeatureDragDesc", "Drop a folder on Clawd to open a terminal there.", "Windows / Linux"),
-      featureCard("tutorialFeatureAuto", "Auto-approve all requests",
-        "tutorialFeatureAutoDesc", "A right-click switch to stop confirming every permission."),
-      featureCard("tutorialFeatureThemes", "Themes & mini mode",
-        "tutorialFeatureThemesDesc", "Swap characters, or pin a tiny pet to a screen edge."),
+      featureCard("tutorialFeatureDrag", "Drop a project folder",
+        "tutorialFeatureDragDesc", "Drop a folder on Clawd to open a terminal in that directory.", "Windows / Linux"),
+      featureCard("tutorialFeatureThemes", "Themes and mini mode",
+        "tutorialFeatureThemesDesc", "Switch character themes, or tuck Clawd against a screen edge."),
       featureCard("tutorialFeatureMobile", "Phone / Telegram approval",
-        "tutorialFeatureMobileDesc", "Approve permission requests from your phone."),
+        "tutorialFeatureMobileDesc", "Handle permission requests from your phone when you are away."),
+      featureCard("tutorialFeatureAuto", "Auto-approve requests",
+        "tutorialFeatureAutoDesc", "Enable only when you fully trust the agent; every request is allowed automatically.", null, "advanced"),
     );
     wrap.appendChild(grid);
-    wrap.appendChild(el("div", { style: "margin-top:14px" },
-      el("span", { class: "inline-link", onclick: () => api.openSettingsTab && api.openSettingsTab("general") },
-        i18n("tutorialFeaturesOpenSettings", "Open Settings to explore everything"))));
     return wrap;
   }
 
   function renderDone() {
-    return el("div", { class: "done" },
-      el("div", { html: PET_SVG }),
-      el("h2", { class: "step-title" }, i18n("tutorialDoneTitle", "You're all set")),
-      el("p", { class: "step-sub" }, i18n("tutorialDoneBody",
-        "Right-click the pet anytime to see this tutorial again. Have fun!")));
+    const wrap = el("div", { class: "done" });
+    wrap.appendChild(heroNode("hero-art hero-sm hero-svg", "done"));
+    wrap.appendChild(el("h2", { class: "step-title" }, i18n("tutorialDoneTitle", "You're all set")));
+    wrap.appendChild(el("p", { class: "step-sub" }, i18n("tutorialDoneBody",
+      "Start a connected AI tool and Clawd will react on your desktop. You can reopen this guide from Settings → General.")));
+    wrap.appendChild(el("div", { style: "margin-top:14px" },
+      el("span", { class: "inline-link", onclick: () => api.openSettingsTab && api.openSettingsTab("general") },
+        i18n("tutorialDoneOpenSettings", "Open Settings"))));
+    return wrap;
   }
 
   const BODY_RENDERERS = {
@@ -253,30 +689,29 @@
   function renderSteps() {
     const host = document.getElementById("steps");
     host.textContent = "";
-    for (let i = 0; i < STEPS.length; i += 1) {
-      if (i > 0) host.appendChild(el("span", { class: "seg" }));
-      const cls = "dot" + (i === step ? " active" : i < step ? " done" : "");
-      host.appendChild(el("span", { class: cls }));
-    }
+    host.appendChild(el("span", { class: "step-count" }, (step + 1) + " / " + STEPS.length));
+    const track = el("div", {
+      class: "step-track",
+      role: "progressbar",
+      "aria-valuemin": "1",
+      "aria-valuemax": String(STEPS.length),
+      "aria-valuenow": String(step + 1),
+    });
+    const fill = el("span", { class: "step-fill" });
+    fill.style.width = Math.round(((step + 1) / STEPS.length) * 100) + "%";
+    track.appendChild(fill);
+    host.appendChild(track);
   }
 
   function primaryLabel() {
     const name = STEPS[step];
     if (name === "welcome") return i18n("tutorialGetStarted", "Get started");
     if (name === "done") return i18n("tutorialFinish", "Finish");
-    if (name === "agents") {
-      const n = installSel.size, m = cleanupSel.size;
-      if (applying) return i18n("tutorialWorking", "Working…");
-      if (n === 0 && m === 0) return i18n("tutorialContinue", "Continue");
-      return i18n("tutorialApplyContinue", "Apply & continue");
-    }
     return i18n("tutorialContinue", "Continue");
   }
 
   function onPrimary() {
-    const name = STEPS[step];
-    if (name === "done") { finish(); return; }
-    if (name === "agents") { applyAgentsAndAdvance(); return; }
+    if (STEPS[step] === "done") { finish(); return; }
     setStep(step + 1);
   }
 
@@ -292,14 +727,13 @@
       host.appendChild(el("button", { class: "btn btn-ghost", onclick: finish },
         i18n("tutorialSkip", "Skip tutorial")));
     }
-    const primary = el("button", { class: "btn btn-primary", onclick: onPrimary }, primaryLabel());
-    if (applying) primary.disabled = true;
-    host.appendChild(primary);
+    host.appendChild(el("button", { class: "btn btn-primary", onclick: onPrimary }, primaryLabel()));
   }
 
   function render() {
     renderSteps();
     const body = document.getElementById("body");
+    body.className = "body step-" + STEPS[step];
     body.textContent = "";
     body.appendChild((BODY_RENDERERS[STEPS[step]] || renderWelcome)());
     renderFooter();
@@ -307,9 +741,24 @@
 
   function adopt(s) {
     STATE = normalizeState(s);
-    syncSelectionDefaults();
+    reconcileSelection("install", STATE.agents.install);
+    reconcileSelection("cleanup", STATE.agents.cleanup);
     render();
   }
+
+  document.addEventListener("keydown", handleShortcutRecordKey, true);
+  window.addEventListener("blur", () => {
+    if (shortcutRecordingActionId) finishShortcutRecording();
+  });
+  document.addEventListener("mousedown", (event) => {
+    if (!shortcutRecordingActionId) return;
+    const target = event.target;
+    const row = target && typeof target.closest === "function"
+      ? target.closest("[data-shortcut-action-id]")
+      : null;
+    if (row && row.getAttribute("data-shortcut-action-id") === shortcutRecordingActionId) return;
+    finishShortcutRecording();
+  });
 
   if (api.onState) api.onState((s) => adopt(s));
   if (api.getState) {
