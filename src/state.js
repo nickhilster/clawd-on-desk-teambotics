@@ -170,8 +170,19 @@ const UPDATE_VISUAL_PRIORITY_MAP = {
 };
 
 // ── Wake poll ──
+const WAKE_POLL_START_DELAY_MS = 500;
+// Cursor-sample cadence while dozing/collapsing/sleeping. (A low-power idle-mode
+// slowdown was tried here and removed: real-machine powermetrics showed no wakeup
+// or CPU win — macOS timer coalescing absorbs a 200ms timer — for added latency.)
+const WAKE_POLL_MS = 200;
+let wakePollStartTimer = null;
+let wakePollStartState = null;
 let wakePollTimer = null;
 let lastWakeCursorX = null, lastWakeCursorY = null;
+
+function isWakePollState(state) {
+  return state === "dozing" || state === "collapsing" || state === "sleeping";
+}
 
 // ── Kimi CLI permission hold ──
 // Keeps the pet in notification state while Kimi is waiting for user approval.
@@ -581,10 +592,8 @@ function applyState(state, svgOverride, options = {}) {
     ctx.sendToRenderer("eye-move", 0, 0);
   }
 
-  if ((state === "dozing" || state === "collapsing" || state === "sleeping") && !ctx.doNotDisturb) {
-    setTimeout(() => {
-      if (currentState === state) startWakePoll();
-    }, 500);
+  if (isWakePollState(state) && !ctx.doNotDisturb) {
+    scheduleWakePollStart(state);
   } else {
     stopWakePoll();
   }
@@ -622,31 +631,64 @@ function applyState(state, svgOverride, options = {}) {
 }
 
 // ── Wake poll ──
+function clearWakePollStartTimer() {
+  if (!wakePollStartTimer) return;
+  clearTimeout(wakePollStartTimer);
+  wakePollStartTimer = null;
+  wakePollStartState = null;
+}
+
+function scheduleWakePollStart(state) {
+  if (wakePollTimer) return;
+  if (wakePollStartTimer && wakePollStartState === state) return;
+  clearWakePollStartTimer();
+  wakePollStartState = state;
+  wakePollStartTimer = setTimeout(() => {
+    wakePollStartTimer = null;
+    wakePollStartState = null;
+    if (currentState === state) startWakePoll();
+  }, WAKE_POLL_START_DELAY_MS);
+}
+
 function startWakePoll() {
   if (!_getCursor || wakePollTimer) return;
+  if (!isWakePollState(currentState) || ctx.doNotDisturb) return;
   const cursor = _getCursor();
   lastWakeCursorX = cursor.x;
   lastWakeCursorY = cursor.y;
+  scheduleWakePollTick();
+}
 
-  wakePollTimer = setInterval(() => {
-    const cursor = _getCursor();
-    const moved = cursor.x !== lastWakeCursorX || cursor.y !== lastWakeCursorY;
+function scheduleWakePollTick(delay = WAKE_POLL_MS) {
+  if (!_getCursor || wakePollTimer) return;
+  clearWakePollStartTimer();
+  wakePollTimer = setTimeout(runWakePollTick, delay);
+}
 
-    if (moved) {
-      stopWakePoll();
-      wakeFromDoze();
-      return;
-    }
+function runWakePollTick() {
+  wakePollTimer = null;
+  if (!_getCursor || !isWakePollState(currentState) || ctx.doNotDisturb) return;
+  const cursor = _getCursor();
+  const moved = cursor.x !== lastWakeCursorX || cursor.y !== lastWakeCursorY;
 
-    if (currentState === "dozing" && Date.now() - ctx.mouseStillSince >= DEEP_SLEEP_TIMEOUT) {
-      stopWakePoll();
-      applyState("collapsing");
-    }
-  }, 200);
+  if (moved) {
+    stopWakePoll();
+    wakeFromDoze();
+    return;
+  }
+
+  if (currentState === "dozing" && Date.now() - ctx.mouseStillSince >= DEEP_SLEEP_TIMEOUT) {
+    applyState("collapsing");
+    scheduleWakePollTick();
+    return;
+  }
+
+  scheduleWakePollTick();
 }
 
 function stopWakePoll() {
-  if (wakePollTimer) { clearInterval(wakePollTimer); wakePollTimer = null; }
+  clearWakePollStartTimer();
+  if (wakePollTimer) { clearTimeout(wakePollTimer); wakePollTimer = null; }
 }
 
 function wakeFromDoze() {
@@ -1989,7 +2031,7 @@ function cleanup() {
   clearAllCompletionDebounces();
   if (eyeResendTimer) clearTimeout(eyeResendTimer);
   if (startupRecoveryTimer) clearTimeout(startupRecoveryTimer);
-  if (wakePollTimer) clearInterval(wakePollTimer);
+  stopWakePoll();
   for (const { timer } of kimiPermissionHolds.values()) {
     if (timer) clearTimeout(timer);
   }

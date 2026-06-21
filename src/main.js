@@ -1719,6 +1719,7 @@ const _sessionHud = require("./session-hud")({
   get sessionHudShowElapsed() { return sessionHudShowElapsed; },
   get sessionHudShowContextUsage() { return sessionHudShowContextUsage; },
   get sessionHudPinned() { return sessionHudPinned; },
+  get lowPowerIdleMode() { return lowPowerIdleMode; },
   getMiniMode: () => _mini.getMiniMode(),
   getMiniTransitioning: () => _mini.getMiniTransitioning(),
   getSessionSnapshot: () => _state.buildSessionSnapshot(),
