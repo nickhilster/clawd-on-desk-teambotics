@@ -33,7 +33,7 @@ test("second-instance relaunch exits hidden state through the pet visibility sta
   );
 });
 
-test("hitWin renderer crash clears drag state before reloading the hit window", () => {
+test("hitWin renderer crash clears transient interaction state before reloading", () => {
   const source = readMain();
   const start = source.indexOf("onRenderProcessGone: (details, ownedHitWin) => {");
   assert.ok(start >= 0, "hitWin render-process-gone handler should be present");
@@ -44,6 +44,10 @@ test("hitWin renderer crash clears drag state before reloading the hit window", 
 
   assert.ok(handler.includes("petWindowRuntime.setDragLocked(false);"));
   assert.ok(handler.includes("petWindowRuntime.clearDragSnapshot();"));
+  assert.ok(handler.includes("idlePaused = false;"));
+  assert.ok(handler.includes("mouseOverPet = false;"));
   assert.ok(handler.indexOf("petWindowRuntime.setDragLocked(false);") < handler.indexOf(reload));
   assert.ok(handler.indexOf("petWindowRuntime.clearDragSnapshot();") < handler.indexOf(reload));
+  assert.ok(handler.indexOf("idlePaused = false;") < handler.indexOf(reload));
+  assert.ok(handler.indexOf("mouseOverPet = false;") < handler.indexOf(reload));
 });

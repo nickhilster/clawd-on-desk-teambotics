@@ -30,7 +30,6 @@ const NON_RELOADABLE_RENDER_GONE_REASONS = new Set([
   "killed",
   "integrity-failure",
   "launch-failed",
-  "launched-failed",
 ]);
 
 function isLiveWindow(win) {

@@ -3338,6 +3338,8 @@ function createWindow() {
       safeConsoleError("hitWin renderer crashed:", details.reason);
       petWindowRuntime.setDragLocked(false);
       petWindowRuntime.clearDragSnapshot();
+      idlePaused = false;
+      mouseOverPet = false;
       petWindowRuntime.reloadWindowWebContents(ownedHitWin, { crashKey: "hitWin", details });
     },
   });
