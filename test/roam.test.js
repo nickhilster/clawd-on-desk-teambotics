@@ -53,11 +53,15 @@ function makeCtx(overrides = {}) {
 
 describe("roam module", () => {
   beforeEach(() => {
+    const randomValues = [0.9, 0.9, 0.9, 0.1];
+    let randomIndex = 0;
+    mock.method(Math, "random", () => randomValues[randomIndex++ % randomValues.length]);
     mock.timers.enable({ apis: ["setTimeout", "Date"] });
   });
 
   afterEach(() => {
     mock.timers.reset();
+    mock.reset();
   });
 
   it("does not schedule roam when disabled", () => {
