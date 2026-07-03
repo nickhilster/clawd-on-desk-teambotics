@@ -162,8 +162,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "rullerzhou-afk",
-        "repo": "clawd-on-desk"
+        "owner": "nickhilster",
+        "repo": "clawd-on-desk-teambotics"
       }
     ]
   },
