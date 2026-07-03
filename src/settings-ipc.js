@@ -3,6 +3,25 @@
 const defaultFs = require("fs");
 const defaultPath = require("path");
 const settingsThemeImporter = require("./settings-theme-importer");
+let qrcodeGenerator = null;
+try {
+  qrcodeGenerator = require("qrcode-generator");
+} catch {
+  qrcodeGenerator = null;
+}
+
+function buildPairUrlQrSvg(pairUrl) {
+  if (!qrcodeGenerator || typeof pairUrl !== "string" || !pairUrl) return null;
+  try {
+    const qr = qrcodeGenerator(0, "M");
+    qr.addData(pairUrl);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 4, margin: 8, scalable: true });
+  } catch (err) {
+    console.warn("Clawd: QR code generation failed:", err && err.message);
+    return null;
+  }
+}
 
 const SOUND_OVERRIDE_ASSET_EXTS = new Set([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]);
 const SOUND_OVERRIDE_DIALOG_STRINGS = {
@@ -473,7 +492,8 @@ function registerSettingsIpc(options = {}) {
       }
       const nameParam = machineName ? `&name=${encodeURIComponent(machineName)}` : "";
       const pairUrl = `http://${lanIp}:${port}/mobile/?host=${lanIp}&port=${port}&token=${tok}${nameParam}`;
-      return { status: "ok", port, token: tok, lanIp, machineId, machineName, pairUrl };
+      const qrSvg = buildPairUrlQrSvg(pairUrl);
+      return { status: "ok", port, token: tok, lanIp, machineId, machineName, pairUrl, qrSvg };
     } catch (err) {
       return { status: "error", message: (err && err.message) || String(err) };
     }
