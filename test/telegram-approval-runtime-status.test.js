@@ -129,6 +129,68 @@ test("off transport keeps the legacy disabled reason after USER_DISABLE", () => 
   assert.equal(status.message, "");
 });
 
+test("legacy runtime-failure overlay keeps the badge failed even if live sidecar is stopped", () => {
+  const status = buildTelegramApprovalStatus({
+    config: COMPLETE_CONFIG_ENABLED,
+    token: TOKEN_STORED,
+    // Live handle already torn down / cleared — without the overlay this would
+    // read back as "ready" and contradict the migration card (issue #430).
+    sidecarStatus: { status: "stopped" },
+    migrationSnapshot: {
+      state: "LEGACY_ACTIVE",
+      transport: "legacy",
+      runtimeStatus: {
+        transport: "legacy",
+        status: "failed",
+        reason: "sidecar_runtime_failed",
+        message: "sidecar exited (signal SIGTERM)",
+      },
+    },
+    nativePolling: false,
+  });
+
+  assert.equal(status.transport, "legacy");
+  assert.equal(status.status, "failed");
+  assert.equal(status.reason, "sidecar_runtime_failed");
+  assert.equal(status.message, "sidecar exited (signal SIGTERM)");
+});
+
+test("legacy runtime overlay never forges running from a stale runtime-status", () => {
+  const status = buildTelegramApprovalStatus({
+    config: COMPLETE_CONFIG_ENABLED,
+    token: TOKEN_STORED,
+    sidecarStatus: { status: "stopped" },
+    migrationSnapshot: {
+      state: "LEGACY_ACTIVE",
+      transport: "legacy",
+      runtimeStatus: { transport: "legacy", status: "running", reason: null, message: "" },
+    },
+    nativePolling: false,
+  });
+
+  // Overlay only honours "failed"; "running" must come from the live sidecar.
+  assert.equal(status.status, "stopped");
+});
+
+test("legacy runtime overlay is dropped once the owner left legacy (stale failed after disable)", () => {
+  const status = buildTelegramApprovalStatus({
+    config: COMPLETE_CONFIG_DISABLED,
+    token: TOKEN_STORED,
+    sidecarStatus: { status: "stopped" },
+    migrationSnapshot: {
+      // User disabled after a failure: state moved to IDLE/off, but a stale
+      // legacy failed runtimeStatus lingers. It must NOT keep the badge red.
+      state: "IDLE",
+      transport: "off",
+      runtimeStatus: { transport: "legacy", status: "failed", reason: "sidecar_runtime_failed", message: "boom" },
+    },
+    nativePolling: false,
+  });
+
+  assert.equal(status.status, "stopped");
+  assert.notEqual(status.status, "failed");
+});
+
 test("native selection includes persisted native transport while excluding off", () => {
   assert.equal(isNativeTelegramApprovalSelected({ state: "NATIVE_ACTIVE" }), true);
   assert.equal(isNativeTelegramApprovalSelected({ state: "TESTING_NATIVE" }), true);

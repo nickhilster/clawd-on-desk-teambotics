@@ -83,12 +83,18 @@ function update(api, o = {}) {
       displayHint: o.displayHint,
       sessionTitle: o.sessionTitle ?? null,
       contextUsage: o.contextUsage ?? null,
+      antigravityQuota: o.antigravityQuota ?? null,
+      claudeQuota: o.claudeQuota ?? null,
       platform: o.platform ?? null,
       model: o.model ?? null,
       provider: o.provider ?? null,
       codexOriginator: o.codexOriginator ?? null,
       codexSource: o.codexSource ?? null,
       ghosttyTerminalId: o.ghosttyTerminalId ?? null,
+      assistantLastOutput: o.assistantLastOutput ?? null,
+      assistantLastOutputTruncated: o.assistantLastOutputTruncated ?? false,
+      toolName: o.toolName ?? null,
+      transcriptPath: o.transcriptPath ?? null,
       backgroundTasksCount: o.backgroundTasksCount ?? 0,
       sessionCronsCount: o.sessionCronsCount ?? 0,
       stopHookActive: o.stopHookActive ?? false,
@@ -604,6 +610,47 @@ describe("wake poll behavior", () => {
     mock.timers.tick(500); // wake poll delay
     mock.timers.tick(200); // poll fires, checks DEEP_SLEEP_TIMEOUT
     assert.strictEqual(api.getCurrentState(), "collapsing");
+  });
+
+  // ── wake-poll lifecycle hardening (kept after the low-power cadence change was
+  // dropped): the start timer is now tracked so it can't fire after teardown. ──
+  it("keeps the wake cursor baseline when state changes mid-poll", () => {
+    api.applyState("collapsing");
+    mock.timers.tick(500); // start delay → wake poll begins, baseline = current cursor
+    api.applyState("sleeping"); // state change must NOT reset the baseline or the timer
+    fakeCursor.x = 200;
+    mock.timers.tick(200); // existing poll still sees movement from the original baseline
+    assert.strictEqual(api.getCurrentState(), "waking");
+  });
+
+  it("cleanup clears a pending wake-poll start before it samples the cursor", () => {
+    let cursorCalls = 0;
+    api.cleanup();
+    ctx = makeCtx({
+      getCursorScreenPoint: () => { cursorCalls += 1; return { ...fakeCursor }; },
+    });
+    api = require("../src/state")(ctx);
+
+    api.applyState("dozing"); // schedules the 500ms wake-poll start
+    api.cleanup();            // must cancel the pending start timer
+    mock.timers.tick(500);
+
+    assert.strictEqual(cursorCalls, 0);
+  });
+
+  it("DND clears a pending wake-poll start before it samples the cursor", () => {
+    let cursorCalls = 0;
+    api.cleanup();
+    ctx = makeCtx({
+      getCursorScreenPoint: () => { cursorCalls += 1; return { ...fakeCursor }; },
+    });
+    api = require("../src/state")(ctx);
+
+    api.applyState("dozing");
+    api.enableDoNotDisturb(); // leaving the wake-poll states must cancel the pending start
+    mock.timers.tick(500);
+
+    assert.strictEqual(cursorCalls, 0);
   });
 });
 
@@ -1374,6 +1421,217 @@ describe("updateSession()", () => {
     assert.strictEqual(api.getCurrentState(), "attention");
   });
 
+  it("does not replay the completion animation for a duplicate Stop without progress", () => {
+    const soundsPlayed = [];
+    const stateChanges = [];
+    api.cleanup();
+    ctx = makeCtx({
+      processKill: () => true,
+      playSound: (name) => soundsPlayed.push(name),
+      sendToRenderer: (channel, state) => {
+        if (channel === "state-change") stateChanges.push(state);
+      },
+    });
+    api = require("../src/state")(ctx);
+
+    update(api, { id: "s1", state: "working" });
+    mock.timers.tick(1000);
+    stateChanges.length = 0;
+
+    update(api, { id: "s1", state: "attention", event: "Stop" });
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 1);
+    assert.deepStrictEqual(stateChanges, ["attention"]);
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
+    mock.timers.tick(4000);
+    assert.strictEqual(api.getCurrentState(), "idle");
+
+    soundsPlayed.length = 0;
+    stateChanges.length = 0;
+    update(api, { id: "s1", state: "attention", event: "Stop" });
+
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 0);
+    assert.ok(!stateChanges.includes("attention"), "duplicate Stop must not re-send attention");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
+    assert.strictEqual(api.getCurrentState(), "idle");
+  });
+
+  it("Codex Stop followed by token_count and task_complete still auto-returns from attention", () => {
+    const soundsPlayed = [];
+    const stateChanges = [];
+    api.cleanup();
+    ctx = makeCtx({
+      processKill: () => true,
+      playSound: (name) => soundsPlayed.push(name),
+      sendToRenderer: (channel, state) => {
+        if (channel === "state-change") stateChanges.push(state);
+      },
+    });
+    api = require("../src/state")(ctx);
+
+    api.updateSession("codex:s1", "working", "PreToolUse", {
+      agentId: "codex",
+      cwd: "/tmp",
+      hookSource: "codex-official",
+    });
+    mock.timers.tick(1000);
+    stateChanges.length = 0;
+
+    api.updateSession("codex:s1", "attention", "Stop", {
+      agentId: "codex",
+      cwd: "/tmp",
+      hookSource: "codex-official",
+    });
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.deepStrictEqual(stateChanges, ["attention"]);
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 1);
+
+    mock.timers.tick(900);
+    api.updateSession("codex:s1", "working", "event_msg:token_count", {
+      agentId: "codex",
+      cwd: "/tmp",
+      preserveState: true,
+      contextUsage: { used: 100, limit: 1000, percent: 10, source: "codex" },
+    });
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.strictEqual(api.sessions.get("codex:s1").awaitingInputSinceStop, true);
+
+    api.updateSession("codex:s1", "attention", "event_msg:task_complete", {
+      agentId: "codex",
+      cwd: "/tmp",
+    });
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 1);
+    assert.deepStrictEqual(stateChanges, ["attention"]);
+
+    mock.timers.tick(3100);
+    assert.strictEqual(api.getCurrentState(), "idle");
+  });
+
+  it("does not replay remote Codex task_complete after the completion animation returned to idle", () => {
+    const soundsPlayed = [];
+    const stateChanges = [];
+    api.cleanup();
+    ctx = makeCtx({
+      processKill: () => true,
+      playSound: (name) => soundsPlayed.push(name),
+      sendToRenderer: (channel, state) => {
+        if (channel === "state-change") stateChanges.push(state);
+      },
+    });
+    api = require("../src/state")(ctx);
+
+    update(api, {
+      id: "codex:remote",
+      state: "attention",
+      event: "event_msg:task_complete",
+      agentId: "codex",
+      host: "ssh:box",
+    });
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 1);
+    assert.deepStrictEqual(stateChanges, ["attention"]);
+    assert.strictEqual(api.sessions.get("codex:remote").requiresCompletionAck, true);
+    mock.timers.tick(4000);
+    const firstEvents = api.sessions.get("codex:remote").recentEvents.map((entry) => ({ ...entry }));
+    assert.strictEqual(api.getCurrentState(), "idle");
+
+    soundsPlayed.length = 0;
+    stateChanges.length = 0;
+    update(api, {
+      id: "codex:remote",
+      state: "attention",
+      event: "event_msg:task_complete",
+      agentId: "codex",
+      host: "ssh:box",
+    });
+
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 0);
+    assert.ok(!stateChanges.includes("attention"), "duplicate task_complete must not re-send attention");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("codex:remote")), "done");
+    assert.strictEqual(api.sessions.get("codex:remote").requiresCompletionAck, true);
+    assert.deepStrictEqual(api.sessions.get("codex:remote").recentEvents, firstEvents);
+  });
+
+
+  it("keeps official Codex Stop as the completion tail when JSONL task_complete arrives later", () => {
+    const soundsPlayed = [];
+    const stateChanges = [];
+    api.cleanup();
+    ctx = makeCtx({
+      processKill: () => true,
+      playSound: (name) => soundsPlayed.push(name),
+      sendToRenderer: (channel, state) => {
+        if (channel === "state-change") stateChanges.push(state);
+      },
+    });
+    api = require("../src/state")(ctx);
+
+    api.updateSession("codex:s2", "working", "PreToolUse", {
+      agentId: "codex",
+      cwd: "/tmp",
+      hookSource: "codex-official",
+    });
+    mock.timers.tick(1000);
+    stateChanges.length = 0;
+
+    api.updateSession("codex:s2", "attention", "Stop", {
+      agentId: "codex",
+      cwd: "/tmp",
+      hookSource: "codex-official",
+    });
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 1);
+    const firstEvents = api.sessions.get("codex:s2").recentEvents.map((entry) => ({ ...entry }));
+    assert.strictEqual(firstEvents.at(-1).event, "Stop");
+    mock.timers.tick(4000);
+    assert.strictEqual(api.getCurrentState(), "idle");
+
+    soundsPlayed.length = 0;
+    stateChanges.length = 0;
+    api.updateSession("codex:s2", "attention", "event_msg:task_complete", {
+      agentId: "codex",
+      cwd: "/tmp",
+    });
+
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 0);
+    assert.ok(!stateChanges.includes("attention"), "late task_complete must not re-send attention");
+    const session = api.sessions.get("codex:s2");
+    assert.deepStrictEqual(session.recentEvents, firstEvents);
+    assert.strictEqual(session.recentEvents.at(-1).event, "Stop");
+    assert.strictEqual(api.deriveSessionBadge(session), "done");
+    assert.strictEqual(api.getCurrentState(), "idle");
+  });
+  it("still plays completion after new progress follows a completed turn", () => {
+    const soundsPlayed = [];
+    const stateChanges = [];
+    api.cleanup();
+    ctx = makeCtx({
+      processKill: () => true,
+      playSound: (name) => soundsPlayed.push(name),
+      sendToRenderer: (channel, state) => {
+        if (channel === "state-change") stateChanges.push(state);
+      },
+    });
+    api = require("../src/state")(ctx);
+
+    update(api, { id: "s1", state: "working", event: "PreToolUse" });
+    mock.timers.tick(1000);
+    update(api, { id: "s1", state: "attention", event: "Stop" });
+    mock.timers.tick(4000);
+
+    soundsPlayed.length = 0;
+    stateChanges.length = 0;
+    update(api, { id: "s1", state: "thinking", event: "UserPromptSubmit" });
+    mock.timers.tick(1000);
+    update(api, { id: "s1", state: "working", event: "PreToolUse" });
+    mock.timers.tick(1000);
+    stateChanges.length = 0;
+
+    update(api, { id: "s1", state: "attention", event: "Stop" });
+
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 1);
+    assert.deepStrictEqual(stateChanges, ["attention"]);
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
+  });
+
   it("SessionEnd + other non-headless sessions → resolves to highest", () => {
     update(api, { id: "s1", state: "working" });
     update(api, { id: "s2", state: "thinking" });
@@ -1468,6 +1726,208 @@ describe("updateSession()", () => {
       percent: 19,
       source: "codex",
     });
+  });
+
+  it("stores antigravityQuota from updateSession opts", () => {
+    update(api, {
+      id: "s1",
+      state: "working",
+      antigravityQuota: {
+        geminiFiveHour: { usedPercent: 100 },
+        geminiWeekly: { usedPercent: 98, resetAt: 1738831180000 },
+      },
+    });
+
+    assert.deepStrictEqual(api.sessions.get("s1").antigravityQuota, {
+      geminiFiveHour: { usedPercent: 100 },
+      geminiWeekly: { usedPercent: 98, resetAt: 1738831180000 },
+    });
+  });
+
+  it("keeps antigravityQuota sticky when later events omit it", () => {
+    update(api, {
+      id: "s1",
+      state: "thinking",
+      antigravityQuota: { thirdPartyWeekly: { usedPercent: 69 } },
+    });
+    update(api, { id: "s1", state: "working" });
+
+    assert.deepStrictEqual(api.sessions.get("s1").antigravityQuota, {
+      thirdPartyWeekly: { usedPercent: 69 },
+    });
+  });
+
+  it("updates antigravityQuota without changing state when preserveState is true", () => {
+    update(api, {
+      id: "antigravity:abc",
+      state: "working",
+      agentId: "antigravity-cli",
+    });
+    api.updateSession("antigravity:abc", "idle", undefined, {
+      agentId: "antigravity-cli",
+      cwd: "/tmp",
+      preserveState: true,
+      antigravityQuota: { geminiWeekly: { usedPercent: 98, resetAt: 1738831180000 } },
+    });
+
+    const session = api.sessions.get("antigravity:abc");
+    assert.strictEqual(session.state, "working");
+    assert.deepStrictEqual(session.antigravityQuota, {
+      geminiWeekly: { usedPercent: 98, resetAt: 1738831180000 },
+    });
+  });
+
+  it("stores claudeQuota from updateSession opts", () => {
+    update(api, {
+      id: "s1",
+      state: "working",
+      claudeQuota: {
+        claudeFiveHour: { usedPercent: 24, resetAt: 1738425600000 },
+        claudeWeekly: { usedPercent: 41 },
+      },
+    });
+
+    assert.deepStrictEqual(api.sessions.get("s1").claudeQuota, {
+      claudeFiveHour: { usedPercent: 24, resetAt: 1738425600000 },
+      claudeWeekly: { usedPercent: 41 },
+    });
+  });
+
+  it("keeps claudeQuota sticky when later events omit it", () => {
+    update(api, {
+      id: "s1",
+      state: "thinking",
+      claudeQuota: { claudeWeekly: { usedPercent: 41 } },
+    });
+    update(api, { id: "s1", state: "working" });
+
+    assert.deepStrictEqual(api.sessions.get("s1").claudeQuota, {
+      claudeWeekly: { usedPercent: 41 },
+    });
+  });
+
+  it("updates claudeQuota without changing state when preserveState is true", () => {
+    update(api, { id: "s1", state: "working" });
+    api.updateSession("s1", "idle", undefined, {
+      preserveState: true,
+      claudeQuota: { claudeFiveHour: { usedPercent: 24, resetAt: 1738425600000 } },
+    });
+
+    const session = api.sessions.get("s1");
+    assert.strictEqual(session.state, "working");
+    assert.deepStrictEqual(session.claudeQuota, {
+      claudeFiveHour: { usedPercent: 24, resetAt: 1738425600000 },
+    });
+  });
+
+  // #590 B2 — statusline refresh POSTs go through updateSessionMetadata,
+  // which annotates quota/context onto an existing session and does nothing
+  // else: no session creation, no recentEvents append, no updatedAt bump.
+  it("updateSessionMetadata annotates quota without touching lifecycle fields", () => {
+    update(api, { id: "s1", state: "working" });
+    const session = api.sessions.get("s1");
+    session.updatedAt = 12345; // pin so a bump is detectable
+    const recentEventsBefore = JSON.stringify(session.recentEvents);
+
+    const applied = api.updateSessionMetadata("s1", {
+      claudeQuota: { claudeFiveHour: { usedPercent: 24, resetAt: 1738425600000 } },
+    });
+
+    assert.strictEqual(applied, true);
+    assert.strictEqual(session.state, "working");
+    assert.strictEqual(session.updatedAt, 12345);
+    assert.strictEqual(JSON.stringify(session.recentEvents), recentEventsBefore);
+    assert.deepStrictEqual(session.claudeQuota, {
+      claudeFiveHour: { usedPercent: 24, resetAt: 1738425600000 },
+    });
+  });
+
+  it("updateSessionMetadata never creates a session for an unknown id", () => {
+    const applied = api.updateSessionMetadata("ghost", {
+      claudeQuota: { claudeWeekly: { usedPercent: 55 } },
+      contextUsage: { used: 1000, limit: 200000, percent: 1, source: "claude" },
+    });
+
+    assert.strictEqual(applied, false);
+    assert.strictEqual(api.sessions.has("ghost"), false);
+  });
+
+  it("updateSessionMetadata ignores a payload with no valid metadata fields", () => {
+    update(api, { id: "s1", state: "working" });
+    const session = api.sessions.get("s1");
+
+    const applied = api.updateSessionMetadata("s1", {
+      claudeQuota: { claudeFiveHour: { usedPercent: "not-a-number" } },
+    });
+
+    assert.strictEqual(applied, false);
+    assert.strictEqual(session.claudeQuota, null);
+  });
+
+  it("updateSessionMetadata updates contextUsage and antigravityQuota too", () => {
+    update(api, { id: "antigravity:abc", state: "idle", agentId: "antigravity-cli" });
+
+    api.updateSessionMetadata("antigravity:abc", {
+      contextUsage: { used: 50000, limit: 1000000, percent: 5, source: "antigravity" },
+      antigravityQuota: { geminiWeekly: { usedPercent: 98, resetAt: 1738831180000 } },
+    });
+
+    const session = api.sessions.get("antigravity:abc");
+    assert.deepStrictEqual(session.contextUsage, { used: 50000, limit: 1000000, percent: 5, source: "antigravity" });
+    assert.deepStrictEqual(session.antigravityQuota, {
+      geminiWeekly: { usedPercent: 98, resetAt: 1738831180000 },
+    });
+  });
+
+  it("updateSessionMetadata broadcasts the refreshed snapshot (signature dedup applies)", () => {
+    const broadcasts = [];
+    const localApi = require("../src/state")(makeCtx({
+      broadcastSessionSnapshot: (snapshot) => broadcasts.push(snapshot),
+    }));
+    update(localApi, { id: "s1", state: "working" });
+    const before = broadcasts.length;
+
+    localApi.updateSessionMetadata("s1", {
+      claudeQuota: { claudeWeekly: { usedPercent: 41 } },
+    });
+
+    assert.ok(broadcasts.length > before, "quota change must broadcast a fresh snapshot");
+    localApi.updateSessionMetadata("s1", {
+      claudeQuota: { claudeWeekly: { usedPercent: 41 } },
+    });
+    assert.strictEqual(broadcasts.length, before + 1, "identical refresh must be deduped by signature");
+  });
+
+  it("updateSessionMetadata stamps metadataUpdatedAt on change only, never updatedAt", () => {
+    update(api, { id: "s1", state: "working" });
+    const session = api.sessions.get("s1");
+    session.updatedAt = 12345;
+
+    api.updateSessionMetadata("s1", {
+      claudeQuota: { claudeWeekly: { usedPercent: 41 } },
+    });
+    assert.ok(Number.isFinite(session.metadataUpdatedAt), "quota change must stamp metadataUpdatedAt");
+    assert.strictEqual(session.updatedAt, 12345);
+
+    session.metadataUpdatedAt = 777; // pin so a re-stamp is detectable
+    api.updateSessionMetadata("s1", {
+      claudeQuota: { claudeWeekly: { usedPercent: 41 } },
+    });
+    assert.strictEqual(session.metadataUpdatedAt, 777, "identical refresh must not re-stamp");
+  });
+
+  it("lifecycle events carry metadataUpdatedAt forward with the quota they preserve", () => {
+    update(api, { id: "s1", state: "working" });
+    api.updateSessionMetadata("s1", {
+      claudeQuota: { claudeWeekly: { usedPercent: 41 } },
+    });
+    api.sessions.get("s1").metadataUpdatedAt = 777; // pin to make loss detectable
+
+    update(api, { id: "s1", state: "working", event: "PostToolUse" });
+
+    const session = api.sessions.get("s1");
+    assert.deepStrictEqual(session.claudeQuota, { claudeWeekly: { usedPercent: 41 } });
+    assert.strictEqual(session.metadataUpdatedAt, 777, "hook-event rebuild must not drop the quota freshness stamp");
   });
 
   it("trims whitespace on sessionTitle", () => {
@@ -2159,13 +2619,46 @@ describe("Stop completion gate (#406)", () => {
     else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
   });
 
-  it("live background_tasks hold the Claude Stop as working — no celebrate, badge stays running", () => {
+  it("background_tasks without final assistant text hold the Claude Stop as working — no celebrate, badge stays running", () => {
     update(api, { id: "s1", state: "attention", event: "Stop", backgroundTasksCount: 2 });
     assert.strictEqual(api.sessions.get("s1").state, "working");
     assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "running");
-    mock.timers.tick(5000); // no debounce scheduled for liveWork — nothing promotes
+    mock.timers.tick(5000); // no debounce scheduled for hard live work — nothing promotes
     assert.strictEqual(api.sessions.get("s1").state, "working");
     assert.ok(!soundsPlayed.includes("complete"), "completion sound must not play");
+  });
+
+  it("background_tasks with final assistant text debounce, then celebrate on a quiet window", () => {
+    update(api, {
+      id: "s1",
+      state: "attention",
+      event: "Stop",
+      backgroundTasksCount: 1,
+      assistantLastOutput: "Done.",
+    });
+    assert.strictEqual(api.sessions.get("s1").state, "working", "held during the bg-only quiet window");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "running");
+    assert.deepStrictEqual(soundsPlayed, [], "no completion sound before the quiet window elapses");
+    mock.timers.tick(1000);
+    assert.strictEqual(api.sessions.get("s1").state, "idle");
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.ok(soundsPlayed.includes("complete"), "bg-only completion with final text celebrates");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
+  });
+
+  it("background_tasks with final assistant text cancel when work resumes inside the window", () => {
+    update(api, {
+      id: "s1",
+      state: "attention",
+      event: "Stop",
+      backgroundTasksCount: 1,
+      assistantLastOutput: "Intermediate result.",
+    });
+    mock.timers.tick(500);
+    update(api, { id: "s1", state: "working", event: "PreToolUse" });
+    mock.timers.tick(2000);
+    assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.ok(!soundsPlayed.includes("complete"), "resumed work cancels the bg-only completion");
   });
 
   it("session_crons hold the Claude Stop as working", () => {
@@ -2174,9 +2667,52 @@ describe("Stop completion gate (#406)", () => {
     assert.ok(!soundsPlayed.includes("complete"));
   });
 
+  it("session_crons still hard-hold even when final assistant text exists", () => {
+    update(api, {
+      id: "s1",
+      state: "attention",
+      event: "Stop",
+      sessionCronsCount: 1,
+      assistantLastOutput: "Done.",
+    });
+    mock.timers.tick(5000);
+    assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "running");
+    assert.ok(!soundsPlayed.includes("complete"));
+  });
+
   it("stop_hook_active (continuation) holds the Claude Stop as working", () => {
     update(api, { id: "s1", state: "attention", event: "Stop", stopHookActive: true });
     assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.ok(!soundsPlayed.includes("complete"));
+  });
+
+  it("stop_hook_active still hard-holds even when final assistant text exists", () => {
+    update(api, {
+      id: "s1",
+      state: "attention",
+      event: "Stop",
+      stopHookActive: true,
+      assistantLastOutput: "Done.",
+    });
+    mock.timers.tick(5000);
+    assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "running");
+    assert.ok(!soundsPlayed.includes("complete"));
+  });
+
+  it("session_crons dominate bg-only assistant text and keep the Stop hard-held", () => {
+    update(api, {
+      id: "s1",
+      state: "attention",
+      event: "Stop",
+      backgroundTasksCount: 1,
+      sessionCronsCount: 1,
+      assistantLastOutput: "Done.",
+    });
+    mock.timers.tick(5000);
+    assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "running");
     assert.ok(!soundsPlayed.includes("complete"));
   });
 
@@ -2200,6 +2736,27 @@ describe("Stop completion gate (#406)", () => {
     assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
   });
 
+  it("debounce: a duplicate Stop after auto-return does not replay completion", () => {
+    update(api, { id: "s1", state: "attention", event: "Stop" });
+    mock.timers.tick(1000);
+    assert.strictEqual(api.sessions.get("s1").state, "idle");
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 1);
+    mock.timers.tick(4000);
+    assert.strictEqual(api.getCurrentState(), "idle");
+
+    soundsPlayed.length = 0;
+    stateChanges.length = 0;
+    update(api, { id: "s1", state: "attention", event: "Stop" });
+
+    assert.strictEqual(api.sessions.get("s1").state, "idle");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
+    mock.timers.tick(5000);
+    assert.strictEqual(soundsPlayed.filter((name) => name === "complete").length, 0);
+    assert.ok(!stateChanges.includes("working"), "duplicate Stop must not reopen a running state");
+    assert.ok(!stateChanges.includes("attention"), "duplicate Stop must not replay attention");
+  });
+
   it("does not debounce non-Claude agents — a Codex Stop celebrates immediately", () => {
     update(api, { id: "cx", state: "attention", event: "Stop", agentId: "codex" });
     assert.strictEqual(api.getCurrentState(), "attention");
@@ -2213,6 +2770,27 @@ describe("Stop completion gate (#406)", () => {
       update(api, { id: "s1", state: "attention", event: "Stop" });
       assert.strictEqual(api.getCurrentState(), "attention");
       assert.ok(soundsPlayed.includes("complete"));
+    } finally {
+      if (saved === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+      else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = saved;
+    }
+  });
+
+  it("CLAWD_COMPLETION_DEBOUNCE_MS=0 also disables the bg-only assistant-text quiet window", () => {
+    const saved = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "0";
+    try {
+      update(api, {
+        id: "s1",
+        state: "attention",
+        event: "Stop",
+        backgroundTasksCount: 1,
+        assistantLastOutput: "Done.",
+      });
+      assert.strictEqual(api.getCurrentState(), "attention");
+      assert.strictEqual(api.sessions.get("s1").state, "idle");
+      assert.ok(soundsPlayed.includes("complete"));
+      assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
     } finally {
       if (saved === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
       else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = saved;
@@ -2233,7 +2811,7 @@ describe("Stop completion gate (#406)", () => {
     assert.strictEqual(api.deriveSessionBadge(s), "done");
   });
 
-  it("liveWork-held Stop does not become a false 'done' after stale cleanup (#406 regression)", () => {
+  it("hard liveWork-held Stop does not become a false 'done' after stale cleanup (#406 regression)", () => {
     update(api, { id: "s1", state: "attention", event: "Stop", backgroundTasksCount: 1, agentPid: 1000, sourcePid: 2000 });
     const held = api.sessions.get("s1");
     assert.strictEqual(held.state, "working");
@@ -2276,6 +2854,181 @@ describe("Stop completion gate (#406)", () => {
       if (saved === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
       else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = saved;
     }
+  });
+
+  it("Claude AskUserQuestion PostToolUse falls back to transcript completion when Stop is missed", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-claude-stop-fallback-"));
+    const transcript = path.join(dir, "transcript.jsonl");
+    fs.writeFileSync(transcript, [
+      JSON.stringify({ type: "assistant", sessionId: "s1", message: { content: [{ type: "tool_use", name: "AskUserQuestion" }] } }),
+      JSON.stringify({ type: "user", sessionId: "s1", message: { content: [{ type: "tool_result", content: "Allow" }] } }),
+    ].join("\n") + "\n");
+
+    update(api, {
+      id: "s1",
+      state: "working",
+      event: "PostToolUse",
+      toolName: "AskUserQuestion",
+      transcriptPath: transcript,
+    });
+
+    mock.timers.tick(1999);
+    assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.deepStrictEqual(soundsPlayed, []);
+
+    fs.appendFileSync(transcript, JSON.stringify({
+      type: "assistant",
+      sessionId: "s1",
+      message: { content: "Final answer from Claude Desktop." },
+    }) + "\n");
+    mock.timers.tick(1);
+
+    const session = api.sessions.get("s1");
+    assert.strictEqual(session.state, "idle");
+    assert.strictEqual(session.assistantLastOutput, "Final answer from Claude Desktop.");
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.ok(soundsPlayed.includes("complete"));
+    assert.strictEqual(api.deriveSessionBadge(session), "done");
+  });
+
+  it("Claude transcript completion fallback is limited to AskUserQuestion tool results", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-claude-stop-fallback-"));
+    const transcript = path.join(dir, "transcript.jsonl");
+    fs.writeFileSync(transcript, [
+      JSON.stringify({ type: "user", sessionId: "s1", message: { content: [{ type: "tool_result", content: "ok" }] } }),
+      JSON.stringify({ type: "assistant", sessionId: "s1", message: { content: "Intermediate explanation." } }),
+    ].join("\n") + "\n");
+
+    update(api, {
+      id: "s1",
+      state: "working",
+      event: "PostToolUse",
+      toolName: "Read",
+      transcriptPath: transcript,
+    });
+    mock.timers.tick(10000);
+
+    assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.ok(!soundsPlayed.includes("complete"));
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "running");
+  });
+
+  it("Claude transcript completion fallback cancels when work resumes", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-claude-stop-fallback-"));
+    const transcript = path.join(dir, "transcript.jsonl");
+    fs.writeFileSync(transcript, [
+      JSON.stringify({ type: "assistant", sessionId: "s1", message: { content: [{ type: "tool_use", name: "AskUserQuestion" }] } }),
+      JSON.stringify({ type: "user", sessionId: "s1", message: { content: [{ type: "tool_result", content: "Allow" }] } }),
+      JSON.stringify({ type: "assistant", sessionId: "s1", message: { content: "Continuing after answer." } }),
+    ].join("\n") + "\n");
+
+    update(api, {
+      id: "s1",
+      state: "working",
+      event: "PostToolUse",
+      toolName: "AskUserQuestion",
+      transcriptPath: transcript,
+    });
+    mock.timers.tick(500);
+    update(api, { id: "s1", state: "working", event: "PreToolUse" });
+    mock.timers.tick(10000);
+
+    assert.strictEqual(api.sessions.get("s1").state, "working");
+    assert.ok(!soundsPlayed.includes("complete"));
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "running");
+  });
+});
+
+describe("Headless Stop debounce default (#449)", () => {
+  let api, ctx, soundsPlayed, savedDebounceEnv;
+
+  beforeEach(() => {
+    mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+    // This group exercises the built-in defaults — make sure no env override
+    // from the host shell leaks in.
+    savedDebounceEnv = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+    delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+    soundsPlayed = [];
+    ctx = makeCtx({
+      processKill: () => true,
+      playSound: (name) => soundsPlayed.push(name),
+    });
+    api = require("../src/state")(ctx);
+  });
+  afterEach(() => {
+    api.cleanup();
+    mock.timers.reset();
+    if (savedDebounceEnv === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+    else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
+  });
+
+  it("headless Stop is held; the orchestrator's next prompt suppresses the celebration", () => {
+    update(api, { id: "h1", state: "attention", event: "Stop", headless: true });
+    assert.strictEqual(api.sessions.get("h1").state, "working", "held during the window");
+    assert.deepStrictEqual(soundsPlayed, [], "no celebration on the mid-task Stop");
+    mock.timers.tick(500); // Claudian-style continuation lands inside the window
+    update(api, { id: "h1", state: "thinking", event: "UserPromptSubmit", headless: true });
+    mock.timers.tick(5000); // well past the original window
+    assert.strictEqual(api.sessions.get("h1").state, "thinking");
+    assert.ok(!soundsPlayed.includes("complete"), "a continued Stop must not celebrate");
+  });
+
+  it("headless Stop with a quiet window celebrates after the 2s default", () => {
+    update(api, { id: "h1", state: "attention", event: "Stop", headless: true });
+    mock.timers.tick(1999);
+    assert.deepStrictEqual(soundsPlayed, [], "still inside the default window");
+    mock.timers.tick(1); // 2000ms — the turn really ended
+    assert.strictEqual(api.sessions.get("h1").state, "idle");
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.ok(soundsPlayed.includes("complete"), "a real headless completion celebrates");
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("h1")), "done");
+  });
+
+  it("interactive (non-headless) Stop still celebrates immediately by default", () => {
+    update(api, { id: "i1", state: "attention", event: "Stop" });
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.ok(soundsPlayed.includes("complete"));
+  });
+
+  it("interactive bg-only Stop with final assistant text waits 2s by default, then celebrates", () => {
+    update(api, {
+      id: "i1",
+      state: "attention",
+      event: "Stop",
+      backgroundTasksCount: 1,
+      assistantLastOutput: "Done from Claude Desktop.",
+    });
+    mock.timers.tick(1999);
+    assert.deepStrictEqual(soundsPlayed, [], "still waiting for a quiet bg-only window");
+    mock.timers.tick(1);
+    assert.strictEqual(api.sessions.get("i1").state, "idle");
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.ok(soundsPlayed.includes("complete"));
+    assert.strictEqual(api.deriveSessionBadge(api.sessions.get("i1")), "done");
+  });
+
+  it("the headless flag persists — a later Stop without the flag still debounces", () => {
+    update(api, { id: "h1", state: "thinking", event: "UserPromptSubmit", headless: true });
+    update(api, { id: "h1", state: "attention", event: "Stop" }); // flag omitted on this event
+    assert.strictEqual(api.sessions.get("h1").state, "working", "held via persisted headless flag");
+    mock.timers.tick(2000);
+    assert.ok(soundsPlayed.includes("complete"), "quiet window still promotes");
+  });
+
+  it("CLAWD_COMPLETION_DEBOUNCE_MS=0 disables the headless default too", () => {
+    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "0";
+    update(api, { id: "h1", state: "attention", event: "Stop", headless: true });
+    assert.strictEqual(api.getCurrentState(), "attention");
+    assert.ok(soundsPlayed.includes("complete"), "explicit 0 keeps the old immediate behavior");
+  });
+
+  it("an explicit CLAWD_COMPLETION_DEBOUNCE_MS overrides the headless default window", () => {
+    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "100";
+    update(api, { id: "h1", state: "attention", event: "Stop", headless: true });
+    mock.timers.tick(99);
+    assert.deepStrictEqual(soundsPlayed, [], "inside the overridden window");
+    mock.timers.tick(1);
+    assert.ok(soundsPlayed.includes("complete"), "overridden window promotes, not the 2s default");
   });
 });
 
@@ -2580,6 +3333,25 @@ describe("requiresCompletionAck lifecycle", () => {
     const entry = api.buildSessionSnapshot().sessions.find((s) => s.id === "s1");
     assert.strictEqual(entry.badge, "done");
     assert.strictEqual(entry.requiresCompletionAck, true);
+  });
+
+  it("remote Codex housekeeping preserves an unacknowledged completion", () => {
+    update(api, { id: "s1", state: "attention", event: "event_msg:task_complete", agentId: "codex", host: "ssh:example.com" });
+    assert.strictEqual(api.sessions.get("s1").requiresCompletionAck, true);
+
+    api.updateSession("s1", "idle", "event_msg:token_count", {
+      agentId: "codex",
+      host: "ssh:example.com",
+      preserveState: true,
+      contextUsage: { used: 100, limit: 1000, percent: 10, source: "codex" },
+    });
+    assert.strictEqual(api.sessions.get("s1").requiresCompletionAck, true);
+
+    api.updateSession("s1", "notification", "Notification", {
+      agentId: "codex",
+      host: "ssh:example.com",
+    });
+    assert.strictEqual(api.sessions.get("s1").requiresCompletionAck, true);
   });
 
   it("#414: unacknowledged remote completion is deleted by the session timeout (no 24h hold)", () => {

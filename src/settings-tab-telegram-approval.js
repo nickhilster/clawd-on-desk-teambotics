@@ -314,7 +314,7 @@
         break;
       case "LEGACY_ACTIVE":
         if (snap.runtimeStatus && snap.runtimeStatus.status === "failed") {
-          body.appendChild(migrationCopy("Legacy sidecar failed to start."));
+          body.appendChild(migrationCopy("Legacy sidecar is not running."));
           body.appendChild(migrationButton("Retry legacy sidecar", () =>
             migrationDispatch("USER_ENABLE_LEGACY")));
         }

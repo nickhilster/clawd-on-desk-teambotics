@@ -1,6 +1,7 @@
 // src/network/mobile-preview-server.js — LAN WebSocket bridge for PWA mobile clients
 // Protocol v1 — serves static PWA files + WebSocket on 0.0.0.0 for LAN access.
 // M1: read-only snapshot/state push. No write or approval operations.
+// Token rotation: 24h auto-rotation with 5-minute grace window.
 
 "use strict";
 
@@ -25,6 +26,8 @@ const CLIENT_TIMEOUT_MS = 90000;
 const RATE_WINDOW_MS = 60000;
 const RATE_MAX = 60;
 const MAX_CLIENTS = 10;
+const GRACE_PERIOD_MS = 5 * 60 * 1000;          // 5 minutes
+const ROTATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const PWA_DIR = path.resolve(__dirname, "../../pwa");
 const TOKEN_PATH = path.join(os.homedir(), ".clawd", "mobile-token.json");
@@ -40,25 +43,46 @@ const MIME = {
   ".webmanifest": "application/manifest+json",
 };
 
-function loadOrCreateIdentity() {
-  let token = null;
-  let machineId = null;
+// ── Token persistence ──
+
+function atomicWrite(tokenPath, state) {
   try {
-    const raw = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf8"));
-    if (raw && typeof raw.token === "string" && /^[a-f0-9]{32,64}$/.test(raw.token)) token = raw.token;
-    if (raw && typeof raw.machineId === "string" && /^[a-f0-9]{32,64}$/.test(raw.machineId)) machineId = raw.machineId;
-  } catch {}
-  if (token && machineId) return { token, machineId };
-  token = token || crypto.randomBytes(16).toString("hex");
-  machineId = machineId || crypto.randomBytes(16).toString("hex");
-  try {
-    const dir = path.dirname(TOKEN_PATH);
+    const dir = path.dirname(tokenPath);
     fs.mkdirSync(dir, { recursive: true });
-    const tmpPath = TOKEN_PATH + ".tmp";
-    fs.writeFileSync(tmpPath, JSON.stringify({ token, machineId }, null, 2), "utf8");
-    fs.renameSync(tmpPath, TOKEN_PATH);
+    const tmpPath = tokenPath + ".tmp";
+    fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2), "utf8");
+    fs.renameSync(tmpPath, tokenPath);
+    return true;
+  } catch (err) {
+    console.error("[mobile-preview] atomicWrite failed:", err.message);
+    return false;
+  }
+}
+
+function loadOrCreateTokenState(tokenPath, nowFn, writeTokenState = atomicWrite) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(tokenPath, "utf8"));
+    if (raw && typeof raw.token === "string" && /^[a-f0-9]{32,64}$/.test(raw.token)) {
+      const state = {
+        token: raw.token,
+        previous: raw.previous || null,
+        graceUntil: typeof raw.graceUntil === "number" ? raw.graceUntil : null,
+        rotatedAt: typeof raw.rotatedAt === "number" ? raw.rotatedAt : nowFn(),
+        rotationPending: typeof raw.rotationPending === "boolean" ? raw.rotationPending : false,
+        machineId: typeof raw.machineId === "string" && /^[a-f0-9]{32,64}$/.test(raw.machineId)
+          ? raw.machineId
+          : crypto.randomBytes(16).toString("hex"),
+      };
+      // Backward compat: rewrite file if it was in old { token } format or missing machineId
+      if (raw.rotatedAt === undefined || raw.machineId !== state.machineId) writeTokenState(tokenPath, state);
+      return state;
+    }
   } catch {}
-  return { token, machineId };
+  const token = crypto.randomBytes(16).toString("hex");
+  const machineId = crypto.randomBytes(16).toString("hex");
+  const state = { token, previous: null, graceUntil: null, rotatedAt: nowFn(), rotationPending: false, machineId };
+  writeTokenState(tokenPath, state);
+  return state;
 }
 
 function buildMessage(type, payload) {
@@ -71,7 +95,13 @@ function isPathInside(parent, child) {
 }
 
 function initMobilePreviewServer(ctx) {
-  const { token, machineId } = loadOrCreateIdentity();
+  const tokenPath = (ctx && ctx.tokenPath) || TOKEN_PATH;
+  const now = () => (ctx && ctx.now && ctx.now()) || Date.now();
+  const writeTokenState = ctx && typeof ctx.writeTokenState === "function"
+    ? ctx.writeTokenState
+    : atomicWrite;
+  const tokenState = loadOrCreateTokenState(tokenPath, now, writeTokenState);
+  const machineId = tokenState.machineId;
   const machineName = os.hostname() || "clawd";
   const clients = new Set();
   const clientMeta = new Map();
@@ -80,9 +110,110 @@ function initMobilePreviewServer(ctx) {
   let wss = null;
   let activePort = null;
   let heartbeatTimer = null;
+  let rotationTimer = null;
   let closed = false;
   let bonjourService = null;
   let bonjourInstance = null;
+
+  // ── Token rotation ──
+
+  function persistTokenState(nextState) {
+    if (!writeTokenState(tokenPath, nextState)) return false;
+    Object.assign(tokenState, nextState);
+    return true;
+  }
+
+  function scheduleRotationRetry() {
+    if (rotationTimer) clearTimeout(rotationTimer);
+    rotationTimer = setTimeout(() => {
+      rotationTimer = null;
+      scheduleRotation();
+    }, RATE_WINDOW_MS);
+  }
+
+  function rotateToken() {
+    const newToken = crypto.randomBytes(16).toString("hex");
+    const rotatedAt = now();
+    const nextState = {
+      ...tokenState,
+      previous: tokenState.token,
+      token: newToken,
+      graceUntil: rotatedAt + GRACE_PERIOD_MS,
+      rotatedAt,
+      rotationPending: false,
+    };
+    if (!persistTokenState(nextState)) return null;
+    return newToken;
+  }
+
+  function performRotation() {
+    if (!rotateToken()) {
+      console.error("[mobile-preview] token rotation skipped: failed to persist token state");
+      return false;
+    }
+    // Track which clients need to ack this rotation
+    for (const meta of clientMeta.values()) {
+      meta.pendingRotationAcks = (meta.pendingRotationAcks || 0) + 1;
+    }
+    broadcast(buildMessage("token_rotate", {
+      newToken: tokenState.token,
+      expiresAt: tokenState.graceUntil,
+    }));
+    return true;
+  }
+
+  function scheduleRotation() {
+    if (tokenState.rotationPending) return;
+    if (rotationTimer) clearTimeout(rotationTimer);
+    const msUntilRotate = Math.max(0, (tokenState.rotatedAt + ROTATION_INTERVAL_MS) - now());
+    rotationTimer = setTimeout(() => {
+      rotationTimer = null;
+      if (clients.size > 0) {
+        if (!performRotation()) {
+          scheduleRotationRetry();
+          return;
+        }
+      } else {
+        const nextState = { ...tokenState, rotationPending: true };
+        if (!persistTokenState(nextState)) {
+          console.error("[mobile-preview] pending token rotation skipped: failed to persist token state");
+          scheduleRotationRetry();
+          return;
+        }
+      }
+      scheduleRotation(); // schedule next (if rotationPending, early-exits)
+    }, msUntilRotate);
+  }
+
+  function regenerateToken() {
+    const newToken = crypto.randomBytes(16).toString("hex");
+    const nextState = {
+      ...tokenState,
+      rotationPending: false,
+      previous: null,      // no grace — old token dies now
+      graceUntil: null,
+      token: newToken,
+      rotatedAt: now(),
+    };
+    if (!persistTokenState(nextState)) {
+      throw new Error("Failed to persist mobile token state");
+    }
+    // Kick all connected clients (they have stale tokens)
+    for (const c of clients) {
+      try { c.close(1008, "Token regenerated"); } catch {}
+    }
+    clients.clear();
+    clientMeta.clear();
+    scheduleRotation(); // reset the 24h timer
+    return newToken;
+  }
+
+  // Full reset: regenerates token AND will revoke all device registrations
+  // in Slice 2+ (device-list semantics). regenerateToken() only rotates the
+  // token and kicks connected clients, but does not clear the device roster.
+  function resetMobileAccess() {
+    return regenerateToken();
+  }
 
   // ── HTTP server (serves PWA + WebSocket upgrade) ──
 
@@ -150,10 +281,22 @@ function initMobilePreviewServer(ctx) {
 
       let url;
       try { url = new URL(req.url, "http://localhost"); } catch { ws.close(1008, "Bad request"); return; }
-      if (url.searchParams.get("token") !== token) {
-        ws.close(1008, "Invalid token");
-        return;
+
+      // Token validation with grace-period support
+      const clientToken = url.searchParams.get("token");
+      let graceAccepted = false;
+      if (clientToken !== tokenState.token) {
+        // Check grace period for previous token
+        if (tokenState.previous && clientToken === tokenState.previous
+            && tokenState.graceUntil !== null && now() < tokenState.graceUntil) {
+          // Accept via grace — client hasn't acked the rotation yet
+          graceAccepted = true;
+        } else {
+          ws.close(1008, "Invalid token");
+          return;
+        }
       }
+
       if (clients.size >= MAX_CLIENTS) {
         ws.close(1013, "Server busy");
         return;
@@ -164,6 +307,13 @@ function initMobilePreviewServer(ctx) {
       const clientIp = (req.socket.remoteAddress || "").replace(/^::ffff:/, "");
       clientMeta.set(ws, { messageCount: 0, windowStart: Date.now(), clientId, ip: clientIp, lastPong: Date.now() });
 
+      // If a rotation was pending and this client has the current token, rotate now
+      if (tokenState.rotationPending && clientToken === tokenState.token) {
+        if (performRotation()) {
+          scheduleRotation(); // arm the next 24h timer
+        }
+      }
+
       // Send snapshot on connect
       try {
         const snapshot = {};
@@ -172,6 +322,19 @@ function initMobilePreviewServer(ctx) {
       } catch {}
 
       startHeartbeat();
+
+      // If client connected via grace-period token, send the new token immediately
+      // (after startHeartbeat so the first heartbeat tick doesn't duplicate the send)
+      if (graceAccepted) {
+        const meta = clientMeta.get(ws);
+        if (meta) meta.pendingRotationAcks = 1;
+        try {
+          ws.send(buildMessage("token_rotate", {
+            newToken: tokenState.token,
+            expiresAt: tokenState.graceUntil,
+          }));
+        } catch {}
+      }
       ws.isAlive = true;
       ws.on("pong", () => {
         ws.isAlive = true;
@@ -183,10 +346,19 @@ function initMobilePreviewServer(ctx) {
         if (closed) return;
         const meta = clientMeta.get(ws);
         if (!meta) return;
-        const now = Date.now();
-        if (now - meta.windowStart > RATE_WINDOW_MS) { meta.messageCount = 0; meta.windowStart = now; }
+        const nowMs = Date.now();
+        if (nowMs - meta.windowStart > RATE_WINDOW_MS) { meta.messageCount = 0; meta.windowStart = nowMs; }
       if (++meta.messageCount > RATE_MAX) { ws.close(1008, "Rate limit"); return; }
-      // M1: read-only — ignore all client messages (rate-limit still applies above)
+      // Handle token_rotate_ack — purely informational, no state change
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed && parsed.type === "token_rotate_ack") {
+          meta.pendingRotationAcks = 0;
+          console.log(`[mobile-preview] token_rotate_ack from ${meta.ip}`);
+          return;
+        }
+      } catch {}
+      // M1: read-only — ignore all other client messages (rate-limit still applies above)
     });
 
     ws.on("close", () => {
@@ -201,14 +373,30 @@ function initMobilePreviewServer(ctx) {
   function startHeartbeat() {
     if (heartbeatTimer) return;
     heartbeatTimer = setInterval(() => {
-      const now = Date.now();
+      const nowMs = Date.now();
       for (const c of clients) {
         const meta = clientMeta.get(c);
-        if (c.isAlive === false || (meta && now - meta.lastPong > CLIENT_TIMEOUT_MS)) {
+        if (c.isAlive === false || (meta && nowMs - meta.lastPong > CLIENT_TIMEOUT_MS)) {
           c.terminate();
           clients.delete(c);
           clientMeta.delete(c);
           continue;
+        }
+        // Retry token_rotate for unacked clients (up to 3 times)
+        if (meta && meta.pendingRotationAcks > 0) {
+          if (meta.pendingRotationAcks >= 3) {
+            c.close(1008, "Token rotation not acknowledged");
+            clients.delete(c);
+            clientMeta.delete(c);
+            continue;
+          }
+          try {
+            c.send(buildMessage("token_rotate", {
+              newToken: tokenState.token,
+              expiresAt: tokenState.graceUntil,
+            }));
+          } catch {}
+          meta.pendingRotationAcks++;
         }
         c.isAlive = false;
         try { c.ping(); } catch {}
@@ -303,7 +491,6 @@ function initMobilePreviewServer(ctx) {
         txt: {
           machineId,
           machineName,
-          token,
           version: PROTOCOL_VERSION,
         },
       });
@@ -363,6 +550,7 @@ function initMobilePreviewServer(ctx) {
 
     httpServer.listen(ports[0], "0.0.0.0");
     pollSessions(); // Prime cache from current state
+    scheduleRotation(); // Start the 24h rotation timer
     return ready;
   }
 
@@ -371,6 +559,7 @@ function initMobilePreviewServer(ctx) {
     sessionCache.clear();
     stopHeartbeat();
     unAdvertiseMDNS();
+    if (rotationTimer) { clearTimeout(rotationTimer); rotationTimer = null; }
     for (const c of clients) { try { c.close(1001, "Server shutting down"); } catch {} }
     clients.clear();
     clientMeta.clear();
@@ -388,9 +577,11 @@ function initMobilePreviewServer(ctx) {
     cleanup,
     onSnapshot,
     getPort: () => activePort,
-    getToken: () => token,
+    getToken: () => tokenState.token,
     getMachineId: () => machineId,
     getMachineName: () => machineName,
+    regenerateToken,
+    resetMobileAccess,
     PROTOCOL_VERSION,
   };
 }

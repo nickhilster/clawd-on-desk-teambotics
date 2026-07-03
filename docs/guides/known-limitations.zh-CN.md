@@ -5,13 +5,13 @@
 | 限制 | 说明 |
 |------|------|
 | **Codex CLI：无法跳转终端** | Codex official hooks 和 JSONL fallback 都不携带可用终端 PID，点击桌宠仍无法跳转到 Codex 终端。Claude Code 和 Copilot CLI 正常。 |
-| **Codex CLI：hook 覆盖仍不完整** | Official hooks 已覆盖实时状态和 `PermissionRequest` 观察 / intercept 模式，但不是所有运行时信号都有 hook。Clawd 会保留 JSONL 轮询，用于 hook 被禁用的会话，以及 web search、context compaction、turn aborted 等 fallback-only 事件；这些事件仍可能有轮询延迟。 |
+| **Codex CLI：hook 覆盖仍不完整** | Official hooks 已覆盖实时状态和 `PermissionRequest` 观察 / intercept 模式，但不是所有运行时信号都有 hook。Clawd 会保留 JSONL 轮询，用于 hook 被禁用的会话，以及 web search、context compaction、turn aborted 等 fallback-only 状态 / metadata 事件；这些事件仍可能有轮询延迟。审批不再从 JSONL 猜测，必须依赖 official `PermissionRequest` hook。 |
 | **Copilot CLI：暂无 Telegram 远程审批** | Copilot 的本地权限气泡已可用，v1 接入时主动排除了 Telegram 远程审批。`edit` 工具的 full diff 是最坏 payload，必须先做一套安全摘要 formatter 才能走桥接发出去。本地气泡链路不受影响。 |
 | **Gemini CLI：无权限气泡** | Gemini 仍在终端内处理工具审批。Clawd 会观察 Gemini hook 事件，但除非 Gemini 未来提供兼容的阻塞式审批协议，否则不显示权限气泡。 |
 | **Antigravity CLI：无权限气泡（仅状态同步）** | Clawd **不会为 agy 弹任何权限气泡**。所有 Allow / Deny / Always-allow 决策都在 agy 自己的 5 选项终端菜单里完成（同意 / 同意并持久 / 拒绝 / 永远拒绝 / 永远拒绝并持久）。想要永久规则就在 agy 菜单里选择标有「Persist to settings.json」的选项 —— 规则落到 `~/.gemini/antigravity-cli/settings.json`，你也可以在那里清理。dogfooding 显示在它之上再加 Clawd bubble 会让单次任务变 8-10 次确认，因此设计上让 agy 完全拥有权限流程。桌宠仍通过 PreInvocation / PostToolUse / Stop hook 反映 working / idle / attention 状态。 |
 | **Cursor Agent：无权限气泡** | Cursor 在 hook 的 stdout JSON 里处理权限，而不是走 HTTP 阻塞式审批，Clawd 无法接管这条审批链路。 |
 | **Cursor Agent：启动恢复能力有限** | 启动时不做进程检测，否则任意 Cursor 编辑器进程都可能误判为活跃会话。Clawd 会保持 idle，直到收到第一条 hook 事件。 |
-| **Hermes Agent：安装前可见但不生效** | Hermes 默认在 Settings 里开启，方便发现；但 Clawd 只有在检测到真实 Hermes 安装后才会写入 plugin 文件。安装 Hermes 后重启 Clawd，或执行 `npm run install:hermes-plugin`。 |
+| **Hermes Agent：使用前需要安装集成** | Hermes 会显示在 Settings 里，但新安装默认是 Not installed。Clawd 只有在你显式安装该集成、且检测到真实 Hermes 安装后才会写入 plugin 文件。安装 Hermes 后，在 **Settings -> Agents -> Install** 里安装，或执行 `npm run install:hermes-plugin`。 |
 | **Hermes Agent：暂不支持权限气泡和 subagent 动画** | 当前 Hermes plugin 覆盖状态、会话、SessionEnd、工具活动和终端聚焦。权限气泡需要上游提供阻塞式审批协议；subagent 动画需要成对的 subagent start/stop 生命周期事件。 |
 | **Hardware Buddy：需要外部 Clawstick runtime** | Clawd v0.8.1 把硬件 runtime 保持在独立的 [Clawstick 仓库](https://github.com/rullerzhou-afk/clawstick)。请单独安装 / checkout Clawstick，把它放到 Clawd 相邻目录 `../clawstick`，或设置 `CLAWD_HARDWARE_BUDDY_ROOT`。runtime 缺失时 Clawd 仍可正常使用，Settings 里的 Hardware Buddy 会提示「需安装 Clawstick」。 |
 | **Kiro CLI：无法区分会话** | Kiro CLI stdin JSON 不含 session_id，所有 Kiro 会话会被合并为单个追踪会话。 |
@@ -27,6 +27,8 @@
 | **OpenClaw：本地 TUI state-only 支持** | Phase 1 通过 OpenClaw plugin 观察 `openclaw tui --local` 的生命周期和工具事件。暂不提供权限气泡或终端聚焦；gateway / daemon / messaging 部署也未必能锚定到本地终端窗口。 |
 | **OpenClaw：启动时不编辑 JSON5 配置** | OpenClaw 支持 JSON5 和 include 型配置。Clawd 启动同步只会编辑已存在且是严格 JSON 的 `~/.openclaw/openclaw.json`；遇到 JSON5 / include 配置会跳过，除非你手动运行 installer，让 OpenClaw CLI 自己负责写入。 |
 | **OpenClaw on Windows：原生 codex relay 可能失败** | 如果 OpenClaw 使用原生 `agentRuntime: codex` 路径时卡住，或报 unsafe native hook relay bridge，建议切到 OpenAI-compatible model/provider，例如 `openai-codex/gpt-5.5`。这是 OpenClaw 自身行为；Clawd 只观察 plugin 状态事件，无法修复 relay。 |
+| **CodeWhale：全局 session id 缓存** | Phase 1 会把最近一次 CodeWhale session id 存在 `os.tmpdir()` 下的单个全局文件。多个 CodeWhale 实例并发运行时可能互相覆盖或误清这个缓存，导致状态串线或 HUD 出现重复标签。 |
+| **Qoder：仅状态同步** | Phase 1 通过 `~/.qoder/settings.json` 的 hook 观察 Qoder 状态与会话。`PermissionRequest` / `PermissionDenied` 只作为通知观察——hook 恒返回 `{}`，从不代答权限决策，所有 Allow / Deny 都留在 Qoder 原生权限流程里，Clawd 不弹权限气泡。启动恢复只识别 Qoder CLI 进程（`qodercli` / `qoder-cli`），闲置打开的 Qoder IDE 不会被当成进行中的 agent 工作。 |
 | **Windows Terminal：tab 聚焦能力有限** | Windows Terminal 会用一个宿主窗口 / 进程承载多个 tab，Clawd 无法可靠激活其中某一个指定 tab。HUD / Dashboard 终端跳转最适合单独的传统 `cmd.exe` / PowerShell 窗口，或标题里包含项目目录名的独立 Windows Terminal 窗口。Windows 11 上，`cmd.exe` 和 PowerShell 也可能默认被 Windows Terminal 托管；如果要使用传统窗口，需要把默认终端应用程序改为 Windows 控制台主机。 |
 | **macOS/Linux 安装包自动更新** | DMG/AppImage/deb 安装包无法自动更新——使用 `git clone` + `npm start` 可通过 `git pull` 自动更新，或从 GitHub Releases 手动下载。 |
 | **Electron 主进程无自动化测试** | 单元测试覆盖了 agent 配置和日志轮询，但状态机、窗口管理、托盘等 Electron 逻辑暂无自动化测试。 |

@@ -4,7 +4,6 @@ const DefaultCodexSubagentClassifier = require("../agents/codex-subagent-classif
 const {
   buildCodexMonitorUpdateOptions,
   isCodexMonitorMetadataOnlyEvent,
-  isCodexMonitorPermissionEvent,
 } = require("./codex-monitor-callback");
 
 const CODEX_OFFICIAL_LOG_SUPPRESS_TTL_MS = 10 * 60 * 1000;
@@ -37,7 +36,6 @@ function createAgentRuntimeMain(options = {}) {
   const isAgentEnabled = options.isAgentEnabled || (() => true);
   const updateSession = options.updateSession || (() => {});
   const captureGhosttyTerminalId = options.captureGhosttyTerminalId || null;
-  const showCodexNotifyBubble = options.showCodexNotifyBubble || (() => {});
   const clearCodexNotifyBubbles = options.clearCodexNotifyBubbles || (() => {});
 
   let codexMonitor = null;
@@ -80,7 +78,6 @@ function createAgentRuntimeMain(options = {}) {
   }
 
   function shouldSuppressCodexLogEvent(sessionId, state, event) {
-    if (state === "codex-permission") return hasRecentCodexOfficialHookSession(sessionId);
     if (!CODEX_LOG_EVENTS_COVERED_BY_OFFICIAL_HOOKS.has(event)) return false;
     if (!hasRecentCodexOfficialHookSession(sessionId)) return false;
     if (shouldAllowCodexJsonlCompletionFallback(sessionId, state, event)) return false;
@@ -136,6 +133,10 @@ function createAgentRuntimeMain(options = {}) {
     return callServer("stopIntegrationForAgent", agentId);
   }
 
+  function uninstallIntegrationForAgent(agentId) {
+    return callServer("uninstallIntegrationForAgent", agentId);
+  }
+
   function clearSessionsByAgent(agentId) {
     const state = getStateRuntime();
     return state && typeof state.clearSessionsByAgent === "function"
@@ -143,11 +144,11 @@ function createAgentRuntimeMain(options = {}) {
       : 0;
   }
 
-  function dismissPermissionsByAgent(agentId) {
+  function dismissPermissionsByAgent(agentId, options) {
     const perm = getPermissionRuntime();
     const state = getStateRuntime();
     const removed = perm && typeof perm.dismissPermissionsByAgent === "function"
-      ? perm.dismissPermissionsByAgent(agentId)
+      ? perm.dismissPermissionsByAgent(agentId, options)
       : 0;
     // Kimi keeps a state-side permission hold for passive notifications; when
     // an agent is disabled, dismissing the bubble must release that hold too.
@@ -194,16 +195,6 @@ function createAgentRuntimeMain(options = {}) {
           }
           return;
         }
-        if (isCodexMonitorPermissionEvent(state)) {
-          updateSession(sid, "notification", event, buildCodexMonitorUpdateOptions(extra, {
-            includeHeadless: false,
-          }));
-          showCodexNotifyBubble({
-            sessionId: sid,
-            command: (extra && extra.permissionDetail && extra.permissionDetail.command) || "",
-          });
-          return;
-        }
         clearCodexNotifyBubbles(sid, `codex-state-transition:${state}`);
         updateSession(sid, state, event, buildCodexMonitorUpdateOptions(extra, {
           includeHeadless: true,
@@ -231,6 +222,7 @@ function createAgentRuntimeMain(options = {}) {
     syncIntegrationForAgent,
     repairIntegrationForAgent,
     stopIntegrationForAgent,
+    uninstallIntegrationForAgent,
     clearSessionsByAgent,
     dismissPermissionsByAgent,
     updateSessionFromServer,

@@ -4,6 +4,7 @@
 const { BrowserWindow, globalShortcut } = require("electron");
 const { getDefaultShortcuts } = require("./shortcut-actions");
 const { keepOutOfTaskbar } = require("./taskbar");
+const { clampTextScale, scaleWidth, scaleHeight, applyZoomToWindow } = require("./text-scale");
 const path = require("path");
 const http = require("http");
 const {
@@ -39,6 +40,12 @@ const LINUX_WINDOW_TYPE = "toolbar";
 // 24px matches the 8px stack margin on both edges plus a small buffer, so a
 // single tall bubble never hugs or exceeds the visible work area.
 const BUBBLE_HEIGHT_RESERVE = 24;
+// CSS px. Multiple of 20 on purpose: every 5% textScale step scales it to an
+// integer DIP width, so the CSS viewport width (and therefore renderer-side
+// height measurements) stays exact across scale changes.
+const BUBBLE_BASE_WIDTH = 340;
+// Hard cap so a scaled bubble can't swallow a small work area.
+const BUBBLE_MAX_WORK_AREA_WIDTH_RATIO = 0.9;
 const REMOTE_RICH_APPROVAL_AGENT_IDS = new Set(["claude-code", "codebuddy"]);
 
 function requiredDependency(value, name, owner) {
@@ -375,6 +382,8 @@ function buildPermissionFocusEntry(perm) {
   if (perm.cwd) focusEntry.cwd = perm.cwd;
   if (perm.agentPid) focusEntry.agentPid = perm.agentPid;
   if (perm.pidChain) focusEntry.pidChain = perm.pidChain;
+  if (perm.tmuxSocket) focusEntry.tmuxSocket = perm.tmuxSocket;
+  if (perm.tmuxClient) focusEntry.tmuxClient = perm.tmuxClient;
   if (perm.host) focusEntry.host = perm.host;
   if (perm.platform) focusEntry.platform = perm.platform;
   if (perm.model) focusEntry.model = perm.model;
@@ -506,11 +515,9 @@ function hotkeyResolve(behavior, message) {
     resolvePermissionEntry(perm, behavior, message);
     if (appName) {
       setTimeout(() => restoreFrontApp(appName), RESTORE_FOCUS_DELAY_MS);
-    } else if (isMac) {
-      // macOS only: osascript failed — fall back to terminal focus
-      setTimeout(() => ctx.focusTerminalForSession(perm.sessionId), RESTORE_FOCUS_DELAY_MS);
     }
-    // non-macOS: no focus change (matches pre-PR behavior)
+    // If macOS frontmost-app capture fails, leave focus untouched. Hotkeys are
+    // meant to answer without pulling the user back to the agent terminal.
   });
 }
 
@@ -521,9 +528,21 @@ const unsubscribeShortcuts = typeof ctx.subscribeShortcuts === "function"
   ? ctx.subscribeShortcuts(() => syncPermissionShortcuts())
   : null;
 
-// Fallback height before renderer reports actual measurement
+// Fallback height before renderer reports actual measurement. CSS px, like
+// perm.measuredHeight — both are converted to DIP at the consumption points.
 function estimateBubbleHeight(sugCount) {
   return 200 + (sugCount || 0) * 37;
+}
+
+function getTextScale() {
+  return clampTextScale(typeof ctx.getTextScale === "function" ? ctx.getTextScale() : 1);
+}
+
+function getBubbleWidth(scale, workArea) {
+  const scaled = scaleWidth(BUBBLE_BASE_WIDTH, scale);
+  const waWidth = Math.floor(Number(workArea && workArea.width) || 0);
+  if (waWidth <= 0) return scaled;
+  return Math.min(scaled, Math.floor(waWidth * BUBBLE_MAX_WORK_AREA_WIDTH_RATIO));
 }
 
 function getAnchorWorkArea(petBounds) {
@@ -537,17 +556,22 @@ function repositionBubbles() {
   // Thin wrapper around computeBubbleStackLayout (top of file). All the
   // geometry lives there so it can be unit-tested without Electron windows.
   if (!ctx.win || ctx.win.isDestroyed()) return;
-  const margin = 8;
-  const gap = 6;
-  const bw = 340;
+  const scale = getTextScale();
+  const margin = Math.round(8 * scale);
+  const gap = Math.round(6 * scale);
   const petBounds = ctx.getPetWindowBounds();
   const wa = getAnchorWorkArea(petBounds);
+  const bw = getBubbleWidth(scale, wa);
   const hitRect = ctx.bubbleFollowPet ? ctx.getHitRectScreen(petBounds) : null;
 
   const layoutPermissions = pendingPermissions.filter((perm) => !isHardwareBuddyTestPermission(perm));
   const bubbleHeights = layoutPermissions.map(perm =>
     clampBubbleHeight(
-      perm.measuredHeight || estimateBubbleHeight((perm.suggestions || []).length),
+      // measuredHeight/estimate are CSS px; the window needs DIP.
+      scaleHeight(
+        perm.measuredHeight || estimateBubbleHeight((perm.suggestions || []).length),
+        scale
+      ),
       wa.height
     )
   );
@@ -566,17 +590,79 @@ function repositionBubbles() {
   for (let i = 0; i < layoutPermissions.length; i++) {
     const perm = layoutPermissions[i];
     if (perm.bubble && !perm.bubble.isDestroyed() && bounds[i]) {
+      // Re-resolve zoom here too: the pet may have crossed onto a display
+      // with a different textScale (applyZoomToWindow memoizes, so this is
+      // a no-op when nothing changed).
+      applyZoomToWindow(perm.bubble, scale);
       perm.bubble.setBounds(bounds[i]);
     }
   }
 }
 
+// DANGER "auto-pilot" chokepoint. Every agent branch in the /permission route
+// funnels through showPermissionBubble after its DND / per-agent / headless
+// gates have already run, so this is the single place to honor the
+// autoApproveAllPermissions toggle without auto-approving requests those gates
+// meant to drop. Passive notifications (codex/kimi) and the hardware-buddy
+// self-test are excluded — they are not approvals and carry no HTTP response
+// to satisfy. Returns true when it consumed the entry (caller must NOT build a
+// bubble), false otherwise.
+
+// Default reply used to answer AskUserQuestion / clarify prompts while
+// auto-pilot is on. The user isn't present to type, so we explicitly defer the
+// choice back to the agent rather than sending blank answers.
+const AUTO_APPROVE_ELICITATION_ANSWER = "You choose whatever is best.";
+
+// Build an answers map that assigns the deferral reply to every question in the
+// elicitation toolInput. Mirrors the question-key shape buildElicitationUpdatedInput
+// expects (keyed by the question text), so each prompt gets a real answer rather
+// than being dropped as empty.
+function buildAutoApproveElicitationAnswers(toolInput) {
+  const input = toolInput && typeof toolInput === "object" ? toolInput : {};
+  const questions = Array.isArray(input.questions) ? input.questions : [];
+  const answers = {};
+  for (const question of questions) {
+    if (!question || typeof question.question !== "string" || !question.question) continue;
+    answers[question.question] = AUTO_APPROVE_ELICITATION_ANSWER;
+  }
+  return answers;
+}
+
+function maybeAutoApprovePermission(permEntry) {
+  if (!permEntry) return false;
+  if (typeof ctx.isAutoApproveAllEnabled !== "function" || !ctx.isAutoApproveAllEnabled()) {
+    return false;
+  }
+  if (permEntry.isCodexNotify || permEntry.isKimiNotify) return false;
+  if (isHardwareBuddyTestPermission(permEntry)) return false;
+
+  // Elicitation (AskUserQuestion / Hermes clarify): a bare "allow" with no
+  // resolvedUpdatedInput is sent as a DENY downstream (see resolvePermissionEntry).
+  // Auto-pilot can't surface the questions to the user, so answer each one with
+  // a neutral "defer to the agent" reply rather than leaving it blank — an empty
+  // answers map makes the agent re-ask or fall back unpredictably.
+  if (permEntry.isElicitation) {
+    permEntry.resolvedUpdatedInput = buildElicitationUpdatedInput(
+      permEntry.toolInput,
+      buildAutoApproveElicitationAnswers(permEntry.toolInput)
+    );
+  }
+
+  permLog(`auto-approve: tool=${permEntry.toolName} session=${permEntry.sessionId} agent=${permEntry.agentId || "claude-code"}`);
+  resolvePermissionEntry(permEntry, "allow");
+  return true;
+}
+
 function showPermissionBubble(permEntry) {
+  // Auto-pilot: if enabled, approve immediately and never render a bubble.
+  if (maybeAutoApprovePermission(permEntry)) return;
+
   const sugCount = (permEntry.suggestions || []).length;
+  const scale = getTextScale();
   const wa = getAnchorWorkArea();
-  const bh = clampBubbleHeight(estimateBubbleHeight(sugCount), wa.height);
+  const bh = clampBubbleHeight(scaleHeight(estimateBubbleHeight(sugCount), scale), wa.height);
   // Temporary position — repositionBubbles() will finalize after renderer reports real height
-  const pos = { x: 0, y: 0, width: 340, height: bh };
+  const pos = { x: 0, y: 0, width: getBubbleWidth(scale, wa), height: bh };
 
   const bub = new BrowserWindow({
     width: pos.width,
@@ -616,6 +702,9 @@ function showPermissionBubble(permEntry) {
 
   bub.webContents.once("did-finish-load", () => {
     permEntry.bubbleReady = true;
+    // Explicit even though same-origin propagation usually covers it — a
+    // stale partition-persisted factor must never win over prefs.
+    applyZoomToWindow(bub, getTextScale());
     syncPermissionBubbleContent(permEntry);
     // Elicitation bubbles need keyboard focus so arrow keys and Enter work.
     // Regular permission bubbles must NOT steal focus from the terminal —
@@ -753,6 +842,9 @@ function buildPermissionBubblePayload(permEntry) {
     isElicitation: permEntry.isElicitation || false,
     isOpencode: permEntry.isOpencode || false,
     isAntigravity: permEntry.isAntigravity || false,
+    // Provenance for the renderer: lets the bubble relabel Codex MCP tool calls
+    // (issue #445) without touching approval semantics. Mirrors the flags above.
+    isCodex: permEntry.isCodex || false,
     opencodeAlways: permEntry.opencodeAlwaysCandidates || [],
     opencodePatterns: permEntry.opencodePatterns || [],
     sessionFolder,
@@ -950,6 +1042,11 @@ function dismissPermissionForTerminal(perm) {
 
 function maybeStartRemoteApproval(permEntry) {
   if (!isRemoteApprovalActionable(permEntry)) return false;
+  // Auto-pilot resolves synchronously inside showPermissionBubble, but the CC
+  // and Codex route branches call startRemoteApproval right after. If the
+  // entry is already gone from the pending list it was resolved (auto-approved
+  // or otherwise) — don't fire a Telegram card for a closed request.
+  if (pendingPermissions.indexOf(permEntry) === -1) return false;
   const client = getTelegramApprovalClient();
   if (!client || typeof client.requestApproval !== "function") return false;
   if (typeof client.isEnabled === "function" && !client.isEnabled()) return false;
@@ -1557,19 +1654,25 @@ function showCodexNotifyBubble({ sessionId, command }) {
   schedulePassiveNotifyAutoExpire(permEntry, policy.autoCloseMs);
 }
 
-function showKimiNotifyBubble({ sessionId, command }) {
+function showKimiNotifyBubble({ sessionId, command, toolName, permissionAction, permissionCommand }) {
   if (shouldSuppressKimiNotifyBubble(ctx)) {
     const policy = getPolicy(ctx, "notification");
     permLog(`kimi notify suppressed: session=${sessionId} dnd=${ctx.doNotDisturb} notificationEnabled=${policy.enabled}`);
     return;
   }
   const policy = getPolicy(ctx, "notification");
+  // #563: prefer the real command from Kimi Code's native PermissionRequest
+  // display block, then its human-readable action line; legacy synthesized
+  // requests carry neither and keep the generic copy.
+  const bubbleCommand = permissionCommand || permissionAction || command
+    || "Approve or reject in Kimi terminal.";
   const permEntry = {
     res: null,
     abortHandler: null, suggestions: [],
     sessionId, bubble: null, hideTimer: null,
     toolName: "KimiPermission",
-    toolInput: { command: command || "Approve or reject in Kimi terminal." },
+    toolInput: { command: bubbleCommand },
+    kimiToolName: typeof toolName === "string" && toolName ? toolName : null,
     resolvedSuggestion: null, createdAt: Date.now(),
     isElicitation: false, isKimiNotify: true,
     agentId: "kimi-cli",
@@ -1686,21 +1789,29 @@ function dismissInteractivePermissionWithoutDecision(perm, reason) {
 
 // Mirrors the DND dispatcher: CC res.destroy() so it falls back to chat,
 // opencode skips the bridge reply so TUI takes over, codex just closes.
-function dismissPermissionsByAgent(agentId) {
+// options.subagentOnly (#451) restricts the sweep to entries that came from a
+// CC subagent, mirroring the shouldBypassCCSubagentBubble exemptions —
+// plan-review and elicitation bubbles stay up even when that sub-gate flips
+// off, so dismissal must not reap them either.
+function dismissPermissionsByAgent(agentId, options = {}) {
   if (!agentId) return 0;
-  const toDismiss = pendingPermissions.filter((p) => p && p.agentId === agentId);
+  const subagentOnly = !!(options && options.subagentOnly);
+  const matchesScope = (p) => !subagentOnly
+    || (p.subagentId && p.toolName !== "ExitPlanMode" && p.toolName !== "AskUserQuestion");
+  const toDismiss = pendingPermissions.filter((p) => p && p.agentId === agentId && matchesScope(p));
   if (toDismiss.length === 0) return 0;
+  const reason = subagentOnly ? `dismiss-by-agent-subagent:${agentId}` : `dismiss-by-agent:${agentId}`;
   for (const perm of toDismiss) {
     if (perm.isCodexNotify || perm.isKimiNotify) {
-      dismissPassiveNotify(perm, `dismiss-by-agent:${agentId}`);
+      dismissPassiveNotify(perm, reason);
       continue;
     }
-    dismissInteractivePermissionWithoutDecision(perm, `dismiss-by-agent:${agentId}`);
+    dismissInteractivePermissionWithoutDecision(perm, reason);
   }
   repositionBubbles();
   repositionDependentBubbles();
   syncPermissionShortcuts();
-  permLog(`dismissPermissionsByAgent(${agentId}): cleared ${toDismiss.length}`);
+  permLog(`dismissPermissionsByAgent(${agentId}${subagentOnly ? ", subagent-only" : ""}): cleared ${toDismiss.length}`);
   return toDismiss.length;
 }
 

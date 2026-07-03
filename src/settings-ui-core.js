@@ -65,6 +65,7 @@
       sessionCleanupControls: new Map(),
       agentSwitches: new Map(),
       agentPermissionModes: new Map(),
+      agentIntegrationActions: new Map(),
       animMapSwitches: new Map(),
       animMapReset: null,
       animOverrideTimingSliders: new Map(),
@@ -74,6 +75,7 @@
       size: null,
       soundSummary: null,
       soundVolume: null,
+      textScale: null,
     },
     shortcutRecordingActionId: null,
     shortcutRecordingError: "",
@@ -83,6 +85,10 @@
 
   const runtime = {
     agentMetadata: null,
+    agentInstallationHints: null,
+    agentInstallationHintsPending: false,
+    agentInstallationHintsFetched: false,
+    agentInstallationHintsPromise: null,
     themeList: null,
     codexPetsRefreshPending: false,
     codexPetZipImportPending: false,
@@ -95,7 +101,7 @@
     animationPreviewPosterCache: new Map(),
     pendingAnimationOverrideEdits: new Map(),
     nextAnimationOverrideEditSeq: 1,
-    animOverridesSubtab: "animations",
+    animOverridesSubtab: "map",
     expandedOverrideRowIds: new Set(),
     assetPicker: {
       state: null,
@@ -149,6 +155,13 @@
   function readAgentFlagValue(agentId, flag) {
     const entry = state.snapshot && state.snapshot.agents && state.snapshot.agents[agentId];
     return entry ? entry[flag] !== false : true;
+  }
+
+  function readAgentIntegrationInstalled(agentId) {
+    const entry = state.snapshot && state.snapshot.agents && state.snapshot.agents[agentId];
+    // Normalized v11 snapshots carry the explicit flag. The true fallback is
+    // only for old/mocked snapshots that predate on-demand installation.
+    return entry ? entry.integrationInstalled === true : true;
   }
 
   function readAgentPermissionMode(agentId) {
@@ -396,10 +409,6 @@
       return `${body.scrollHeight}px`;
     }
 
-    function isGroupConnected() {
-      return !!(document.body && document.body.contains(group));
-    }
-
     function setExpandedBodyHeight() {
       body.style.setProperty("--collapsible-body-height", measureCollapsibleBodyHeight());
     }
@@ -442,12 +451,11 @@
         if (collapsed) {
           body.style.setProperty("--collapsible-body-height", "0px");
         } else {
-          // Detached groups report scrollHeight=0 in some engines. Keep the
-          // body fully expanded until the post-mount RAF can measure a real height.
-          body.style.setProperty(
-            "--collapsible-body-height",
-            isGroupConnected() ? measureCollapsibleBodyHeight() : "none"
-          );
+          // Settled-open groups must NOT keep a pinned max-height: text zoom
+          // or window-width changes rewrap descriptions and grow the content,
+          // and a stale pinned height clips the bottom rows (overflow:
+          // hidden). A measured height is only needed while animating.
+          body.style.setProperty("--collapsible-body-height", "none");
         }
         return;
       }
@@ -493,11 +501,13 @@
     body.addEventListener("transitionend", (ev) => {
       if (ev.target !== body || ev.propertyName !== "max-height") return;
       group.classList.remove("expanding", "collapsing");
-      if (!collapsed) setExpandedBodyHeight();
+      // Release the pinned height once settled so later reflows (text zoom,
+      // window resize) can grow the body instead of clipping at the bottom.
+      if (!collapsed) body.style.setProperty("--collapsible-body-height", "none");
     });
     applyCollapsedState();
     requestAnimationFrame(() => {
-      if (!collapsed) setExpandedBodyHeight();
+      if (!collapsed) body.style.setProperty("--collapsible-body-height", "none");
     });
     return group;
   }
@@ -538,6 +548,7 @@
     descExtraKey = null,
     onToggle = null,
     actionButton = null,
+    danger = false,
   }) {
     const row = document.createElement("div");
     row.className = "row";
@@ -547,7 +558,9 @@
         `<span class="row-desc"></span>` +
       `</div>` +
       `<div class="row-control"><div class="switch" role="switch" tabindex="0"></div></div>`;
-    row.querySelector(".row-label").textContent = t(labelKey);
+    const labelEl = row.querySelector(".row-label");
+    labelEl.textContent = t(labelKey);
+    if (danger) labelEl.classList.add("row-label-danger");
     const text = row.querySelector(".row-text");
     const desc = row.querySelector(".row-desc");
     if (descKey) desc.textContent = t(descKey);
@@ -797,11 +810,18 @@
     if (state.mountedControls.soundVolume && typeof state.mountedControls.soundVolume.dispose === "function") {
       state.mountedControls.soundVolume.dispose();
     }
+    // Rolls back a transient text-scale preview that a full re-render would
+    // otherwise strand in the main process (the row's blur never fires when
+    // its subtree is dropped wholesale).
+    if (state.mountedControls.textScale && typeof state.mountedControls.textScale.dispose === "function") {
+      state.mountedControls.textScale.dispose();
+    }
     state.mountedControls.generalSwitches.clear();
     state.mountedControls.bubblePolicyControls.clear();
     state.mountedControls.sessionCleanupControls.clear();
     state.mountedControls.agentSwitches.clear();
     state.mountedControls.agentPermissionModes.clear();
+    state.mountedControls.agentIntegrationActions.clear();
     state.mountedControls.animMapSwitches.clear();
     state.mountedControls.animMapReset = null;
     state.mountedControls.animOverrideTimingSliders.clear();
@@ -811,6 +831,7 @@
     state.mountedControls.size = null;
     state.mountedControls.soundSummary = null;
     state.mountedControls.soundVolume = null;
+    state.mountedControls.textScale = null;
   }
 
   function syncMountedSizeControl({ fromBroadcast = false } = {}) {
@@ -858,6 +879,62 @@
   function applyAgentMetadata(list) {
     runtime.agentMetadata = Array.isArray(list) ? list : [];
     if (state.activeTab === "agents") requestRender({ content: true });
+  }
+
+  function normalizeAgentInstallationHints(result) {
+    const source = result && typeof result === "object" ? result : {};
+    const normalized = {
+      checkedAt: Number.isFinite(source.checkedAt) ? source.checkedAt : null,
+      agents: Array.isArray(source.agents) ? source.agents : [],
+      skippedAgentIds: Array.isArray(source.skippedAgentIds) ? source.skippedAgentIds : [],
+    };
+    if (typeof source.error === "string" && source.error) normalized.error = source.error;
+    return normalized;
+  }
+
+  function emptyAgentInstallationHints(error) {
+    const result = {
+      checkedAt: null,
+      agents: [],
+      skippedAgentIds: [],
+    };
+    if (error) result.error = error;
+    return result;
+  }
+
+  function fetchAgentInstallationHints({ force = false } = {}) {
+    if (runtime.agentInstallationHintsPending) {
+      return runtime.agentInstallationHintsPromise || Promise.resolve(runtime.agentInstallationHints);
+    }
+    if (!force && runtime.agentInstallationHintsFetched) {
+      return Promise.resolve(runtime.agentInstallationHints);
+    }
+    if (!window.settingsAPI || typeof window.settingsAPI.detectAgentInstallations !== "function") {
+      runtime.agentInstallationHints = emptyAgentInstallationHints();
+      runtime.agentInstallationHintsFetched = true;
+      return Promise.resolve(runtime.agentInstallationHints);
+    }
+
+    runtime.agentInstallationHintsPending = true;
+    runtime.agentInstallationHintsPromise = window.settingsAPI.detectAgentInstallations()
+      .then((result) => {
+        runtime.agentInstallationHints = normalizeAgentInstallationHints(result);
+        return runtime.agentInstallationHints;
+      })
+      .catch((err) => {
+        console.warn("settings: detectAgentInstallations failed", err);
+        runtime.agentInstallationHints = emptyAgentInstallationHints(
+          err && err.message ? err.message : String(err)
+        );
+        return runtime.agentInstallationHints;
+      })
+      .finally(() => {
+        runtime.agentInstallationHintsPending = false;
+        runtime.agentInstallationHintsFetched = true;
+        runtime.agentInstallationHintsPromise = null;
+        if (state.activeTab === "agents") requestRender({ content: true });
+      });
+    return runtime.agentInstallationHintsPromise;
   }
 
   function fetchThemes() {
@@ -1136,10 +1213,9 @@
         });
         return;
       }
-      if (state.activeTab !== "animMap") {
-        requestRender({ sidebar: true, content: true });
-        return;
-      }
+      // Any other tab that surfaces theme-derived content: full re-render.
+      requestRender({ sidebar: true, content: true });
+      return;
     }
 
     if (needsAnimOverridesRefresh && (state.activeTab === "animOverrides" || runtime.assetPicker.state)) {
@@ -1166,6 +1242,7 @@
     readGeneralSwitchVisual,
     agentSwitchStateId,
     readAgentFlagValue,
+    readAgentIntegrationInstalled,
     readAgentPermissionMode,
     getShortcutValue,
     getLang,
@@ -1173,8 +1250,79 @@
     hasAnyThemeOverride,
   };
 
+  function showSettingsConfirmModal({ title, detail, actions }) {
+    const rootNode = document.getElementById("modalRoot");
+    if (!rootNode) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      let settled = false;
+      const overlay = document.createElement("div");
+      overlay.className = "modal-backdrop settings-confirm-backdrop";
+
+      const modal = document.createElement("div");
+      modal.className = "settings-confirm-modal";
+      modal.setAttribute("role", "dialog");
+      modal.setAttribute("aria-modal", "true");
+
+      const icon = document.createElement("div");
+      icon.className = "settings-confirm-icon";
+      icon.textContent = "!";
+
+      const titleNode = document.createElement("h2");
+      titleNode.textContent = title;
+
+      const detailNode = document.createElement("p");
+      detailNode.textContent = detail;
+
+      const actionsNode = document.createElement("div");
+      actionsNode.className = "settings-confirm-actions";
+
+      function close(actionId) {
+        if (settled) return;
+        settled = true;
+        document.removeEventListener("keydown", onKeyDown, true);
+        rootNode.innerHTML = "";
+        resolve(actionId);
+      }
+
+      function onKeyDown(ev) {
+        if (ev.key === "Escape") close(null);
+      }
+
+      overlay.addEventListener("click", (ev) => {
+        if (ev.target === overlay) close(null);
+      });
+      const buttons = (Array.isArray(actions) ? actions : []).map((action) => {
+        const button = document.createElement("button");
+        const tone = action && typeof action.tone === "string" ? action.tone : "neutral";
+        const toneClass = tone === "accent"
+          ? "accent"
+          : (tone === "danger" ? "settings-confirm-danger" : "");
+        button.type = "button";
+        button.className = `soft-btn${toneClass ? ` ${toneClass}` : ""}`;
+        button.textContent = action && action.label ? action.label : "";
+        button.addEventListener("click", () => close(action && action.id ? action.id : null));
+        actionsNode.appendChild(button);
+        return { action, button };
+      });
+      document.addEventListener("keydown", onKeyDown, true);
+      modal.appendChild(icon);
+      modal.appendChild(titleNode);
+      modal.appendChild(detailNode);
+      modal.appendChild(actionsNode);
+      overlay.appendChild(modal);
+      rootNode.innerHTML = "";
+      rootNode.appendChild(overlay);
+      const focusTarget =
+        buttons.find((action) => action.action && action.action.defaultFocus)
+        || buttons[buttons.length - 1]
+        || null;
+      if (focusTarget) focusTarget.button.focus();
+    });
+  }
+
   core.helpers = {
     t,
+    showSettingsConfirmModal,
     escapeHtml,
     setSwitchVisual,
     attachAnimatedSwitch,
@@ -1221,6 +1369,7 @@
     finishShortcutRecording,
     handleShortcutRecordKey,
     applyShortcutFailures,
+    fetchAgentInstallationHints,
     fetchThemes,
     fetchAnimationOverridesData,
     applyAnimationPreviewPoster,

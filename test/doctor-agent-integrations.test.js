@@ -12,6 +12,7 @@ const {
 const { GEMINI_HOOK_EVENTS } = require("../hooks/gemini-install");
 const { ANTIGRAVITY_HOOK_EVENTS, __test: antigravityInstallTest } = require("../hooks/antigravity-install");
 const { QWEN_CODE_HOOK_EVENTS, buildQwenCodeHookCommand } = require("../hooks/qwen-code-install");
+const { HOOK_ENTRIES: CODEWHALE_HOOK_ENTRIES } = require("../hooks/codewhale-install");
 const { QODER_HOOK_EVENTS, buildQoderHookCommand } = require("../hooks/qoder-install");
 
 const tempDirs = [];
@@ -25,6 +26,11 @@ function makeTempDir() {
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
+}
+
+function writeText(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, value, "utf8");
 }
 
 function baseDescriptor(overrides = {}) {
@@ -154,6 +160,37 @@ function qoderHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/qode
   return hooks;
 }
 
+function codewhaleDescriptor() {
+  const root = makeTempDir();
+  const parentDir = path.join(root, ".codewhale");
+  return baseDescriptor({
+    agentId: "codewhale",
+    agentName: "CodeWhale",
+    parentDir,
+    configPath: path.join(parentDir, "config.toml"),
+    commandMarker: "codewhale-hook.js",
+    marker: "managed by clawd-on-desk",
+    configMode: "codewhale-hooks-toml",
+    hookEvents: CODEWHALE_HOOK_ENTRIES.map((entry) => entry[0]),
+  });
+}
+
+function codewhaleToml(events = CODEWHALE_HOOK_ENTRIES.map((entry) => entry[0]), commandForEvent = (event) => `"/node" "/app/hooks/codewhale-hook.js" "${event}"`) {
+  return [
+    "[hooks]",
+    "enabled = true",
+    "",
+    ...events.flatMap((event) => [
+      "[[hooks.hooks]]",
+      "# managed by clawd-on-desk",
+      `event = "${event}"`,
+      `command = '''${commandForEvent(event)}'''`,
+      "background = true",
+      "",
+    ]),
+  ].join("\n");
+}
+
 function qwenHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/qwen-code-hook.js" ${event}`) {
   const hooks = {};
   for (const event of QWEN_CODE_HOOK_EVENTS) {
@@ -214,6 +251,23 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.status, "not-installed");
     assert.strictEqual(detail.level, "info");
     assert.strictEqual(detail.parentDirExists, false);
+  });
+
+  it("reports not-managed before disabled for uninstalled agents", () => {
+    const descriptor = baseDescriptor({ agentId: "gemini-cli" });
+    const detail = runOne(descriptor, {
+      prefs: {
+        agents: {
+          "gemini-cli": {
+            integrationInstalled: false,
+            enabled: false,
+          },
+        },
+      },
+    });
+
+    assert.strictEqual(detail.status, "not-managed");
+    assert.strictEqual(detail.level, "info");
   });
 
   it("keeps enabled Hermes missing install info-only when another integration is ok", () => {
@@ -793,6 +847,67 @@ describe("checkAgentIntegrations", () => {
     assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "qoder" });
   });
 
+  it("validates CodeWhale TOML hooks", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml());
+
+    const seen = [];
+    const detail = runOne(descriptor, {
+      validateCommand: (command) => {
+        seen.push(command);
+        return { ok: true, nodeBin: "/node", scriptPath: "/app/hooks/codewhale-hook.js" };
+      },
+    });
+
+    assert.strictEqual(detail.status, "ok");
+    assert.strictEqual(detail.commandCount, CODEWHALE_HOOK_ENTRIES.length);
+    assert.ok(seen.every((command) => command.includes("codewhale-hook.js")));
+    assert.strictEqual(detail.scriptPath, "/app/hooks/codewhale-hook.js");
+  });
+
+  it("warns and offers repair when CodeWhale is missing managed hook events", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml(["session_start"]));
+
+    const detail = runOne(descriptor);
+
+    assert.strictEqual(detail.status, "not-connected");
+    assert.ok(detail.missingCodewhaleHookEvents.includes("session_end"));
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "codewhale" });
+  });
+
+  it("warns and offers repair when CodeWhale hooks are disabled", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml().replace("enabled = true", "enabled = false"));
+
+    const detail = runOne(descriptor);
+
+    assert.strictEqual(detail.status, "not-connected");
+    assert.deepStrictEqual(detail.supplementary, {
+      key: "codewhale_hooks",
+      value: "disabled",
+      detail: "[hooks].enabled is false",
+    });
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "codewhale" });
+  });
+
+  it("warns and offers repair when CodeWhale hook commands fail validation", () => {
+    const descriptor = codewhaleDescriptor();
+    writeText(descriptor.configPath, codewhaleToml());
+
+    const detail = runOne(descriptor, {
+      validateCommand: () => ({
+        ok: false,
+        reason: "missing-script",
+        scriptPath: "/missing/codewhale-hook.js",
+      }),
+    });
+
+    assert.strictEqual(detail.status, "broken-path");
+    assert.match(detail.detail, /parse-failed/);
+    assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "codewhale" });
+  });
+
   it("does not offer automatic repair when Antigravity Clawd hooks are disabled", () => {
     const descriptor = antigravityDescriptor();
     writeAntigravityHooks(descriptor, {
@@ -867,6 +982,85 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.hookCommandIssue, "scriptPath-missing");
   });
 
+  it("judges the kimi-code target when both generations exist (#563)", () => {
+    const root = makeTempDir();
+    const legacyDir = path.join(root, ".kimi");
+    const kimiCodeDir = path.join(root, ".kimi-code");
+    const descriptor = baseDescriptor({
+      agentId: "kimi-cli",
+      marker: "kimi-hook.js",
+      configMode: "toml-text",
+      parentDir: legacyDir,
+      configPath: path.join(legacyDir, "config.toml"),
+      configTargets: [
+        { label: "kimi-code", parentDir: kimiCodeDir, configPath: path.join(kimiCodeDir, "config.toml") },
+        { label: "legacy", parentDir: legacyDir, configPath: path.join(legacyDir, "config.toml") },
+      ],
+    });
+    fs.mkdirSync(legacyDir, { recursive: true });
+    fs.mkdirSync(kimiCodeDir, { recursive: true });
+    // Legacy config carries a healthy hook; the kimi-code config is missing —
+    // doctor must judge the kimi-code (priority) target and say not-connected.
+    fs.writeFileSync(
+      path.join(legacyDir, "config.toml"),
+      '[[hooks]]\nevent = "Stop"\ncommand = \'"node" "/app/hooks/kimi-hook.js"\'\n',
+      "utf8"
+    );
+
+    const detail = runOne(descriptor);
+    assert.strictEqual(detail.status, "not-connected");
+    assert.ok(String(detail.configPath).includes(".kimi-code"));
+  });
+
+  it("falls back to the legacy target when kimi-code is absent (#563)", () => {
+    const root = makeTempDir();
+    const legacyDir = path.join(root, ".kimi");
+    const kimiCodeDir = path.join(root, ".kimi-code");
+    const descriptor = baseDescriptor({
+      agentId: "kimi-cli",
+      marker: "kimi-hook.js",
+      configMode: "toml-text",
+      parentDir: legacyDir,
+      configPath: path.join(legacyDir, "config.toml"),
+      configTargets: [
+        { label: "kimi-code", parentDir: kimiCodeDir, configPath: path.join(kimiCodeDir, "config.toml") },
+        { label: "legacy", parentDir: legacyDir, configPath: path.join(legacyDir, "config.toml") },
+      ],
+    });
+    fs.mkdirSync(legacyDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(legacyDir, "config.toml"),
+      '[[hooks]]\nevent = "Stop"\ncommand = \'"node" "/app/hooks/kimi-hook.js"\'\n',
+      "utf8"
+    );
+
+    const detail = runOne(descriptor);
+    assert.strictEqual(detail.status, "ok");
+    const judged = String(detail.configPath);
+    assert.ok(judged.includes(".kimi") && !judged.includes(".kimi-code"));
+  });
+
+  it("lists both generation dirs when neither exists (#563)", () => {
+    const root = makeTempDir();
+    const legacyDir = path.join(root, ".kimi");
+    const kimiCodeDir = path.join(root, ".kimi-code");
+    const descriptor = baseDescriptor({
+      agentId: "kimi-cli",
+      marker: "kimi-hook.js",
+      configMode: "toml-text",
+      parentDir: legacyDir,
+      configPath: path.join(legacyDir, "config.toml"),
+      configTargets: [
+        { label: "kimi-code", parentDir: kimiCodeDir, configPath: path.join(kimiCodeDir, "config.toml") },
+        { label: "legacy", parentDir: legacyDir, configPath: path.join(legacyDir, "config.toml") },
+      ],
+    });
+
+    const detail = runOne(descriptor);
+    assert.strictEqual(detail.status, "not-installed");
+    assert.ok(detail.detail.includes(".kimi-code") && detail.detail.includes(".kimi"));
+  });
+
   it("turns Codex ok into warning when hooks=false", () => {
     const descriptor = codexDescriptor();
     writeJson(descriptor.configPath, codexHooksConfig(["Stop"]));
@@ -882,6 +1076,92 @@ describe("checkAgentIntegrations", () => {
     });
   });
 
+
+  // #544: Windows Clawd writes dual-field entries — commandWindows carries
+  // the PowerShell form codex actually runs on Windows, command carries a
+  // WSL-interop form only executable inside WSL. The doctor must validate
+  // the field THIS platform's codex resolves; blanket-validating `command`
+  // flagged every dual-field Windows install as broken-path, and Repair
+  // regenerated the same fields forever.
+  it("validates commandWindows on win32 for dual-field Codex entries (#544)", () => {
+    const descriptor = codexDescriptor();
+    const psForm = '& "C:\\Program Files\\nodejs\\node.exe" "D:/app/hooks/codex-hook.js"';
+    const interopForm = '"/mnt/c/Program Files/nodejs/node.exe" "D:/app/hooks/codex-hook.js"';
+    writeJson(descriptor.configPath, {
+      hooks: {
+        Stop: [{ hooks: [{ type: "command", command: interopForm, commandWindows: psForm, timeout: 30 }] }],
+      },
+    });
+    fs.writeFileSync(descriptor.supplementary.configPath, codexTrustState(descriptor, ["Stop"]), "utf8");
+
+    const seen = [];
+    const result = checkAgentIntegrations({
+      fs,
+      prefs: {},
+      descriptors: [descriptor],
+      server: null,
+      platform: "win32",
+      validateCommand: (command) => {
+        seen.push(command);
+        return {
+          ok: true,
+          nodeBin: "C:\\Program Files\\nodejs\\node.exe",
+          scriptPath: "D:/app/hooks/codex-hook.js",
+        };
+      },
+    });
+
+    assert.deepStrictEqual(seen, [psForm]);
+    assert.strictEqual(result.details[0].status, "ok");
+  });
+
+  it("validates the POSIX command field for dual-field Codex entries off win32", () => {
+    const descriptor = codexDescriptor();
+    const psForm = '& "C:\\Program Files\\nodejs\\node.exe" "D:/app/hooks/codex-hook.js"';
+    const interopForm = '"/mnt/c/Program Files/nodejs/node.exe" "D:/app/hooks/codex-hook.js"';
+    writeJson(descriptor.configPath, {
+      hooks: {
+        Stop: [{ hooks: [{ type: "command", command: interopForm, commandWindows: psForm, timeout: 30 }] }],
+      },
+    });
+    fs.writeFileSync(descriptor.supplementary.configPath, codexTrustState(descriptor, ["Stop"]), "utf8");
+
+    const seen = [];
+    const result = checkAgentIntegrations({
+      fs,
+      prefs: {},
+      descriptors: [descriptor],
+      server: null,
+      platform: "linux",
+      validateCommand: (command) => {
+        seen.push(command);
+        return { ok: true, nodeBin: "/mnt/c/Program Files/nodejs/node.exe", scriptPath: "D:/app/hooks/codex-hook.js" };
+      },
+    });
+
+    assert.deepStrictEqual(seen, [interopForm]);
+    assert.strictEqual(result.details[0].status, "ok");
+  });
+
+  it("reports Codex hooks=false even when hook registration is missing", () => {
+    const descriptor = codexDescriptor();
+    writeJson(descriptor.configPath, { hooks: {} });
+    fs.writeFileSync(descriptor.supplementary.configPath, "[features]\nhooks = false\n", "utf8");
+
+    const detail = runOne(descriptor);
+    assert.strictEqual(detail.status, "not-connected");
+    assert.strictEqual(detail.level, "warning");
+    assert.deepStrictEqual(detail.supplementary, {
+      key: "hooks",
+      value: "disabled",
+      detail: "hooks=false",
+    });
+    assert.deepStrictEqual(detail.fixAction, {
+      type: "agent-integration",
+      agentId: "codex",
+      forceCodexHooksFeature: true,
+    });
+  });
   it("turns Codex ok into warning when hooks need Codex review", () => {
     const descriptor = codexDescriptor();
     writeJson(descriptor.configPath, codexHooksConfig(["PermissionRequest", "Stop"]));
@@ -1281,9 +1561,10 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.permissionBubbleDetail, "permission bubbles disabled for this agent");
   });
 
-  it("aggregates all-info states as critical when no integration is ok", () => {
-    // none-global agents (info status `manual-only`) + missing agents only:
-    // no real `ok` integrations means the overall summary is critical.
+  it("aggregates all-info states as pass (no false critical) when nothing is active", () => {
+    // none-global agents (info status `manual-only`) + missing agents only.
+    // Every integration being disabled / manual / not installed is a user or
+    // environment choice, not a fault, so the summary must stay green (#490).
     const result = checkAgentIntegrations({
       fs,
       descriptors: [
@@ -1291,8 +1572,28 @@ describe("checkAgentIntegrations", () => {
         baseDescriptor({ agentId: "missing-agent" }),
       ],
     });
-    assert.strictEqual(result.status, "critical");
-    assert.strictEqual(result.level, "critical");
+    assert.strictEqual(result.status, "pass");
+    assert.strictEqual(result.level, null);
+  });
+
+  it("stays warning when a real problem coexists with info-only integrations", () => {
+    // One auto-install agent with a missing config (not-connected → warning)
+    // plus a disabled agent (info). The warning must still drive the summary;
+    // the #490 de-escalation only applies when nothing is actually wrong.
+    const brokenDescriptor = baseDescriptor({ agentId: "broken-agent", marker: "broken-hook.js" });
+    fs.mkdirSync(brokenDescriptor.parentDir, { recursive: true });
+    const disabledDescriptor = baseDescriptor({ agentId: "off-agent", marker: "off-hook.js" });
+
+    const result = checkAgentIntegrations({
+      fs,
+      prefs: { agents: { "off-agent": { enabled: false } } },
+      descriptors: [brokenDescriptor, disabledDescriptor],
+    });
+
+    assert.strictEqual(result.status, "warning");
+    assert.strictEqual(result.level, "warning");
+    assert.strictEqual(result.warningCount, 1);
+    assert.strictEqual(result.okCount, 0);
   });
 
   it("keeps the integration summary in warning when Gemini hooks are disabled", () => {

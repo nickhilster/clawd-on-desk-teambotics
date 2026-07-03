@@ -49,15 +49,19 @@ test("sendMessage: success returns result; token is NOT in transport args", asyn
   assert.deepEqual(server.calls[0].payload, { chat_id: 1, text: "hi" });
 });
 
-test("getMe / answerCallbackQuery / editMessageReplyMarkup roundtrip", async () => {
+test("getMe / answerCallbackQuery / editMessageReplyMarkup / editMessageText roundtrip", async () => {
   const { client, server } = makeClient();
   server.enqueueOk("getMe", { id: 9, username: "fake_bot" });
   server.enqueueOk("answerCallbackQuery", true);
   server.enqueueOk("editMessageReplyMarkup", { message_id: 11 });
+  server.enqueueOk("editMessageText", { message_id: 12, text: "done" });
 
   assert.equal((await client.getMe()).username, "fake_bot");
   assert.equal(await client.answerCallbackQuery({ callback_query_id: "x" }), true);
   assert.equal((await client.editMessageReplyMarkup({ chat_id: 1, message_id: 11 })).message_id, 11);
+  const edited = await client.editMessageText({ chat_id: 1, message_id: 12, text: "done" });
+  assert.equal(edited.message_id, 12);
+  assert.deepEqual(server.calls[3].payload, { chat_id: 1, message_id: 12, text: "done" });
 });
 
 test("getUpdates advances offset to lastUpdate.update_id + 1", async () => {

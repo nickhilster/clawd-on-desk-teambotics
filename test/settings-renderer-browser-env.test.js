@@ -9,6 +9,7 @@ const vm = require("node:vm");
 const SRC_DIR = path.join(__dirname, "..", "src");
 const SETTINGS_HTML = path.join(SRC_DIR, "settings.html");
 const SETTINGS_CSS = path.join(SRC_DIR, "settings.css");
+const SETTINGS_TAB_GENERAL = path.join(SRC_DIR, "settings-tab-general.js");
 const SETTINGS_RENDERER = path.join(SRC_DIR, "settings-renderer.js");
 const SETTINGS_UI_CORE = path.join(SRC_DIR, "settings-ui-core.js");
 const SETTINGS_ANIM_OVERRIDES_MERGE = path.join(SRC_DIR, "settings-anim-overrides-merge.js");
@@ -724,6 +725,8 @@ function loadAgentsTabForTest({
   snapshot,
   agentMetadata,
   collapsedGroups = {},
+  settingsAPI = {},
+  doctor = null,
 } = {}) {
   const raf = createQueuedRaf();
   const body = new FakeElement("body");
@@ -759,7 +762,9 @@ function loadAgentsTabForTest({
     globalThis: null,
     settingsAPI: {
       command: () => Promise.resolve({ status: "ok" }),
+      ...settingsAPI,
     },
+    doctor,
     ClawdSettingsSizeSlider: {
       SIZE_UI_MIN: 1,
       SIZE_UI_MAX: 100,
@@ -777,6 +782,9 @@ function loadAgentsTabForTest({
           agentsTitle: "Agents",
           agentsSubtitle: "subtitle",
           agentsEmpty: "empty",
+          agentSectionConnected: "Connected",
+          agentSectionRecommended: "Detected locally",
+          agentSectionUnavailable: "Not detected locally",
           rowAgentIdleAlerts: "Idle alerts",
           rowAgentIdleAlertsDesc: "Idle alert desc",
           rowAgentPermissions: "Permissions",
@@ -792,8 +800,36 @@ function loadAgentsTabForTest({
           eventSourceLogPoll: "Log poll",
           eventSourcePlugin: "Plugin",
           eventSourceExtension: "Extension",
+          agentIntegrationInstalled: "Installed",
+          agentIntegrationNotInstalled: "Not installed",
+          agentIntegrationInstall: "Install",
+          agentCodexHookNeedsAttention: "Needs attention",
+          codexHookHealthReasonInactive: "Hook inactive",
+          codexHookHealthReasonDisabled: "Hooks disabled",
+          codexHookHealthReasonNeedsReview: "Needs review",
+          agentIntegrationUninstall: "Uninstall",
+          agentIntegrationWorking: "Working",
+          agentIntegrationUninstallConfirm: "Confirm uninstall",
+          agentIntegrationInstallSkipped: "No local installation was found for {agents}.",
+          agentListSeparator: ", ",
+          agentInstallHintTitle: "Connect detected agents",
+          agentInstallHintDesc: "Detected local signals for {agents}.",
+          agentInstallHintInstallRecommended: "Install recommended",
+          agentInstallHintDismiss: "Not now",
+          agentCleanupHintTitle: "Review missing local agents",
+          agentCleanupHintDesc: "Missing local installs for {agents}.",
+          agentCleanupHintRemove: "Remove integrations",
+          agentCleanupHintDismiss: "Keep for now",
           collapsibleExpand: "Expand",
           collapsibleCollapse: "Collapse",
+          toastAgentIntegrationInstalled: "Integration installed.",
+          toastAgentIntegrationUninstalled: "Integration uninstalled.",
+          toastAgentInstallHintInstalled: "Recommended integrations installed.",
+          toastAgentInstallHintSkipped: "No local installation was found for {agents}.",
+          toastAgentInstallHintPartialSkipped: "{success} installed. Skipped {agents}.",
+          toastAgentInstallHintPartial: "{success} installed, {failed} failed: {message}",
+          toastAgentCleanupHintRemoved: "Missing integrations removed.",
+          toastAgentCleanupHintPartial: "{success} removed, {failed} failed: {message}",
           toastSaveFailed: "Failed: ",
         },
       },
@@ -888,11 +924,15 @@ function loadAnimMapTabForTest({
   vm.runInContext(fs.readFileSync(SETTINGS_ANIM_OVERRIDES_MERGE, "utf8"), context);
   vm.runInContext(fs.readFileSync(SETTINGS_UI_CORE, "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(SRC_DIR, "settings-tab-anim-map.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(SRC_DIR, "settings-tab-anim-overrides.js"), "utf8"), context);
 
   const core = context.ClawdSettingsCore;
   core.state.snapshot = snapshot || { theme: "clawd", themeOverrides: {} };
-  core.state.activeTab = "animMap";
+  // The Animation Map now lives as the default "on / off" subtab of the
+  // Animation & Sound Overrides tab, so patching flows through that tab.
+  core.state.activeTab = "animOverrides";
   context.ClawdSettingsTabAnimMap.init(core);
+  context.ClawdSettingsTabAnimOverrides.init(core);
 
   let contentRenderCount = 0;
   core.ops.installRenderHooks({
@@ -1202,6 +1242,7 @@ describe("settings renderer browser environment", () => {
       "settings-tab-about.js",
       "settings-tab-remote-ssh.js",
       "settings-doctor-modal.js",
+      "settings-icons.js",
       "settings-renderer.js",
     ];
 
@@ -2221,7 +2262,7 @@ describe("settings renderer browser environment", () => {
     assert.ok(css.includes(".doctor-action-notice-icon"));
     assert.ok(/@media \(prefers-color-scheme:\s*dark\)\s*\{[\s\S]*\.doctor-action-notice\.ok[\s\S]*color:\s*#8ce99a;[\s\S]*\.doctor-action-notice\.error[\s\S]*color:\s*#fca5a5;/.test(css));
     assert.ok(css.includes("@keyframes doctor-notice-in"));
-    assert.ok(/\.doctor-modal\s*\{[\s\S]*width:\s*min\(728px,\s*100%\);[\s\S]*max-height:\s*calc\(100vh - 32px\);/.test(css));
+    assert.ok(/\.doctor-modal\s*\{[\s\S]*width:\s*min\(728px,\s*100%\);[\s\S]*max-height:\s*calc\(100vh \/ var\(--clawd-text-zoom, 1\) - 32px\);/.test(css));
     assert.ok(/\.doctor-modal\s*\{[\s\S]*gap:\s*8px;[\s\S]*padding:\s*14px;/.test(css));
     assert.ok(css.includes(".doctor-modal-entering"));
     assert.ok(css.includes("@keyframes doctor-modal-in"));
@@ -2303,25 +2344,142 @@ describe("settings renderer browser environment", () => {
     assert.ok(!i18nSource.includes('doctorOpenLogOpened: "デバッグログを開きました。"'));
   });
 
-  it("does not animate the size bubble's horizontal position", () => {
+  it("unifies the size slider on the simple volume-style control (no floating bubble, no ticks)", () => {
     const css = fs.readFileSync(SETTINGS_CSS, "utf8");
-    const match = css.match(/\.size-bubble\s*\{([\s\S]*?)\n\}/);
-    assert.ok(match, "settings.css should define a .size-bubble rule");
-    assert.ok(!/transition:\s*left\b/.test(match[1]));
-    assert.ok(/transition:\s*transform 0\.14s ease,\s*box-shadow 0\.18s ease;/.test(match[1]));
+    const tabSource = fs.readFileSync(SETTINGS_TAB_GENERAL, "utf8");
+    // Old floating-bubble/tick design must be fully gone.
+    assert.ok(!/\.size-bubble/.test(css));
+    assert.ok(!/\.size-ticks/.test(css));
+    assert.ok(!/\.size-slider-wrap/.test(css));
+    assert.ok(!/size-bubble/.test(tabSource));
+    assert.ok(!/size-ticks/.test(tabSource));
+    // The size row reuses the volume-style classes plus its preview-session
+    // drag affordances.
+    assert.ok(/volume-control size-control/.test(tabSource));
+    assert.ok(/volume-slider size-slider/.test(tabSource));
+    assert.ok(/\.size-control\.dragging \.volume-slider::-webkit-slider-thumb/.test(css));
+    assert.ok(/\.size-control\.pending \.volume-slider\s*\{[\s\S]*cursor:\s*ew-resize;/.test(css));
   });
 
-  it("renders the size bubble tail as a separated double-layer callout instead of overlapping the pill", () => {
+  it("compensates every viewport unit for the injected text zoom", () => {
+    // vh/vw resolve against the UNZOOMED window (verified by probe: a 100vh
+    // box renders S× the window height under the injected root zoom), so any
+    // bare viewport unit overflows the window at scale > 1 — symptom:
+    // settings pages that cannot scroll to the bottom. Every occurrence must
+    // divide by --clawd-text-zoom or use the zoom-aware 100% chain instead.
     const css = fs.readFileSync(SETTINGS_CSS, "utf8");
-    assert.ok(/--size-bubble-tail-size:\s*4px;/.test(css));
-    assert.ok(/--size-bubble-tail-inner-size:\s*3px;/.test(css));
-    assert.ok(/--size-bubble-tail-gap:\s*1px;/.test(css));
-    assert.ok(/padding-top:\s*29px;/.test(css));
-    assert.ok(/\.size-bubble\s*\{[\s\S]*top:\s*6px;[\s\S]*border-radius:\s*9px;[\s\S]*padding:\s*0 7px;[\s\S]*line-height:\s*1\.2;[\s\S]*\}/.test(css));
-    assert.ok(/\.size-bubble::before,\s*\.size-bubble::after\s*\{/.test(css));
-    assert.ok(/\.size-bubble::before\s*\{[\s\S]*top:\s*calc\(100%\s*\+\s*var\(--size-bubble-tail-gap\)\);[\s\S]*border-top:\s*var\(--size-bubble-tail-size\)\s+solid\s+var\(--accent\);[\s\S]*\}/.test(css));
-    assert.ok(/\.size-bubble::after\s*\{[\s\S]*top:\s*calc\(100%\s*\+\s*var\(--size-bubble-tail-gap\)\);[\s\S]*border-top:\s*var\(--size-bubble-tail-inner-size\)\s+solid\s+var\(--panel-bg\);[\s\S]*\}/.test(css));
-    assert.ok(!/\.size-bubble::after\s*\{[\s\S]*margin-top:\s*-1px;/.test(css));
+    const dashboardHtml = fs.readFileSync(path.join(SRC_DIR, "dashboard.html"), "utf8");
+    const mainSource = fs.readFileSync(MAIN_PROCESS, "utf8");
+    const bare = css.match(/\d+(?:\.\d+)?v[hw]\b(?!\s*\/\s*var\(--clawd-text-zoom)/g) || [];
+    assert.deepStrictEqual(bare, [], "settings.css has uncompensated viewport units");
+    assert.doesNotMatch(dashboardHtml, /\d+(?:\.\d+)?v[hw]\b/, "dashboard.html must not use viewport units");
+    assert.match(mainSource, /height:calc\(100vh \/ \$\{resumeScale\}\)/);
+  });
+
+  it("keeps the text-scale slider in sync across display moves without fighting a live drag", () => {
+    const tabSource = fs.readFileSync(SETTINGS_TAB_GENERAL, "utf8");
+    const uiCoreSource = fs.readFileSync(SETTINGS_UI_CORE, "utf8");
+    // The committed percent is per-display and lives main-side; a window move
+    // never produces a settings-changed broadcast, so the row must subscribe
+    // to the context-changed poke from the settings-window runtime…
+    assert.ok(/onTextScaleContextChanged\(\(\) => \{\s*if \(!previewLive\) syncFromContext\(\);/.test(tabSource),
+      "text-scale row must re-pull context on display change, gated on previewLive");
+    // …and must not repaint to the committed value mid-drag (the preview
+    // itself triggers pokes via applyTextScaleNow).
+    assert.ok(/previewLive = true;/.test(tabSource));
+    // Preview exits clear the flag: manual pointer release, commit (change),
+    // and rollback (blur).
+    // (Lookbehind excludes the `let previewLive = false;` declaration.)
+    assert.strictEqual((tabSource.match(/(?<!let )previewLive = false;/g) || []).length, 3);
+    // Full re-renders must dispose the row (unsubscribe + roll back a
+    // stranded transient preview) — see clearMountedControls.
+    assert.ok(/unsubscribeContextChanged\(\);/.test(tabSource));
+    assert.ok(/mountedControls\.textScale && typeof state\.mountedControls\.textScale\.dispose === "function"/.test(uiCoreSource),
+      "clearMountedControls must dispose the text-scale control");
+    assert.ok(/state\.mountedControls\.textScale = null;/.test(uiCoreSource));
+    // Renderer-side rollback rides IPC and can't be trusted during window
+    // teardown — main must clear the transient preview when settings closes,
+    // or a mid-drag ⌘W pins the preview scale to the display until restart.
+    const mainSource = fs.readFileSync(MAIN_PROCESS, "utf8");
+    assert.ok(/onBeforeClosed: \(\) => \{[^}]*endTextScalePreview\(\);/.test(mainSource),
+      "settings onBeforeClosed must end a live text-scale preview");
+  });
+
+  it("keeps text-scale pointer drags stable while the Settings page live-zooms", async () => {
+    const previewCalls = [];
+    const commandCalls = [];
+    const harness = loadGeneralTabForTest({
+      snapshot: makeGeneralSnapshot(),
+      settingsAPI: {
+        getTextScaleContext: () => Promise.resolve({ percent: 100 }),
+        previewTextScale: (value) => {
+          previewCalls.push(value);
+          return Promise.resolve({ status: "ok" });
+        },
+        endTextScalePreview: () => Promise.resolve({ status: "ok" }),
+        command: (action, payload) => {
+          commandCalls.push({ action, payload });
+          return Promise.resolve({ status: "ok" });
+        },
+      },
+    });
+    harness.renderContent();
+    await Promise.resolve();
+
+    const slider = harness.content.querySelector(".text-scale-slider");
+    assert.ok(slider);
+    let rect = { left: 100, width: 240, top: 0, height: 28, right: 340, bottom: 28 };
+    slider.getBoundingClientRect = () => rect;
+
+    slider.dispatchEvent({
+      type: "pointerdown",
+      pointerId: 1,
+      button: 0,
+      isPrimary: true,
+      screenX: 160,
+      clientX: 160,
+      bubbles: false,
+    });
+
+    // Simulate the Settings page live-zooming wider after the first preview.
+    // The manual pointer math must keep using the pointerdown geometry above:
+    // screenX 145 is 95% on the original 240px track, but would be ~90% if the
+    // now-wider track were used mid-drag.
+    rect = { left: 100, width: 384, top: 0, height: 45, right: 484, bottom: 45 };
+    slider.dispatchEvent({
+      type: "pointermove",
+      pointerId: 1,
+      screenX: 145,
+      clientX: 145,
+      bubbles: false,
+    });
+    assert.strictEqual(slider.value, "95");
+    assert.strictEqual(previewCalls.at(-1), 0.95);
+
+    slider.dispatchEvent({
+      type: "pointerup",
+      pointerId: 1,
+      screenX: 145,
+      clientX: 145,
+      bubbles: false,
+    });
+    await Promise.resolve();
+
+    assert.strictEqual(commandCalls.at(-1).action, "setTextScaleForDisplay");
+    assert.strictEqual(commandCalls.at(-1).payload.value, 0.95);
+  });
+
+  it("makes both percent readouts clickable reset buttons", () => {
+    const css = fs.readFileSync(SETTINGS_CSS, "utf8");
+    const tabSource = fs.readFileSync(SETTINGS_TAB_GENERAL, "utf8");
+    assert.ok(/\.text-scale-readout\s*\{[\s\S]*cursor:\s*pointer;/.test(css));
+    // Size readout resets the pet to the prefs default (P:9 → 30 on the UI scale).
+    assert.ok(/SIZE_UI_DEFAULT = 30/.test(tabSource));
+    assert.ok(/controller\.change\(SIZE_UI_DEFAULT\)/.test(tabSource));
+    assert.ok(/rowSizeResetTitle/.test(tabSource));
+    // Text-size readout resets to 100% via the per-display command.
+    assert.ok(/setTextScaleForDisplay/.test(tabSource));
+    assert.ok(/textScaleResetTitle/.test(tabSource));
   });
 
   it("uses transform-based Settings switch motion with a calmer shared timing", () => {
@@ -2602,7 +2760,7 @@ describe("settings renderer browser environment", () => {
 
     const sections = generalHarness.content.querySelectorAll(".section");
     const sectionTitles = sections.map((section) => section.querySelector(".section-title").textContent);
-    assert.deepStrictEqual(sectionTitles, ["Appearance", "Session management", "Startup", "Bubbles"]);
+    assert.deepStrictEqual(sectionTitles, ["Appearance", "Session management", "Alerts & feedback", "Behavior & position", "System & startup", "Permissions"]);
     assert.strictEqual(generalHarness.content.querySelector(".hardware-buddy-collapsible"), null);
 
     const remoteHarness = loadTelegramApprovalTabForTest({
@@ -2814,11 +2972,10 @@ describe("settings renderer browser environment", () => {
     assert.strictEqual(calls.length, 0);
   });
 
-  it("adds hover affordance to General size and volume sliders", () => {
+  it("adds hover affordance to General sliders via the shared volume-style classes", () => {
     const css = fs.readFileSync(SETTINGS_CSS, "utf8");
-    assert.ok(/\.size-slider:hover::-webkit-slider-thumb\s*\{[\s\S]*transform:\s*scale\(1\.08\);/.test(css));
     assert.ok(/\.volume-slider:hover::-webkit-slider-thumb\s*\{[\s\S]*transform:\s*scale\(1\.08\);/.test(css));
-    assert.ok(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.size-slider:hover::-webkit-slider-thumb,[\s\S]*\.volume-slider:hover::-webkit-slider-thumb\s*\{[\s\S]*transform:\s*none;/.test(css));
+    assert.ok(/@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.volume-slider:hover::-webkit-slider-thumb,[\s\S]*\.size-control\.dragging \.volume-slider::-webkit-slider-thumb\s*\{[\s\S]*transform:\s*none;/.test(css));
   });
 
   it("describes notification bubble seconds as an auto-close upper bound instead of a guaranteed visible duration", () => {
@@ -2852,7 +3009,8 @@ describe("settings renderer browser environment", () => {
     const generalSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-general.js"), "utf8");
     const i18nSource = fs.readFileSync(SETTINGS_I18N, "utf8");
     const css = fs.readFileSync(SETTINGS_CSS, "utf8");
-    assert.ok(generalSource.includes("settings-confirm-modal"));
+    const uiCoreSource = fs.readFileSync(SETTINGS_UI_CORE, "utf8");
+    assert.ok(uiCoreSource.includes("settings-confirm-modal"));
     assert.ok(generalSource.includes("updateBubbleDisableConfirmAction"));
     assert.ok(css.includes(".settings-confirm-modal"));
     assert.ok(css.includes(".settings-confirm-backdrop"));
@@ -2865,8 +3023,8 @@ describe("settings renderer browser environment", () => {
     assert.ok(generalSource.includes('{ id: "confirm", label: t("updateBubbleDisableConfirmAction"), tone: "danger" }'));
     assert.ok(generalSource.includes('{ id: "cancel", label: t("updateBubbleDisableConfirmCancel"), tone: "accent", defaultFocus: true }'));
     assert.ok(generalSource.includes('if (actionId === "confirm") runToggleCommit(nextEnabled);'));
-    assert.ok(generalSource.includes('tone === "accent"'));
-    assert.ok(generalSource.includes('tone === "danger"'));
+    assert.ok(uiCoreSource.includes('tone === "accent"'));
+    assert.ok(uiCoreSource.includes('tone === "danger"'));
   });
 
   it("keeps Claude hooks confirmations inside the Settings renderer", () => {
@@ -2875,15 +3033,17 @@ describe("settings renderer browser environment", () => {
     const generalSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-general.js"), "utf8");
     const i18nSource = fs.readFileSync(SETTINGS_I18N, "utf8");
     const css = fs.readFileSync(SETTINGS_CSS, "utf8");
-    assert.ok(generalSource.includes("confirmDisableClaudeHookManagement"));
-    assert.ok(generalSource.includes("runDisconnectClaudeHooks"));
-    assert.ok(generalSource.includes("showSettingsConfirmModal({"));
-    assert.ok(generalSource.includes("claudeHooksDisableConfirmTitle"));
-    assert.ok(generalSource.includes("claudeHooksDisconnectConfirmTitle"));
-    assert.ok(generalSource.includes("buttons.find((action) => action.action && action.action.defaultFocus)"));
-    assert.ok(generalSource.includes('button.className = `soft-btn${toneClass ? ` ${toneClass}` : ""}`;'));
-    assert.ok(generalSource.includes('tone === "accent"'));
-    assert.ok(generalSource.includes('tone === "danger"'));
+    const agentsSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-agents.js"), "utf8");
+    const uiCoreSource = fs.readFileSync(SETTINGS_UI_CORE, "utf8");
+    assert.ok(agentsSource.includes("confirmDisableClaudeHookManagement"));
+    assert.ok(agentsSource.includes("runDisconnectClaudeHooks"));
+    assert.ok(agentsSource.includes("showSettingsConfirmModal({"));
+    assert.ok(agentsSource.includes("claudeHooksDisableConfirmTitle"));
+    assert.ok(agentsSource.includes("claudeHooksDisconnectConfirmTitle"));
+    assert.ok(uiCoreSource.includes("buttons.find((action) => action.action && action.action.defaultFocus)"));
+    assert.ok(uiCoreSource.includes('button.className = `soft-btn${toneClass ? ` ${toneClass}` : ""}`;'));
+    assert.ok(uiCoreSource.includes('tone === "accent"'));
+    assert.ok(uiCoreSource.includes('tone === "danger"'));
     assert.ok(css.includes(".settings-confirm-danger"));
     assert.ok(!preloadSource.includes("confirmDisableClaudeHooks"));
     assert.ok(!preloadSource.includes("confirmDisconnectClaudeHooks"));
@@ -2893,6 +3053,29 @@ describe("settings renderer browser environment", () => {
     assert.ok(i18nSource.includes("claudeHooksDisableConfirmTitle"));
     assert.ok(i18nSource.includes("claudeHooksDisableConfirmKeep"));
     assert.ok(i18nSource.includes("claudeHooksDisconnectConfirmKeep"));
+  });
+
+  it("wires the danger auto-pilot toggle with a confirm modal and red label", () => {
+    const generalSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-general.js"), "utf8");
+    const coreSource = fs.readFileSync(SETTINGS_UI_CORE, "utf8");
+    const i18nSource = fs.readFileSync(SETTINGS_I18N, "utf8");
+    const css = fs.readFileSync(SETTINGS_CSS, "utf8");
+    // Row is registered with danger:true and routes the enable path through a confirm.
+    assert.ok(generalSource.includes('key: "autoApproveAllPermissions"'));
+    assert.ok(generalSource.includes("danger: true"));
+    assert.ok(generalSource.includes("confirmAutoApproveAll"));
+    assert.ok(generalSource.includes("showAutoApproveAllConfirmModal"));
+    assert.ok(generalSource.includes('{ id: "enable", label: t("autoApproveAllConfirmEnable"), tone: "danger" }'));
+    // buildSwitchRow honors danger by painting the label red.
+    assert.ok(coreSource.includes("row-label-danger"));
+    assert.ok(css.includes(".row-label.row-label-danger"));
+    // Simple title + localized confirm strings exist.
+    assert.ok(i18nSource.includes('rowAutoApproveAll: "Auto-approve all requests"'));
+    assert.ok(i18nSource.includes('rowAutoApproveAll: "自动放行所有请求"'));
+    assert.ok(i18nSource.includes("autoApproveAllConfirmTitle"));
+    // Lives in its own Permissions section, not under Bubbles.
+    assert.ok(generalSource.includes('t("sectionPermissions")'));
+    assert.ok(i18nSource.includes('sectionPermissions: "Permissions"'));
   });
 
   it("clears successful switch transient state so rerenders do not keep wait cursors", () => {
@@ -3221,71 +3404,72 @@ describe("settings renderer browser environment", () => {
     assert.strictEqual(harness.core.state.transientUiState.generalSwitches.has("soundMuted"), false);
   });
 
-  it("patches Claude hook management child switch state without rebuilding General content", async () => {
-    const updateCalls = [];
-    const initialSnapshot = {
-      lang: "en",
-      size: 50,
-      sessionHudEnabled: true,
-      sessionHudShowStateLabels: true,
-      sessionHudShowElapsed: true,
-      sessionHudCleanupDetached: true,
-      soundMuted: false,
-      soundVolume: 0.5,
-      lowPowerIdleMode: false,
-      allowEdgePinning: true,
-      keepSizeAcrossDisplays: true,
-      manageClaudeHooksAutomatically: false,
-      openAtLogin: false,
-      autoStartWithClaude: false,
-      hideBubbles: false,
-      bubbleFollowPet: true,
-      permissionBubblesEnabled: true,
-      notificationBubbleAutoCloseSeconds: 8,
-      updateBubbleAutoCloseSeconds: 12,
-    };
-    const harness = loadGeneralTabForTest({
-      snapshot: initialSnapshot,
-      settingsAPI: {
-        update: (key, value) => {
-          updateCalls.push({ key, value });
-          return Promise.resolve({ status: "ok" });
-        },
+  it("renders Claude hook management in the Agents claude-code group with autoStart gated", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        manageClaudeHooksAutomatically: false,
+        autoStartWithClaude: true,
+        agents: { "claude-code": { integrationInstalled: true, enabled: true } },
       },
+      agentMetadata: [
+        { id: "claude-code", name: "Claude Code", eventSource: "hook", capabilities: {} },
+      ],
     });
-    harness.renderContent();
 
-    const master = harness.getSwitch("manageClaudeHooksAutomatically");
-    const autoStart = harness.getSwitch("autoStartWithClaude");
-    const autoStartMeta = harness.getSwitchMeta("autoStartWithClaude");
-    assert.ok(master);
-    assert.ok(autoStart);
-    assert.ok(autoStartMeta.extraElement);
-    assert.strictEqual(autoStart.classList.contains("disabled"), true);
+    harness.core.ops.requestRender({ content: true });
 
-    const beforeRenderCount = harness.getContentRenderCount();
+    const manage = harness.core.state.mountedControls.generalSwitches.get("manageClaudeHooksAutomatically");
+    const autoStart = harness.core.state.mountedControls.generalSwitches.get("autoStartWithClaude");
+    assert.ok(manage, "manage-hooks switch should mount inside the Agents claude-code group");
+    assert.ok(autoStart, "autoStart switch should mount inside the Agents claude-code group");
+    // Master is off, so the child autoStart is disabled at render time (D2: Agents
+    // does a full rebuild on these keys instead of an in-place patch).
+    assert.strictEqual(autoStart.element.classList.contains("disabled"), true);
+    assert.ok(autoStart.extraElement, "autoStart shows the disabled note when management is off");
+  });
+
+  it("re-gates autoStart when Claude hook management toggles via applyChanges (D2 full rebuild)", () => {
+    const baseSnapshot = {
+      manageClaudeHooksAutomatically: true,
+      autoStartWithClaude: true,
+      agents: { "claude-code": { integrationInstalled: true, enabled: true } },
+    };
+    const harness = loadAgentsTabForTest({
+      snapshot: { ...baseSnapshot },
+      agentMetadata: [
+        { id: "claude-code", name: "Claude Code", eventSource: "hook", capabilities: {} },
+      ],
+    });
+
+    harness.core.ops.requestRender({ content: true });
+
+    // Master is on, so the child autoStart starts enabled with no disabled note.
+    let autoStart = harness.core.state.mountedControls.generalSwitches.get("autoStartWithClaude");
+    assert.ok(autoStart, "autoStart switch should mount inside the Agents claude-code group");
+    assert.strictEqual(autoStart.element.classList.contains("disabled"), false);
+    assert.strictEqual(autoStart.extraElement, null);
+
+    // Turning management off is not an `agents` patch, so Agents falls through to a
+    // full rebuild (D2) — the rebuilt child must come back disabled with the note.
+    harness.core.ops.applyChanges({
+      changes: { manageClaudeHooksAutomatically: false },
+      snapshot: { ...baseSnapshot, manageClaudeHooksAutomatically: false },
+    });
+
+    autoStart = harness.core.state.mountedControls.generalSwitches.get("autoStartWithClaude");
+    assert.ok(autoStart, "autoStart switch should remount after the rebuild");
+    assert.strictEqual(autoStart.element.classList.contains("disabled"), true);
+    assert.ok(autoStart.extraElement, "autoStart shows the disabled note after management is turned off");
+
+    // Turning management back on re-enables the child and drops the note.
     harness.core.ops.applyChanges({
       changes: { manageClaudeHooksAutomatically: true },
-      snapshot: { ...initialSnapshot, manageClaudeHooksAutomatically: true },
+      snapshot: { ...baseSnapshot, manageClaudeHooksAutomatically: true },
     });
 
-    assert.strictEqual(
-      harness.getContentRenderCount(),
-      beforeRenderCount,
-      "Claude hook management broadcasts should patch the mounted startup switches"
-    );
-    assert.strictEqual(harness.getSwitch("manageClaudeHooksAutomatically"), master);
-    assert.strictEqual(harness.getSwitch("autoStartWithClaude"), autoStart);
-    assert.strictEqual(master.classList.contains("on"), true);
-    assert.strictEqual(autoStart.classList.contains("disabled"), false);
-    assert.strictEqual(autoStart.attributes["aria-disabled"], undefined);
-    assert.strictEqual(autoStart.tabIndex, 0);
-    assert.strictEqual(autoStartMeta.extraElement, null);
-
-    autoStart.eventListeners.click[0]();
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.deepStrictEqual(updateCalls, [{ key: "autoStartWithClaude", value: true }]);
+    autoStart = harness.core.state.mountedControls.generalSwitches.get("autoStartWithClaude");
+    assert.strictEqual(autoStart.element.classList.contains("disabled"), false);
+    assert.strictEqual(autoStart.extraElement, null);
   });
 
   it("patches hide-bubbles aggregate changes without rebuilding General content", () => {
@@ -3394,55 +3578,27 @@ describe("settings renderer browser environment", () => {
     assert.deepStrictEqual(updateCalls, []);
   });
 
-  it("patches Claude hook management off and restores the child disabled note", async () => {
-    const updateCalls = [];
-    const initialSnapshot = makeGeneralSnapshot({
-      manageClaudeHooksAutomatically: true,
-      autoStartWithClaude: true,
-    });
-    const harness = loadGeneralTabForTest({
-      snapshot: initialSnapshot,
-      settingsAPI: {
-        update: (key, value) => {
-          updateCalls.push({ key, value });
-          return Promise.resolve({ status: "ok" });
-        },
-      },
-    });
-    harness.renderContent();
-
-    const master = harness.getSwitch("manageClaudeHooksAutomatically");
-    const autoStart = harness.getSwitch("autoStartWithClaude");
-    const autoStartMeta = harness.getSwitchMeta("autoStartWithClaude");
-    assert.ok(master);
-    assert.ok(autoStart);
-    assert.ok(autoStartMeta);
-    assert.strictEqual(autoStart.classList.contains("disabled"), false);
-    assert.strictEqual(autoStartMeta.extraElement, null);
-
-    const beforeRenderCount = harness.getContentRenderCount();
-    harness.core.ops.applyChanges({
-      changes: { manageClaudeHooksAutomatically: false },
-      snapshot: { ...initialSnapshot, manageClaudeHooksAutomatically: false },
-    });
-
-    assert.strictEqual(harness.getContentRenderCount(), beforeRenderCount);
-    assert.strictEqual(harness.getSwitch("manageClaudeHooksAutomatically"), master);
-    assert.strictEqual(harness.getSwitch("autoStartWithClaude"), autoStart);
-    assert.strictEqual(master.classList.contains("on"), false);
-    assert.strictEqual(autoStart.classList.contains("disabled"), true);
-    assert.strictEqual(autoStart.attributes["aria-disabled"], "true");
-    assert.strictEqual(autoStart.tabIndex, -1);
-    assert.ok(autoStartMeta.extraElement);
-    assert.strictEqual(
-      autoStartMeta.extraElement.textContent,
-      harness.core.helpers.t("rowStartWithClaudeDisabledDesc")
-    );
-
-    autoStart.eventListeners.click[0]();
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.deepStrictEqual(updateCalls, []);
+  it("moves Claude hook management out of General into the Agents claude-code group", () => {
+    const generalSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-general.js"), "utf8");
+    const agentsSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-agents.js"), "utf8");
+    // No longer rendered or patched by the General tab.
+    assert.ok(!generalSource.includes('key: "manageClaudeHooksAutomatically"'));
+    assert.ok(!generalSource.includes('key: "autoStartWithClaude"'));
+    assert.ok(!generalSource.includes("CLAUDE_HOOK_MANAGEMENT_CHILD_SWITCH_KEYS"));
+    assert.ok(!generalSource.includes("manageClaudeHooksAutomatically"));
+    // Built in the Agents claude-code group as top-level pref rows.
+    assert.ok(agentsSource.includes("buildClaudeHookManagementRows"));
+    assert.ok(agentsSource.includes('agent.id === "claude-code"'));
+    assert.ok(agentsSource.includes('key: "manageClaudeHooksAutomatically"'));
+    assert.ok(agentsSource.includes('key: "autoStartWithClaude"'));
+    assert.ok(agentsSource.includes("rowManageClaudeHooks"));
+    assert.ok(agentsSource.includes("rowStartWithClaude"));
+    // autoStart stays gated on the master (disabled + extra note computed at render).
+    assert.ok(agentsSource.includes("disabled: !manageHooksEnabled"));
+    assert.ok(agentsSource.includes('descExtraKey: manageHooksEnabled ? null : "rowStartWithClaudeDisabledDesc"'));
+    // Confirm/disconnect flows moved with the switches.
+    assert.ok(agentsSource.includes("confirmDisableClaudeHookManagement"));
+    assert.ok(agentsSource.includes("runDisconnectClaudeHooks"));
   });
 
   it("patches hide-bubbles aggregate off without rebuilding General content", () => {
@@ -3614,6 +3770,8 @@ describe("settings renderer browser environment", () => {
     assert.ok(tabSource.includes("handleRemoveCodexPet"));
     assert.ok(tabSource.includes("themeUninstallPetLabel"));
     assert.ok(tabSource.includes('footer.className = "theme-card-footer";'));
+    assert.ok(tabSource.includes('caps.powerProfile === "scripted"'));
+    assert.ok(tabSource.includes("themeCapabilityFineMotion"));
     assert.ok(tabSource.includes('if (!theme.active) indicator.setAttribute("aria-hidden", "true");'));
     assert.ok(!tabSource.includes("if (theme.active || canDelete || canRemoveCodexPet)"));
     assert.ok(coreSource.includes("codexPetZipImportPending"));
@@ -3651,7 +3809,9 @@ describe("settings renderer browser environment", () => {
     assert.ok(strings.en.themeImportUserThemeZipHint.includes("theme.json"));
     assert.strictEqual(strings.en.themeOpenUserThemesFolder, "Open themes folder");
     assert.strictEqual(strings.en.themeRefreshThemes, "Refresh themes");
+    assert.strictEqual(strings.en.themeCapabilityFineMotion, "Fine motion");
     assert.strictEqual(strings.zh.themeImportPetZip, "导入 Codex Pet 包（.zip）");
+    assert.strictEqual(strings.zh.themeCapabilityFineMotion, "精细动效");
     assert.strictEqual(strings.zh.themeActionGroupCodexPets, "Codex Pets");
     assert.strictEqual(strings.zh.themeImportUserThemeZip, "导入 Clawd 主题包（.zip）");
     assert.ok(strings.zh.themeImportUserThemeZipHint.includes("theme.json"));
@@ -3776,6 +3936,8 @@ describe("settings renderer browser environment", () => {
     assert.ok(agentOrderSource.includes("NON_COLLAPSIBLE_AGENT_PRIORITY"));
     assert.ok(agentsSource.includes("ClawdSettingsAgentOrder"));
     assert.ok(agentsSource.includes("sortAgentMetadataForSettings(runtime.agentMetadata"));
+    assert.ok(agentsSource.includes("function categorizeAgentsForSections("));
+    assert.ok(agentsSource.includes("function renderAgentSections("));
   });
 
   it("keeps Agent management capability-driven for Gemini wait-for-input alerts", () => {
@@ -3788,6 +3950,466 @@ describe("settings renderer browser environment", () => {
     assert.ok(!agentsSource.includes("if (disabled || btn.classList.contains(\"active\")) return;"));
     assert.ok(agentsSource.includes("if (btn.disabled || btn.classList.contains(\"active\")) return;"));
     assert.ok(!agentsSource.includes("codex-permission-mode-transitioning"));
+  });
+
+  it("confirms before uninstalling an agent integration", () => {
+    const agentsSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-agents.js"), "utf8");
+    const i18nSource = fs.readFileSync(path.join(SRC_DIR, "settings-i18n.js"), "utf8");
+    assert.ok(agentsSource.includes('window.confirm(t("agentIntegrationUninstallConfirm"))'));
+    assert.ok(i18nSource.includes("agentIntegrationUninstallConfirm"));
+  });
+
+  it("fetches agent installation hints lazily when Agents renders and then uses the cache", async () => {
+    let calls = 0;
+    const detectionResult = {
+      checkedAt: 123,
+      agents: [{ agentId: "qwen-code", detectedInstalled: true }],
+      skippedAgentIds: ["claude-code", "codex"],
+    };
+    const harness = loadAgentsTabForTest({
+      agentMetadata: [{
+        id: "qwen-code",
+        name: "Qwen Code",
+        eventSource: "hook",
+        capabilities: {},
+      }],
+      settingsAPI: {
+        detectAgentInstallations: () => {
+          calls++;
+          return Promise.resolve(detectionResult);
+        },
+      },
+    });
+
+    assert.strictEqual(calls, 0);
+    harness.core.ops.requestRender({ content: true });
+    assert.strictEqual(calls, 1);
+    assert.strictEqual(harness.core.runtime.agentInstallationHintsPending, true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(harness.core.runtime.agentInstallationHints.checkedAt, detectionResult.checkedAt);
+    assert.deepStrictEqual(
+      harness.core.runtime.agentInstallationHints.agents.map((agent) => agent.agentId),
+      ["qwen-code"]
+    );
+    assert.deepStrictEqual(
+      harness.core.runtime.agentInstallationHints.skippedAgentIds,
+      detectionResult.skippedAgentIds
+    );
+    assert.strictEqual(harness.core.runtime.agentInstallationHintsFetched, true);
+    assert.strictEqual(harness.core.runtime.agentInstallationHintsPending, false);
+
+    harness.core.ops.requestRender({ content: true });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.strictEqual(calls, 1);
+  });
+
+  it("groups agents into connected, recommended, and unavailable sections", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          hermes: { integrationInstalled: true, enabled: true },
+          "qwen-code": { integrationInstalled: false, enabled: false },
+          pi: { integrationInstalled: false, enabled: false },
+        },
+        dismissedAgentInstallHints: { "qwen-code": true },
+      },
+      agentMetadata: [
+        { id: "pi", name: "Pi", eventSource: "extension", capabilities: {} },
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+        { id: "hermes", name: "Hermes Agent", eventSource: "plugin-event", capabilities: {} },
+      ],
+    });
+    harness.core.runtime.agentInstallationHints = {
+      checkedAt: 1,
+      agents: [
+        { agentId: "qwen-code", detectedInstalled: true, confidence: "high" },
+        { agentId: "hermes", detectedInstalled: false, confidence: "low" },
+        { agentId: "pi", detectedInstalled: false, confidence: "low" },
+      ],
+      skippedAgentIds: [],
+    };
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+
+    const connected = harness.content.querySelector(".agent-section-connected");
+    const recommended = harness.content.querySelector(".agent-section-recommended");
+    const unavailable = harness.content.querySelector(".agent-section-unavailable");
+    assert.ok(connected);
+    assert.ok(recommended);
+    assert.ok(unavailable);
+    assert.strictEqual(connected.querySelector(".section-title").textContent, "Connected");
+    assert.strictEqual(recommended.querySelector(".section-title").textContent, "Detected locally");
+    assert.strictEqual(unavailable.querySelector(".section-title").textContent, "Not detected locally");
+
+    const labelsFor = (section) => section.querySelectorAll(".agent-summary-row .row-label").map((el) => el.textContent);
+    assert.deepStrictEqual(labelsFor(connected), ["Hermes Agent"]);
+    assert.deepStrictEqual(labelsFor(recommended), ["Qwen Code"]);
+    assert.deepStrictEqual(labelsFor(unavailable), ["Pi"]);
+  });
+
+  it("renders an install hint banner for detected local agents that are not integrated", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "qwen-code": { integrationInstalled: false, enabled: false },
+          hermes: { integrationInstalled: true, enabled: true },
+        },
+        dismissedAgentInstallHints: {},
+      },
+      agentMetadata: [
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+        { id: "hermes", name: "Hermes Agent", eventSource: "plugin-event", capabilities: {} },
+      ],
+    });
+    harness.core.runtime.agentInstallationHints = {
+      checkedAt: 1,
+      agents: [
+        { agentId: "qwen-code", detectedInstalled: true, confidence: "high" },
+        { agentId: "hermes", detectedInstalled: true, confidence: "high" },
+        { agentId: "pi", detectedInstalled: true, confidence: "low" },
+      ],
+      skippedAgentIds: ["claude-code", "codex"],
+    };
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+
+    const banner = harness.content.querySelector(".agent-install-hint-banner");
+    assert.ok(banner, "detected unintegrated agents should render a banner");
+    assert.ok(harness.content.querySelector(".agent-install-hint-install"));
+    assert.ok(harness.content.querySelector(".agent-install-hint-dismiss"));
+    const desc = harness.content.querySelector(".agent-install-hint-desc").textContent;
+    assert.match(desc, /Qwen Code/);
+    assert.doesNotMatch(desc, /Hermes/);
+  });
+
+  it("hides install hint banners after the agent is dismissed", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "qwen-code": { integrationInstalled: false, enabled: false },
+        },
+        dismissedAgentInstallHints: { "qwen-code": true },
+      },
+      agentMetadata: [
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+    });
+    harness.core.runtime.agentInstallationHints = {
+      checkedAt: 1,
+      agents: [{ agentId: "qwen-code", detectedInstalled: true, confidence: "high" }],
+      skippedAgentIds: [],
+    };
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+
+    assert.strictEqual(harness.content.querySelector(".agent-install-hint-banner"), null);
+  });
+
+  it("clears install dismissals when the detector no longer sees the agent", async () => {
+    const calls = [];
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          codex: { integrationInstalled: false, enabled: false },
+          "qwen-code": { integrationInstalled: false, enabled: false },
+        },
+        dismissedAgentInstallHints: {
+          codex: true,
+          "qwen-code": true,
+        },
+      },
+      agentMetadata: [
+        { id: "codex", name: "Codex", eventSource: "hook", capabilities: {} },
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+      settingsAPI: {
+        command: (action, payload) => {
+          calls.push([action, payload]);
+          return Promise.resolve({ status: "ok" });
+        },
+      },
+    });
+    harness.core.runtime.agentInstallationHints = {
+      checkedAt: 1,
+      agents: [{ agentId: "qwen-code", detectedInstalled: false, confidence: "low" }],
+      skippedAgentIds: ["codex"],
+    };
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(harness.content.querySelector(".agent-install-hint-banner"), null);
+    assert.strictEqual(calls[0][0], "clearAgentInstallHints");
+    assert.deepStrictEqual([...calls[0][1].agentIds], ["qwen-code"]);
+  });
+
+  it("wires install hint banner buttons to bulk install and dismiss commands", async () => {
+    const calls = [];
+    const detectionResult = {
+      checkedAt: 2,
+      agents: [{ agentId: "qwen-code", detectedInstalled: true, confidence: "high" }],
+      skippedAgentIds: [],
+    };
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "qwen-code": { integrationInstalled: false, enabled: false },
+        },
+        dismissedAgentInstallHints: {},
+      },
+      agentMetadata: [
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+      settingsAPI: {
+        command: (action, payload) => {
+          calls.push([action, payload]);
+          return Promise.resolve({ status: "ok" });
+        },
+        detectAgentInstallations: () => Promise.resolve(detectionResult),
+      },
+    });
+    harness.core.runtime.agentInstallationHints = detectionResult;
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+    harness.content.querySelector(".agent-install-hint-install").dispatchEvent({ type: "click", bubbles: false });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(calls[0][0], "installAgentIntegration");
+    assert.strictEqual(calls[0][1].agentId, "qwen-code");
+
+    calls.length = 0;
+    harness.core.runtime.agentInstallationHintsFetched = true;
+    harness.core.ops.requestRender({ content: true });
+    harness.content.querySelector(".agent-install-hint-dismiss").dispatchEvent({ type: "click", bubbles: false });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(calls[0][0], "dismissAgentInstallHints");
+    assert.deepStrictEqual([...calls[0][1].agentIds], ["qwen-code"]);
+  });
+
+  it("shows a non-error toast when a recommended install is skipped", async () => {
+    const toasts = [];
+    const detectionResult = {
+      checkedAt: 2,
+      agents: [{ agentId: "qwen-code", detectedInstalled: true, confidence: "high" }],
+      skippedAgentIds: [],
+    };
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "qwen-code": { integrationInstalled: false, enabled: false },
+        },
+        dismissedAgentInstallHints: {},
+      },
+      agentMetadata: [
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+      settingsAPI: {
+        command: () => Promise.resolve({ status: "skipped", message: "Qwen missing" }),
+        detectAgentInstallations: () => Promise.resolve(detectionResult),
+      },
+    });
+    harness.core.ops.showToast = (message, options = {}) => {
+      toasts.push({ message, options });
+    };
+    harness.core.runtime.agentInstallationHints = detectionResult;
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+    harness.content.querySelector(".agent-install-hint-install").dispatchEvent({ type: "click", bubbles: false });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(toasts.length, 1);
+    assert.match(toasts[0].message, /Qwen Code/);
+    assert.notStrictEqual(toasts[0].options.error, true);
+  });
+
+  it("shows a non-error toast when a manual agent install is skipped", async () => {
+    const toasts = [];
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          pi: { integrationInstalled: false, enabled: false },
+        },
+      },
+      agentMetadata: [
+        { id: "pi", name: "Pi", eventSource: "extension", capabilities: {} },
+      ],
+      settingsAPI: {
+        command: () => Promise.resolve({ status: "skipped", message: "Pi missing" }),
+      },
+    });
+    harness.core.ops.showToast = (message, options = {}) => {
+      toasts.push({ message, options });
+    };
+
+    harness.core.ops.requestRender({ content: true });
+    harness.content.querySelector(".agent-integration-action").dispatchEvent({ type: "click", bubbles: false });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(toasts.length, 1);
+    assert.match(toasts[0].message, /Pi/);
+    assert.notStrictEqual(toasts[0].options.error, true);
+  });
+
+  it("renders cleanup hint banners only from detector entries, not skipped default agents", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "claude-code": { integrationInstalled: true, enabled: true },
+          codex: { integrationInstalled: true, enabled: true },
+          "qwen-code": { integrationInstalled: true, enabled: true },
+        },
+        dismissedAgentCleanupHints: {},
+      },
+      agentMetadata: [
+        { id: "claude-code", name: "Claude Code", eventSource: "hook", capabilities: {} },
+        { id: "codex", name: "Codex", eventSource: "hook", capabilities: {} },
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+    });
+    harness.core.runtime.agentInstallationHints = {
+      checkedAt: 1,
+      agents: [{ agentId: "qwen-code", detectedInstalled: false, confidence: "low" }],
+      skippedAgentIds: ["claude-code", "codex"],
+    };
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+
+    const banner = harness.content.querySelector(".agent-cleanup-hint-banner");
+    assert.ok(banner, "installed agents missing from detector entries should render cleanup banner");
+    assert.ok(harness.content.querySelector(".agent-cleanup-hint-remove"));
+    assert.ok(harness.content.querySelector(".agent-cleanup-hint-dismiss"));
+    const desc = harness.content.querySelector(".agent-cleanup-hint-desc").textContent;
+    assert.match(desc, /Qwen Code/);
+    assert.doesNotMatch(desc, /Claude Code/);
+    assert.doesNotMatch(desc, /Codex/);
+  });
+
+  it("hides cleanup hint banners after the agent is dismissed", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "qwen-code": { integrationInstalled: true, enabled: true },
+        },
+        dismissedAgentCleanupHints: { "qwen-code": true },
+      },
+      agentMetadata: [
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+    });
+    harness.core.runtime.agentInstallationHints = {
+      checkedAt: 1,
+      agents: [{ agentId: "qwen-code", detectedInstalled: false, confidence: "low" }],
+      skippedAgentIds: [],
+    };
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+
+    assert.strictEqual(harness.content.querySelector(".agent-cleanup-hint-banner"), null);
+  });
+
+  it("clears cleanup dismissals when the detector sees the agent restored", async () => {
+    const calls = [];
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "qwen-code": { integrationInstalled: true, enabled: true },
+        },
+        dismissedAgentCleanupHints: { "qwen-code": true },
+      },
+      agentMetadata: [
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+      settingsAPI: {
+        command: (action, payload) => {
+          calls.push([action, payload]);
+          return Promise.resolve({ status: "ok" });
+        },
+      },
+    });
+    harness.core.runtime.agentInstallationHints = {
+      checkedAt: 1,
+      agents: [{ agentId: "qwen-code", detectedInstalled: true, confidence: "high" }],
+      skippedAgentIds: [],
+    };
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(harness.content.querySelector(".agent-cleanup-hint-banner"), null);
+    assert.strictEqual(calls[0][0], "clearAgentCleanupHints");
+    assert.deepStrictEqual([...calls[0][1].agentIds], ["qwen-code"]);
+  });
+
+  it("wires cleanup hint banner buttons to bulk uninstall and dismiss commands", async () => {
+    const calls = [];
+    const detectionResult = {
+      checkedAt: 2,
+      agents: [{ agentId: "qwen-code", detectedInstalled: false, confidence: "low" }],
+      skippedAgentIds: [],
+    };
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "qwen-code": { integrationInstalled: true, enabled: true },
+        },
+        dismissedAgentCleanupHints: {},
+      },
+      agentMetadata: [
+        { id: "qwen-code", name: "Qwen Code", eventSource: "hook", capabilities: {} },
+      ],
+      settingsAPI: {
+        command: (action, payload) => {
+          calls.push([action, payload]);
+          return Promise.resolve({ status: "ok" });
+        },
+        detectAgentInstallations: () => Promise.resolve(detectionResult),
+      },
+    });
+    harness.core.runtime.agentInstallationHints = detectionResult;
+    harness.core.runtime.agentInstallationHintsFetched = true;
+
+    harness.core.ops.requestRender({ content: true });
+    harness.content.querySelector(".agent-cleanup-hint-remove").dispatchEvent({ type: "click", bubbles: false });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(calls[0][0], "uninstallAgentIntegration");
+    assert.strictEqual(calls[0][1].agentId, "qwen-code");
+    assert.strictEqual(calls[0][1].dismissInstallHint, false);
+
+    calls.length = 0;
+    harness.core.runtime.agentInstallationHintsFetched = true;
+    harness.core.ops.requestRender({ content: true });
+    harness.content.querySelector(".agent-cleanup-hint-dismiss").dispatchEvent({ type: "click", bubbles: false });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.strictEqual(calls[0][0], "dismissAgentCleanupHints");
+    assert.deepStrictEqual([...calls[0][1].agentIds], ["qwen-code"]);
   });
 
   it("keeps Agent management switch broadcasts in place even when Codex permission rows are mounted", () => {
@@ -3965,6 +4587,98 @@ describe("settings renderer browser environment", () => {
     assert.strictEqual(soundSwitch.element.attributes.tabindex, "0");
   });
 
+  it("mounts the Claude subagent permission switch and greys it with the permission gate (#451)", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          "claude-code": {
+            enabled: true,
+            permissionsEnabled: true,
+            subagentPermissionsEnabled: true,
+          },
+        },
+      },
+      agentMetadata: [{
+        id: "claude-code",
+        name: "Claude Code",
+        eventSource: "hook",
+        capabilities: {
+          permissionApproval: true,
+        },
+      }],
+      collapsedGroups: {
+        "agents:claude-code": false,
+      },
+    });
+
+    harness.core.ops.requestRender({ content: true });
+    harness.raf.flush();
+
+    const subagentSwitch = [...harness.core.state.mountedControls.agentSwitches.values()]
+      .find((meta) => meta.agentId === "claude-code" && meta.flag === "subagentPermissionsEnabled");
+    assert.ok(subagentSwitch, "Claude subagent permission switch should be mounted");
+    assert.strictEqual(subagentSwitch.element.classList.contains("disabled"), false);
+
+    harness.core.ops.applyChanges({
+      changes: {
+        agents: {
+          "claude-code": {
+            enabled: true,
+            permissionsEnabled: false,
+            subagentPermissionsEnabled: true,
+          },
+        },
+      },
+      snapshot: {
+        agents: {
+          "claude-code": {
+            enabled: true,
+            permissionsEnabled: false,
+            subagentPermissionsEnabled: true,
+          },
+        },
+      },
+    });
+
+    assert.strictEqual(subagentSwitch.element.classList.contains("disabled"), true);
+    assert.strictEqual(subagentSwitch.element.attributes["aria-disabled"], "true");
+    assert.strictEqual(subagentSwitch.element.attributes.tabindex, "-1");
+  });
+
+  it("does not render the subagent permission switch for non-Claude agents (#451)", () => {
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          codebuddy: {
+            enabled: true,
+            permissionsEnabled: true,
+          },
+        },
+      },
+      agentMetadata: [{
+        id: "codebuddy",
+        name: "CodeBuddy",
+        eventSource: "hook",
+        capabilities: {
+          permissionApproval: true,
+        },
+      }],
+      collapsedGroups: {
+        "agents:codebuddy": false,
+      },
+    });
+
+    harness.core.ops.requestRender({ content: true });
+    harness.raf.flush();
+
+    const subagentSwitch = [...harness.core.state.mountedControls.agentSwitches.values()]
+      .find((meta) => meta.flag === "subagentPermissionsEnabled");
+    assert.strictEqual(subagentSwitch, undefined);
+    const permissionsSwitch = [...harness.core.state.mountedControls.agentSwitches.values()]
+      .find((meta) => meta.agentId === "codebuddy" && meta.flag === "permissionsEnabled");
+    assert.ok(permissionsSwitch, "CodeBuddy permission switch should still be mounted");
+  });
+
   it("slides the Codex permission mode pill when mode broadcasts patch in place", () => {
     const harness = loadAgentsTabForTest({
       snapshot: {
@@ -4074,6 +4788,56 @@ describe("settings renderer browser environment", () => {
     );
   });
 
+  it("ignores stale Codex hook health results after the badge becomes not installed", async () => {
+    let resolveHealth;
+    const healthPromise = new Promise((resolve) => { resolveHealth = resolve; });
+    const harness = loadAgentsTabForTest({
+      snapshot: {
+        agents: {
+          codex: { integrationInstalled: true, enabled: true },
+        },
+      },
+      agentMetadata: [{
+        id: "codex",
+        name: "Codex",
+        eventSource: "hook",
+        capabilities: { permissionApproval: true },
+      }],
+      doctor: { codexHookHealth: () => healthPromise },
+    });
+
+    harness.core.ops.requestRender({ content: true });
+    const findIntegrationBadge = () => harness.content.querySelectorAll(".agent-badge")
+      .find((candidate) => candidate.classList.contains("integration"));
+    let badge = findIntegrationBadge();
+    assert.ok(badge);
+    assert.strictEqual(badge.textContent, "Installed");
+
+    harness.core.ops.applyChanges({
+      changes: {
+        agents: {
+          codex: { integrationInstalled: false, enabled: false },
+        },
+      },
+      snapshot: {
+        agents: {
+          codex: { integrationInstalled: false, enabled: false },
+        },
+      },
+    });
+    badge = findIntegrationBadge();
+    assert.ok(badge);
+    assert.strictEqual(badge.textContent, "Not installed");
+
+    resolveHealth({ healthy: false, signature: "not-registered", reasonKey: "codexHookHealthReasonInactive" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    badge = findIntegrationBadge();
+    assert.strictEqual(badge.textContent, "Not installed");
+    assert.strictEqual(badge.classList.contains("hook-warning"), false);
+    assert.strictEqual(badge.title, "");
+  });
   it("does not initialize an expanded agent group at 0px height during rerender", () => {
     const harness = loadAgentsTabForTest({
       snapshot: {
@@ -4107,20 +4871,37 @@ describe("settings renderer browser environment", () => {
     );
   });
 
-  it("uses animated switches and local theme override patching in Animation Map", () => {
+  it("uses animated switches and local theme override patching in the Animation Map subtab", () => {
     const animMapSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-anim-map.js"), "utf8");
+    const overridesSource = fs.readFileSync(path.join(SRC_DIR, "settings-tab-anim-overrides.js"), "utf8");
     const coreSource = fs.readFileSync(SETTINGS_UI_CORE, "utf8");
     assert.ok(animMapSource.includes("state.transientUiState.animMapSwitches"));
     assert.ok(animMapSource.includes("state.mountedControls.animMapSwitches"));
     assert.ok(animMapSource.includes("helpers.attachAnimatedSwitch(sw, {"));
     assert.ok(animMapSource.includes('command("setThemeOverrideDisabled"'));
     assert.ok(!animMapSource.includes("helpers.attachActivation(sw"));
-    assert.ok(animMapSource.includes("function patchInPlace(changes)"));
+    assert.ok(animMapSource.includes("function renderMapSubtab(parent)"));
+    assert.ok(animMapSource.includes("function patchMapInPlace(changes)"));
     assert.ok(animMapSource.includes('Object.prototype.hasOwnProperty.call(changes, "themeOverrides")'));
     assert.ok(animMapSource.includes("helpers.setSwitchVisual(meta.element, readAnimMapVisualOn(meta.themeId, meta.stateKey), { pending: false });"));
-    assert.ok(animMapSource.includes("patchInPlace,"));
-    assert.ok(coreSource.includes('if (state.activeTab !== "animMap") {'));
+    // Folded in: the Animation & Sound Overrides tab renders + patches the map subtab.
+    assert.ok(overridesSource.includes("ClawdSettingsTabAnimMap.renderMapSubtab"));
+    assert.ok(overridesSource.includes("ClawdSettingsTabAnimMap.patchMapInPlace"));
     assert.ok(coreSource.includes("activeTab.patchInPlace(changes"));
+  });
+
+  it("renders the Animation Map switches inside the Animation Overrides 'on / off' subtab", () => {
+    const harness = loadAnimMapTabForTest({
+      snapshot: { theme: "clawd", themeOverrides: {} },
+    });
+    // Map is the default subtab; rendering the overrides tab should mount the
+    // five interrupt on/off switches under it (folded in, not a standalone tab).
+    harness.core.tabs.animOverrides.render(harness.content);
+    assert.strictEqual(harness.core.state.mountedControls.animMapSwitches.size, 5);
+    assert.ok(
+      harness.core.state.mountedControls.animMapReset,
+      "the reset-all control should mount under the subtab"
+    );
   });
 
   it("keeps Animation Map theme override broadcasts in place and syncs the mounted switch", () => {
@@ -4217,6 +4998,37 @@ describe("settings renderer browser environment", () => {
       harness.getContentRenderCount(),
       before + 1,
       "theme changes should force a rebuild so Animation Map switches use the new theme id"
+    );
+  });
+
+  it("drops the cached animation/sound card data when the map subtab patches a theme-override change", () => {
+    const harness = loadAnimMapTabForTest({
+      snapshot: {
+        theme: "clawd",
+        themeOverrides: { clawd: { states: { error: { disabled: false } } } },
+      },
+    });
+    // Simulate having opened the Animations subtab earlier: its card data is cached.
+    harness.core.runtime.animationOverridesData = { theme: { id: "clawd" }, cards: [], sounds: [] };
+    // A mounted map switch so patchMapInPlace takes the in-place themeOverrides branch.
+    const sw = new FakeElement("div");
+    sw.className = "switch on";
+    harness.content.appendChild(sw);
+    harness.core.state.mountedControls.animMapSwitches.set("clawd:error", {
+      element: sw,
+      themeId: "clawd",
+      stateKey: "error",
+    });
+
+    harness.core.ops.applyChanges({
+      changes: { themeOverrides: { clawd: { states: { error: { disabled: true } } } } },
+      snapshot: { theme: "clawd", themeOverrides: { clawd: { states: { error: { disabled: true } } } } },
+    });
+
+    assert.strictEqual(
+      harness.core.runtime.animationOverridesData,
+      null,
+      "a map-subtab theme-override patch must invalidate the cached cards so Animations/Sounds refetch"
     );
   });
 

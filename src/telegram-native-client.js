@@ -4,6 +4,7 @@
 // primitives the migration test card and approval surface need:
 //
 //   getMe / sendMessage / getUpdates / answerCallbackQuery / editMessageReplyMarkup
+//   / editMessageText
 //
 // + offset progression on getUpdates and AbortController-driven cancellation.
 //
@@ -151,6 +152,10 @@ class TelegramNativeClient {
 
   editMessageReplyMarkup(payload, opts) {
     return this._call("editMessageReplyMarkup", payload, opts);
+  }
+
+  editMessageText(payload, opts) {
+    return this._call("editMessageText", payload, opts);
   }
 
   // long-poll one batch. Caller is responsible for looping; this method only

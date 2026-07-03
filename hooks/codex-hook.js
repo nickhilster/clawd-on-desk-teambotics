@@ -21,6 +21,7 @@ const {
   extractLastAssistantTextFromTranscript,
 } = require("./codex-assistant-output");
 const { readCodexThreadName } = require("./codex-session-index");
+const { fitStateBodyToByteBudget } = require("./state-payload-size");
 
 const TOOL_MATCH_STRING_MAX = 240;
 const TOOL_MATCH_ARRAY_MAX = 16;
@@ -196,12 +197,14 @@ function shouldReportForegroundWtHwnd(event) {
 }
 
 function applyLocalProcessFields(body, resolve, options = {}) {
-  const { stablePid, agentPid, detectedEditor, pidChain, foregroundWtHwnd } = resolve();
+  const { stablePid, agentPid, detectedEditor, pidChain, foregroundWtHwnd, tmuxSocket, tmuxClient } = resolve();
   const sourcePid = options.preferAgentPid && agentPid ? agentPid : stablePid;
   body.source_pid = sourcePid;
   if (detectedEditor) body.editor = detectedEditor;
   if (agentPid) body.agent_pid = agentPid;
   if (pidChain.length) body.pid_chain = pidChain;
+  if (tmuxSocket) body.tmux_socket = tmuxSocket;
+  if (tmuxClient) body.tmux_client = tmuxClient;
   if (shouldReportForegroundWtHwnd(options.event, foregroundWtHwnd) && foregroundWtHwnd) {
     body.wt_hwnd = String(foregroundWtHwnd);
   }
@@ -292,6 +295,12 @@ function buildPermissionBody(payload, resolve) {
     body.transcript_path = payload.transcript_path;
   }
   if (typeof payload.model === "string" && payload.model) body.model = payload.model;
+  // Carry the session role so the /permission route's headless gate
+  // (isHeadlessPermissionRequest) can identify subagent requests even when
+  // no state event has populated the sessions map yet. Before PR #448
+  // subagent permissions deliberately bubbled, so the role was state-only.
+  const codexRole = resolveCodexSessionRole(payload, sessionMeta);
+  if (codexRole !== ROLE_UNKNOWN) body.codex_session_role = codexRole;
   applyCodexSessionMetaFields(body, payload, sessionMeta);
 
   const toolUseId = normalizeToolUseId(payload.tool_use_id ?? payload.toolUseId ?? payload.toolUseID);
@@ -410,7 +419,11 @@ function main() {
 
       const body = buildStateBody(payload || {}, resolve);
       if (!body) process.exit(0);
-      postStateToRunningServer(JSON.stringify(body), { timeoutMs: 100 }, () => process.exit(0));
+      // Byte-fit before POST so a long CJK assistant_last_output can't trip the
+      // server's headerless 413 (read back as posted=false). See
+      // hooks/state-payload-size.js.
+      const fitted = fitStateBodyToByteBudget(body);
+      postStateToRunningServer(JSON.stringify(fitted.body), { timeoutMs: 100 }, () => process.exit(0));
     })
     .catch(() => process.exit(0));
 }

@@ -14,12 +14,23 @@
     { id: "native", labelKey: "codexPermissionModeNative" },
     { id: "intercept", labelKey: "codexPermissionModeIntercept" },
   ];
+  const INSTALL_HINT_CONFIDENCES = new Set(["high", "medium"]);
+  let agentHintActionPending = false;
+  let agentInstallHintResetPending = false;
+  let agentCleanupHintResetPending = false;
+  let codexHookHealthRequestSeq = 0;
 
   function t(key) {
     return helpers.t(key);
   }
 
   function render(parent) {
+    if (ops && typeof ops.fetchAgentInstallationHints === "function") {
+      ops.fetchAgentInstallationHints();
+    }
+    resetMissingInstallDismissals();
+    resetRestoredCleanupDismissals();
+
     const h1 = document.createElement("h1");
     h1.textContent = t("agentsTitle");
     parent.appendChild(h1);
@@ -28,6 +39,15 @@
     subtitle.className = "subtitle";
     subtitle.textContent = t("agentsSubtitle");
     parent.appendChild(subtitle);
+
+    const recommendedHints = getRecommendedInstallHints();
+    if (recommendedHints.length > 0) {
+      parent.appendChild(buildAgentInstallHintBanner(recommendedHints));
+    }
+    const cleanupHints = getRecommendedCleanupHints();
+    if (cleanupHints.length > 0) {
+      parent.appendChild(buildAgentCleanupHintBanner(cleanupHints));
+    }
 
     if (!runtime.agentMetadata || runtime.agentMetadata.length === 0) {
       const empty = document.createElement("div");
@@ -40,8 +60,470 @@
     const agents = typeof sortAgentMetadataForSettings === "function"
       ? sortAgentMetadataForSettings(runtime.agentMetadata)
       : runtime.agentMetadata;
-    const groups = agents.map((agent) => buildAgentGroup(agent));
-    parent.appendChild(helpers.buildSection("", groups));
+    renderAgentSections(parent, agents);
+  }
+
+  function getAgentMetadata(agentId) {
+    return (runtime.agentMetadata || []).find((agent) => agent && agent.id === agentId) || null;
+  }
+
+  function getAgentDisplayName(agentId) {
+    const agent = getAgentMetadata(agentId);
+    return (agent && (agent.name || agent.id)) || agentId;
+  }
+
+  function formatAgentNames(agentIds) {
+    const names = agentIds.map(getAgentDisplayName);
+    if (typeof Intl !== "undefined" && typeof Intl.ListFormat === "function") {
+      try {
+        return new Intl.ListFormat((state.snapshot && state.snapshot.lang) || "en", {
+          style: "short",
+          type: "conjunction",
+        }).format(names);
+      } catch {
+        // Fall back to the explicit locale separator below.
+      }
+    }
+    return names.join(t("agentListSeparator"));
+  }
+
+  function getRecommendedInstallHints() {
+    const hints = runtime.agentInstallationHints;
+    const entries = hints && Array.isArray(hints.agents) ? hints.agents : [];
+    const dismissed = state.snapshot && state.snapshot.dismissedAgentInstallHints;
+    return entries.filter((entry) => {
+      if (!entry || typeof entry.agentId !== "string") return false;
+      if (!entry.detectedInstalled) return false;
+      if (!INSTALL_HINT_CONFIDENCES.has(entry.confidence)) return false;
+      if (!getAgentMetadata(entry.agentId)) return false;
+      if (readers.readAgentIntegrationInstalled(entry.agentId)) return false;
+      if (dismissed && dismissed[entry.agentId] === true) return false;
+      return true;
+    });
+  }
+
+  function getRecommendedCleanupHints() {
+    const hints = runtime.agentInstallationHints;
+    const entries = hints && Array.isArray(hints.agents) ? hints.agents : [];
+    const dismissed = state.snapshot && state.snapshot.dismissedAgentCleanupHints;
+    return entries.filter((entry) => {
+      if (!entry || typeof entry.agentId !== "string") return false;
+      if (entry.detectedInstalled) return false;
+      if (!getAgentMetadata(entry.agentId)) return false;
+      if (!readers.readAgentIntegrationInstalled(entry.agentId)) return false;
+      if (dismissed && dismissed[entry.agentId] === true) return false;
+      return true;
+    });
+  }
+
+  function getInstallationHint(agentId) {
+    const hints = runtime.agentInstallationHints;
+    const entries = hints && Array.isArray(hints.agents) ? hints.agents : [];
+    return entries.find((entry) => entry && entry.agentId === agentId) || null;
+  }
+
+  function hasRecommendedLocalInstall(agentId) {
+    const entry = getInstallationHint(agentId);
+    return !!(
+      entry
+      && entry.detectedInstalled === true
+      && INSTALL_HINT_CONFIDENCES.has(entry.confidence)
+    );
+  }
+
+  function categorizeAgentsForSections(agents) {
+    const sections = {
+      connected: [],
+      recommended: [],
+      unavailable: [],
+    };
+    for (const agent of agents) {
+      if (!agent || !agent.id) continue;
+      if (readers.readAgentIntegrationInstalled(agent.id)) {
+        sections.connected.push(agent);
+      } else if (hasRecommendedLocalInstall(agent.id)) {
+        sections.recommended.push(agent);
+      } else {
+        sections.unavailable.push(agent);
+      }
+    }
+    return sections;
+  }
+
+  function renderAgentSections(parent, agents) {
+    const categorized = categorizeAgentsForSections(agents);
+    const specs = [
+      ["connected", "agentSectionConnected", "agent-section-connected"],
+      ["recommended", "agentSectionRecommended", "agent-section-recommended"],
+      ["unavailable", "agentSectionUnavailable", "agent-section-unavailable"],
+    ];
+    for (const [key, titleKey, className] of specs) {
+      const sectionAgents = categorized[key];
+      if (!Array.isArray(sectionAgents) || sectionAgents.length === 0) continue;
+      const groups = sectionAgents.map((agent) => buildAgentGroup(agent));
+      const section = helpers.buildSection(t(titleKey), groups);
+      section.classList.add("agent-section", className);
+      parent.appendChild(section);
+    }
+  }
+
+  function getRestoredCleanupDismissalAgentIds() {
+    const hints = runtime.agentInstallationHints;
+    const entries = hints && Array.isArray(hints.agents) ? hints.agents : [];
+    const dismissed = state.snapshot && state.snapshot.dismissedAgentCleanupHints;
+    if (!dismissed || typeof dismissed !== "object") return [];
+    return entries
+      .filter((entry) =>
+        entry
+        && typeof entry.agentId === "string"
+        && entry.detectedInstalled === true
+        && dismissed[entry.agentId] === true
+      )
+      .map((entry) => entry.agentId);
+  }
+
+  function getMissingInstallDismissalAgentIds() {
+    const hints = runtime.agentInstallationHints;
+    const entries = hints && Array.isArray(hints.agents) ? hints.agents : [];
+    const dismissed = state.snapshot && state.snapshot.dismissedAgentInstallHints;
+    if (!dismissed || typeof dismissed !== "object") return [];
+    return entries
+      .filter((entry) =>
+        entry
+        && typeof entry.agentId === "string"
+        && entry.detectedInstalled === false
+        && dismissed[entry.agentId] === true
+      )
+      .map((entry) => entry.agentId);
+  }
+
+  function resetMissingInstallDismissals() {
+    if (agentInstallHintResetPending) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") return;
+    const agentIds = getMissingInstallDismissalAgentIds();
+    if (agentIds.length === 0) return;
+    agentInstallHintResetPending = true;
+    window.settingsAPI.command("clearAgentInstallHints", { agentIds }).catch((err) => {
+      console.warn("settings: clearAgentInstallHints failed", err);
+    }).finally(() => {
+      agentInstallHintResetPending = false;
+    });
+  }
+
+  function resetRestoredCleanupDismissals() {
+    if (agentCleanupHintResetPending) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") return;
+    const agentIds = getRestoredCleanupDismissalAgentIds();
+    if (agentIds.length === 0) return;
+    agentCleanupHintResetPending = true;
+    window.settingsAPI.command("clearAgentCleanupHints", { agentIds }).catch((err) => {
+      console.warn("settings: clearAgentCleanupHints failed", err);
+    }).finally(() => {
+      agentCleanupHintResetPending = false;
+    });
+  }
+
+  function buildAgentInstallHintBanner(hints) {
+    const agentIds = hints.map((entry) => entry.agentId);
+    const banner = document.createElement("section");
+    banner.className = "agent-hint-banner agent-install-hint-banner";
+
+    const text = document.createElement("div");
+    text.className = "agent-hint-text agent-install-hint-text";
+    const title = document.createElement("div");
+    title.className = "agent-hint-title agent-install-hint-title";
+    title.textContent = t("agentInstallHintTitle");
+    const desc = document.createElement("div");
+    desc.className = "agent-hint-desc agent-install-hint-desc";
+    desc.textContent = t("agentInstallHintDesc").replace("{agents}", formatAgentNames(agentIds));
+    text.appendChild(title);
+    text.appendChild(desc);
+    banner.appendChild(text);
+
+    const actions = document.createElement("div");
+    actions.className = "agent-hint-actions agent-install-hint-actions";
+    const installBtn = document.createElement("button");
+    installBtn.type = "button";
+    installBtn.className = "soft-btn accent agent-install-hint-install";
+    installBtn.textContent = agentHintActionPending
+      ? t("agentIntegrationWorking")
+      : t("agentInstallHintInstallRecommended");
+    installBtn.disabled = !!agentHintActionPending;
+    installBtn.addEventListener("click", () => installRecommendedHints(agentIds));
+
+    const dismissBtn = document.createElement("button");
+    dismissBtn.type = "button";
+    dismissBtn.className = "soft-btn agent-install-hint-dismiss";
+    dismissBtn.textContent = t("agentInstallHintDismiss");
+    dismissBtn.disabled = !!agentHintActionPending;
+    dismissBtn.addEventListener("click", () => dismissInstallHints(agentIds));
+
+    actions.appendChild(installBtn);
+    actions.appendChild(dismissBtn);
+    banner.appendChild(actions);
+    return banner;
+  }
+
+  function buildAgentCleanupHintBanner(hints) {
+    const agentIds = hints.map((entry) => entry.agentId);
+    const banner = document.createElement("section");
+    banner.className = "agent-hint-banner agent-cleanup-hint-banner";
+
+    const text = document.createElement("div");
+    text.className = "agent-hint-text agent-cleanup-hint-text";
+    const title = document.createElement("div");
+    title.className = "agent-hint-title agent-cleanup-hint-title";
+    title.textContent = t("agentCleanupHintTitle");
+    const desc = document.createElement("div");
+    desc.className = "agent-hint-desc agent-cleanup-hint-desc";
+    desc.textContent = t("agentCleanupHintDesc").replace("{agents}", formatAgentNames(agentIds));
+    text.appendChild(title);
+    text.appendChild(desc);
+    banner.appendChild(text);
+
+    const actions = document.createElement("div");
+    actions.className = "agent-hint-actions agent-cleanup-hint-actions";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "soft-btn accent agent-cleanup-hint-remove";
+    removeBtn.textContent = agentHintActionPending
+      ? t("agentIntegrationWorking")
+      : t("agentCleanupHintRemove");
+    removeBtn.disabled = !!agentHintActionPending;
+    removeBtn.addEventListener("click", () => removeCleanupHints(agentIds));
+
+    const dismissBtn = document.createElement("button");
+    dismissBtn.type = "button";
+    dismissBtn.className = "soft-btn agent-cleanup-hint-dismiss";
+    dismissBtn.textContent = t("agentCleanupHintDismiss");
+    dismissBtn.disabled = !!agentHintActionPending;
+    dismissBtn.addEventListener("click", () => dismissCleanupHints(agentIds));
+
+    actions.appendChild(removeBtn);
+    actions.appendChild(dismissBtn);
+    banner.appendChild(actions);
+    return banner;
+  }
+
+  function refreshInstallationHints() {
+    if (ops && typeof ops.fetchAgentInstallationHints === "function") {
+      return ops.fetchAgentInstallationHints({ force: true });
+    }
+    return Promise.resolve();
+  }
+
+  async function installRecommendedHints(agentIds) {
+    if (agentHintActionPending) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") {
+      ops.showToast(t("toastSaveFailed") + "settings API unavailable", { error: true });
+      return;
+    }
+    agentHintActionPending = true;
+    ops.requestRender({ content: true });
+    let installed = 0;
+    let skipped = 0;
+    const skippedAgentIds = [];
+    let failed = 0;
+    let firstError = "";
+    try {
+      for (const agentId of agentIds) {
+        const result = await window.settingsAPI.command("installAgentIntegration", { agentId });
+        if (result && result.status === "ok") {
+          installed++;
+        } else if (result && result.status === "skipped") {
+          skipped++;
+          skippedAgentIds.push(agentId);
+        } else if (!firstError) {
+          failed++;
+          firstError = (result && result.message) || "unknown error";
+        } else {
+          failed++;
+        }
+      }
+      if (failed > 0) {
+        ops.showToast(formatHintResult(t("toastAgentInstallHintPartial"), {
+          success: installed,
+          failed,
+          message: firstError,
+        }), { error: true });
+      } else if (installed > 0) {
+        if (skipped > 0) {
+          ops.showToast(formatHintResult(t("toastAgentInstallHintPartialSkipped"), {
+            success: installed,
+            agents: formatAgentNames(skippedAgentIds),
+          }), { ttl: 5000 });
+        } else {
+          ops.showToast(t("toastAgentInstallHintInstalled"));
+        }
+      } else if (skipped > 0) {
+        ops.showToast(formatHintResult(t("toastAgentInstallHintSkipped"), {
+          agents: formatAgentNames(skippedAgentIds),
+        }), { ttl: 5000 });
+      }
+    } catch (err) {
+      ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+    } finally {
+      agentHintActionPending = false;
+      refreshInstallationHints().finally(() => ops.requestRender({ content: true }));
+    }
+  }
+
+  function dismissInstallHints(agentIds) {
+    if (agentHintActionPending) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") {
+      ops.showToast(t("toastSaveFailed") + "settings API unavailable", { error: true });
+      return;
+    }
+    agentHintActionPending = true;
+    ops.requestRender({ content: true });
+    window.settingsAPI.command("dismissAgentInstallHints", { agentIds }).then((result) => {
+      if (!result || result.status !== "ok") {
+        const msg = (result && result.message) || "unknown error";
+        ops.showToast(t("toastSaveFailed") + msg, { error: true });
+      }
+    }).catch((err) => {
+      ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+    }).finally(() => {
+      agentHintActionPending = false;
+      ops.requestRender({ content: true });
+    });
+  }
+
+  async function removeCleanupHints(agentIds) {
+    if (agentHintActionPending) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") {
+      ops.showToast(t("toastSaveFailed") + "settings API unavailable", { error: true });
+      return;
+    }
+    agentHintActionPending = true;
+    ops.requestRender({ content: true });
+    let removed = 0;
+    let failed = 0;
+    let firstError = "";
+    try {
+      for (const agentId of agentIds) {
+        const result = await window.settingsAPI.command("uninstallAgentIntegration", {
+          agentId,
+          dismissInstallHint: false,
+        });
+        if (result && result.status === "ok") {
+          removed++;
+        } else {
+          failed++;
+          if (!firstError) firstError = (result && result.message) || "unknown error";
+        }
+      }
+      if (failed > 0) {
+        ops.showToast(formatHintResult(t("toastAgentCleanupHintPartial"), {
+          success: removed,
+          failed,
+          message: firstError,
+        }), { error: true });
+      } else if (removed > 0) {
+        ops.showToast(t("toastAgentCleanupHintRemoved"));
+      }
+    } catch (err) {
+      ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+    } finally {
+      agentHintActionPending = false;
+      refreshInstallationHints().finally(() => ops.requestRender({ content: true }));
+    }
+  }
+
+  function dismissCleanupHints(agentIds) {
+    if (agentHintActionPending) return;
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") {
+      ops.showToast(t("toastSaveFailed") + "settings API unavailable", { error: true });
+      return;
+    }
+    agentHintActionPending = true;
+    ops.requestRender({ content: true });
+    window.settingsAPI.command("dismissAgentCleanupHints", { agentIds }).then((result) => {
+      if (!result || result.status !== "ok") {
+        const msg = (result && result.message) || "unknown error";
+        ops.showToast(t("toastSaveFailed") + msg, { error: true });
+      }
+    }).catch((err) => {
+      ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+    }).finally(() => {
+      agentHintActionPending = false;
+      ops.requestRender({ content: true });
+    });
+  }
+
+  function formatHintResult(template, values) {
+    return String(template)
+      .replace("{success}", String(values.success))
+      .replace("{failed}", String(values.failed))
+      .replace("{agents}", values.agents || "")
+      .replace("{message}", values.message || "unknown error");
+  }
+
+  function showClaudeHooksDisableConfirmModal() {
+    return helpers.showSettingsConfirmModal({
+      title: t("claudeHooksDisableConfirmTitle"),
+      detail: t("claudeHooksDisableConfirmDetail"),
+      actions: [
+        { id: "disconnect", label: t("claudeHooksDisableConfirmDisconnect"), tone: "danger" },
+        { id: "disable", label: t("claudeHooksDisableConfirmDisableOnly"), tone: "neutral" },
+        { id: "keep", label: t("claudeHooksDisableConfirmKeep"), tone: "accent", defaultFocus: true },
+      ],
+    });
+  }
+
+  function showClaudeHooksDisconnectConfirmModal() {
+    return helpers.showSettingsConfirmModal({
+      title: t("claudeHooksDisconnectConfirmTitle"),
+      detail: t("claudeHooksDisconnectConfirmDetail"),
+      actions: [
+        { id: "disconnect", label: t("claudeHooksDisconnectConfirmAction"), tone: "danger" },
+        { id: "keep", label: t("claudeHooksDisconnectConfirmKeep"), tone: "accent", defaultFocus: true },
+      ],
+    });
+  }
+
+  function confirmDisableClaudeHookManagement(nextRaw) {
+    if (nextRaw) return window.settingsAPI.update("manageClaudeHooksAutomatically", true);
+    return showClaudeHooksDisableConfirmModal().then((actionId) => {
+      if (!actionId || actionId === "keep") return { status: "ok", noop: true };
+      if (actionId === "disconnect") return window.settingsAPI.command("uninstallHooks");
+      return window.settingsAPI.update("manageClaudeHooksAutomatically", false);
+    });
+  }
+
+  function runDisconnectClaudeHooks() {
+    if (!window.settingsAPI || typeof window.settingsAPI.command !== "function") {
+      return Promise.resolve({ status: "error", message: "settings API unavailable" });
+    }
+    return showClaudeHooksDisconnectConfirmModal().then((actionId) => {
+      if (actionId !== "disconnect") return { status: "ok", noop: true };
+      return window.settingsAPI.command("uninstallHooks");
+    });
+  }
+
+  function buildClaudeHookManagementRows() {
+    const manageHooksEnabled = !!(state.snapshot && state.snapshot.manageClaudeHooksAutomatically);
+    const manageRow = helpers.buildSwitchRow({
+      key: "manageClaudeHooksAutomatically",
+      labelKey: "rowManageClaudeHooks",
+      descKey: "rowManageClaudeHooksDesc",
+      descExtraKey: "rowManageClaudeHooksOffNote",
+      onToggle: ({ nextRaw }) => confirmDisableClaudeHookManagement(nextRaw),
+      actionButton: {
+        labelKey: "actionDisconnectClaudeHooks",
+        invoke: () => runDisconnectClaudeHooks(),
+      },
+    });
+    manageRow.classList.add("row-sub");
+    const autoStartRow = helpers.buildSwitchRow({
+      key: "autoStartWithClaude",
+      labelKey: "rowStartWithClaude",
+      descKey: "rowStartWithClaudeDesc",
+      descExtraKey: manageHooksEnabled ? null : "rowStartWithClaudeDisabledDesc",
+      disabled: !manageHooksEnabled,
+    });
+    autoStartRow.classList.add("row-sub");
+    return [manageRow, autoStartRow];
   }
 
   function buildAgentGroup(agent) {
@@ -59,6 +541,7 @@
   }
 
   function buildAgentMasterRow(agent) {
+    let integrationBadge = null;
     return buildAgentSwitchRow({
       agent,
       flag: "enabled",
@@ -81,13 +564,26 @@
         esBadge.className = "agent-badge";
         esBadge.textContent = t(esKey);
         badges.appendChild(esBadge);
+        integrationBadge = document.createElement("span");
+        integrationBadge.className = "agent-badge integration";
+        badges.appendChild(integrationBadge);
         if (agent.capabilities && agent.capabilities.permissionApproval) {
           const permBadge = document.createElement("span");
           permBadge.className = "agent-badge accent";
           permBadge.textContent = t("badgePermissionBubble");
           badges.appendChild(permBadge);
         }
+        syncAgentIntegrationBadge(integrationBadge, agent.id);
         text.appendChild(badges);
+      },
+      buildExtraControls: (ctrl) => {
+        const button = buildAgentIntegrationActionButton(agent);
+        const meta = state.mountedControls.agentIntegrationActions.get(agent.id);
+        if (meta) {
+          meta.badge = integrationBadge;
+          meta.syncFromSnapshot();
+        }
+        ctrl.appendChild(button);
       },
     });
   }
@@ -95,6 +591,9 @@
   function buildAgentDetailRows(agent) {
     const rows = [];
     const caps = agent.capabilities || {};
+    if (agent.id === "claude-code") {
+      rows.push(...buildClaudeHookManagementRows());
+    }
     if (agent.id === "codex") {
       rows.push(buildCodexPermissionModeRow(agent, computeAgentSubSwitchDisabled(agent.id, "permissionMode")));
       rows.push(buildAgentSwitchRow({
@@ -113,6 +612,15 @@
           text.appendChild(desc);
         },
       }));
+      // Startup nudge gate: warn (once per breakage) when the official hook —
+      // now the ONLY Codex approval path — is disabled / needs review / inactive.
+      const codexHookNotifyRow = helpers.buildSwitchRow({
+        key: "codexHookHealthNotifyEnabled",
+        labelKey: "rowCodexHookHealthNotify",
+        descKey: "rowCodexHookHealthNotifyDesc",
+      });
+      codexHookNotifyRow.classList.add("row-sub");
+      rows.push(codexHookNotifyRow);
     }
     if (caps.permissionApproval || caps.interactiveBubble) {
       rows.push(buildAgentSwitchRow({
@@ -131,6 +639,26 @@
           text.appendChild(desc);
         },
       }));
+      // #451: only Claude Code marks subagent-origin permission requests
+      // (agent_id in the common hook fields), so only it gets the sub-gate.
+      if (agent.id === "claude-code") {
+        rows.push(buildAgentSwitchRow({
+          agent,
+          flag: "subagentPermissionsEnabled",
+          extraClass: "row-sub",
+          disabled: computeAgentSubSwitchDisabled(agent.id, "subagentPermissionsEnabled"),
+          buildText: (text) => {
+            const label = document.createElement("span");
+            label.className = "row-label";
+            label.textContent = t("rowAgentSubagentPermissions");
+            text.appendChild(label);
+            const desc = document.createElement("span");
+            desc.className = "row-desc";
+            desc.textContent = t("rowAgentSubagentPermissionsDesc");
+            text.appendChild(desc);
+          },
+        }));
+      }
     }
     if (caps.notificationHook) {
       rows.push(buildAgentSwitchRow({
@@ -162,6 +690,11 @@
     }
     if (agentId === "codex" && flag === "nativeNotificationSoundEnabled") {
       return readers.readAgentPermissionMode(agentId) !== "native";
+    }
+    // Subagent sub-gate sits under the permission switch: pointless to toggle
+    // while the parent permission gate already suppresses every CC bubble.
+    if (flag === "subagentPermissionsEnabled") {
+      return !readers.readAgentFlagValue(agentId, "permissionsEnabled");
     }
     return false;
   }
@@ -262,7 +795,103 @@
     sw.setAttribute("tabindex", disabled ? "-1" : "0");
   }
 
-  function buildAgentSwitchRow({ agent, flag, extraClass, disabled = false, buildText }) {
+  function syncAgentIntegrationBadge(badge, agentId) {
+    if (!badge) return;
+    const installed = readers.readAgentIntegrationInstalled(agentId);
+    badge.classList.toggle("not-installed", !installed);
+    badge.textContent = t(installed ? "agentIntegrationInstalled" : "agentIntegrationNotInstalled");
+    if (agentId === "codex") annotateCodexHookHealth(badge, installed);
+  }
+
+  // Codex approval awareness now depends ENTIRELY on the official PermissionRequest
+  // hook (JSONL no longer infers approvals). A hook that is registered but
+  // disabled / needs-review / mis-registered still reads as "Installed" from
+  // prefs, yet Codex never runs it — so the pet shows no approval prompts. Overlay
+  // an amber warning, sourced from the same check the Doctor uses (so they agree),
+  // with the specific reason in the tooltip. Async + best-effort: if the probe is
+  // unavailable or healthy, the badge keeps its base "Installed" state.
+  function annotateCodexHookHealth(badge, installed) {
+    if (!badge) return;
+    const seq = String(++codexHookHealthRequestSeq);
+    if (badge.dataset) badge.dataset.codexHookHealthSeq = seq;
+    badge.classList.remove("hook-warning");
+    badge.removeAttribute("title");
+    if (!installed || !window.doctor || typeof window.doctor.codexHookHealth !== "function") return;
+    window.doctor.codexHookHealth().then((health) => {
+      if (badge.isConnected === false) return;
+      if (badge.dataset && badge.dataset.codexHookHealthSeq !== seq) return;
+      if (!health || health.healthy || !health.signature) return;
+      if (!readers.readAgentIntegrationInstalled("codex")) return;
+      badge.classList.add("hook-warning");
+      badge.textContent = t("agentCodexHookNeedsAttention");
+      if (health.reasonKey) badge.title = t(health.reasonKey);
+    }).catch(() => {});
+  }
+
+  function syncAgentIntegrationAction(meta) {
+    if (!meta || !meta.button) return;
+    const installed = readers.readAgentIntegrationInstalled(meta.agentId);
+    meta.button.disabled = false;
+    meta.button.classList.remove("pending");
+    meta.button.textContent = t(installed ? "agentIntegrationUninstall" : "agentIntegrationInstall");
+    meta.button.setAttribute(
+      "aria-label",
+      t(installed ? "agentIntegrationUninstall" : "agentIntegrationInstall")
+    );
+    if (meta.badge) syncAgentIntegrationBadge(meta.badge, meta.agentId);
+  }
+
+  function buildAgentIntegrationActionButton(agent) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "soft-btn agent-integration-action";
+    const meta = {
+      button,
+      agentId: agent.id,
+      badge: null,
+    };
+    meta.syncFromSnapshot = () => syncAgentIntegrationAction(meta);
+    syncAgentIntegrationAction(meta);
+    button.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (button.disabled) return;
+      const installed = readers.readAgentIntegrationInstalled(agent.id);
+      const command = installed ? "uninstallAgentIntegration" : "installAgentIntegration";
+      if (installed && typeof window.confirm === "function" && !window.confirm(t("agentIntegrationUninstallConfirm"))) {
+        return;
+      }
+      button.disabled = true;
+      button.classList.add("pending");
+      button.textContent = t("agentIntegrationWorking");
+      window.settingsAPI.command(command, { agentId: agent.id }).then((result) => {
+        if (result && result.status === "skipped") {
+          ops.showToast(formatHintResult(t("agentIntegrationInstallSkipped"), {
+            agents: agent.name || agent.id,
+          }), { ttl: 5000 });
+          refreshInstallationHints();
+          syncAgentIntegrationAction(meta);
+          return;
+        }
+        if (!result || result.status !== "ok") {
+          const msg = (result && result.message) || "unknown error";
+          ops.showToast(t("toastSaveFailed") + msg, { error: true });
+          syncAgentIntegrationAction(meta);
+          return;
+        }
+        const key = installed ? "toastAgentIntegrationUninstalled" : "toastAgentIntegrationInstalled";
+        ops.showToast(t(key));
+        refreshInstallationHints();
+      }).catch((err) => {
+        ops.showToast(t("toastSaveFailed") + (err && err.message), { error: true });
+      }).finally(() => {
+        syncAgentIntegrationAction(meta);
+      });
+    });
+    state.mountedControls.agentIntegrationActions.set(agent.id, meta);
+    return button;
+  }
+
+  function buildAgentSwitchRow({ agent, flag, extraClass, disabled = false, buildText, buildExtraControls }) {
     const row = document.createElement("div");
     row.className = extraClass ? `row ${extraClass}` : "row";
 
@@ -273,6 +902,9 @@
 
     const ctrl = document.createElement("div");
     ctrl.className = "row-control";
+    if (typeof buildExtraControls === "function") {
+      buildExtraControls(ctrl);
+    }
     const sw = document.createElement("div");
     sw.className = "switch";
     sw.setAttribute("role", "switch");
@@ -329,6 +961,9 @@
     for (const [, meta] of state.mountedControls.agentPermissionModes) {
       if (!meta || !meta.row || !document.body.contains(meta.row)) return false;
     }
+    for (const [, meta] of state.mountedControls.agentIntegrationActions) {
+      if (!meta || !meta.button || !document.body.contains(meta.button)) return false;
+    }
     for (const [id, meta] of state.mountedControls.agentSwitches) {
       state.transientUiState.agentSwitches.delete(id);
       if (meta.flag !== "enabled") {
@@ -337,6 +972,9 @@
       helpers.setSwitchVisual(meta.element, readers.readAgentFlagValue(meta.agentId, meta.flag), { pending: false });
     }
     for (const [, meta] of state.mountedControls.agentPermissionModes) {
+      meta.syncFromSnapshot();
+    }
+    for (const [, meta] of state.mountedControls.agentIntegrationActions) {
       meta.syncFromSnapshot();
     }
     return true;

@@ -101,7 +101,7 @@ readStdinJson()
       cwd = payload.workspace_roots[0];
     }
 
-    const { stablePid, agentPid, detectedEditor, pidChain } = resolve();
+    const { stablePid, agentPid, detectedEditor, pidChain, tmuxSocket, tmuxClient } = resolve();
 
     const body = { state, session_id: sessionId, event };
     body.agent_id = "cursor-agent";
@@ -118,6 +118,8 @@ readStdinJson()
         body.cursor_pid = agentPid;
       }
       if (pidChain.length) body.pid_chain = pidChain;
+      if (tmuxSocket) body.tmux_socket = tmuxSocket;
+      if (tmuxClient) body.tmux_client = tmuxClient;
     }
 
     // Answer Cursor immediately so it never sees empty/malformed stdout, but

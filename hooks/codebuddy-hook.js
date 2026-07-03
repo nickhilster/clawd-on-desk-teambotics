@@ -83,7 +83,7 @@ readStdinJson()
     const sessionId = (payload && payload.session_id) || "default";
     const cwd = (payload && payload.cwd) || "";
 
-    const { stablePid, agentPid, detectedEditor, pidChain } = resolve();
+    const { stablePid, agentPid, detectedEditor, pidChain, tmuxSocket, tmuxClient } = resolve();
 
     const body = { state, session_id: sessionId, event };
     body.agent_id = "codebuddy";
@@ -95,6 +95,8 @@ readStdinJson()
       if (detectedEditor) body.editor = detectedEditor;
       if (agentPid) body.agent_pid = agentPid;
       if (pidChain.length) body.pid_chain = pidChain;
+      if (tmuxSocket) body.tmux_socket = tmuxSocket;
+      if (tmuxClient) body.tmux_client = tmuxClient;
     }
 
     // Answer CodeBuddy immediately so it never sees empty stdout, but don't

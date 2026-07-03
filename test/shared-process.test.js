@@ -2,10 +2,13 @@
 const { describe, it, beforeEach, mock } = require("node:test");
 const assert = require("node:assert");
 
+const { PassThrough } = require("node:stream");
+
 const {
   getPlatformConfig,
   createPidResolver,
-  readStdinJson,
+  readStdinJsonDetailed,
+  DEFAULT_STDIN_READ_TIMEOUT_MS,
   buildElectronLaunchConfig,
 } = require("../hooks/shared-process");
 
@@ -120,6 +123,152 @@ describe("createPidResolver()", () => {
     const resolve = createPidResolver({ platformConfig: cfg, startPid: process.pid, maxDepth: 1 });
     const { pidChain } = resolve();
     assert.ok(pidChain.length <= 1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// createPidResolver() — tmux resolution
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Mocked tmux bridge tests. The previous { skip: !process.env.TMUX } block
+// required a running tmux server with a GUI terminal in the client's ancestry,
+// so it never ran in CI and failed silently for tmux users in ssh / IDE
+// terminals. These mocked variants always run.
+describe("createPidResolver() — tmux bridge (mocked)", () => {
+  const { loadSharedProcessWithMock } = require("./helpers/load-shared-process-with-mock");
+
+  function makeMock(routes) {
+    return function execFileSync(cmd, args /*, opts */) {
+      const key = cmd + " " + args.join(" ");
+      for (const [pattern, value] of routes) {
+        const match = pattern instanceof RegExp ? pattern.test(key) : pattern === key;
+        if (!match) continue;
+        if (typeof value === "function") return value();
+        return value;
+      }
+      const err = new Error("ENOENT: no route for " + key);
+      err.code = "ENOENT";
+      throw err;
+    };
+  }
+
+  it("(a) walk reaches tmux server; list-clients yields client pid → stablePid is terminal", () => {
+    const routes = [
+      ["ps -o ppid= -p 100", "200\n"],
+      ["ps -o comm= -p 100", "zsh\n"],
+      ["ps -o ppid= -p 200", "1\n"],
+      ["ps -o comm= -p 200", "tmux\n"],
+      ["tmux list-clients -t %1 -F #{client_pid}\t#{client_tty}", "300\t/dev/pts/7\n"],
+      ["ps -o comm= -p 300", "alacritty\n"],
+      ["ps -o ppid= -p 300", "1\n"],
+    ];
+    const { mod, cleanup } = loadSharedProcessWithMock({
+      execFileSyncMock: makeMock(routes),
+      env: { TMUX: "/tmp/tmux-1000/default,200,5", TMUX_PANE: "%1" },
+      platform: "linux",
+    });
+    try {
+      const cfg = mod.getPlatformConfig();
+      const resolve = mod.createPidResolver({ platformConfig: cfg, startPid: 100 });
+      const { stablePid, pidChain, tmuxSocket, tmuxClient } = resolve();
+      assert.strictEqual(stablePid, 300, "stablePid should be the terminal pid");
+      assert.ok(pidChain.includes(200), "pidChain should include tmux server pid");
+      assert.ok(pidChain.includes(300), "pidChain should include terminal pid");
+      assert.strictEqual(tmuxSocket, "/tmp/tmux-1000/default");
+      assert.strictEqual(tmuxClient, "/dev/pts/7");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("(b) walk does not reach tmux server → bridge skipped", () => {
+    const routes = [
+      ["ps -o ppid= -p 100", "1\n"],
+      ["ps -o comm= -p 100", "zsh\n"],
+    ];
+    const { mod, cleanup } = loadSharedProcessWithMock({
+      execFileSyncMock: makeMock(routes),
+      env: { TMUX: "/tmp/tmux-1000/default,200,5", TMUX_PANE: "%1" },
+      platform: "linux",
+    });
+    try {
+      const cfg = mod.getPlatformConfig();
+      const { stablePid, pidChain } = mod.createPidResolver({
+        platformConfig: cfg, startPid: 100, maxDepth: 1,
+      })();
+      assert.strictEqual(stablePid, 100);
+      assert.strictEqual(pidChain.length, 1, "no extra hops appended");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("(c) list-clients empty (detached) → bridge skipped, stablePid falls back", () => {
+    const routes = [
+      ["ps -o ppid= -p 100", "200\n"],
+      ["ps -o comm= -p 100", "zsh\n"],
+      ["ps -o ppid= -p 200", "1\n"],
+      ["ps -o comm= -p 200", "tmux\n"],
+      ["tmux list-clients -t %1 -F #{client_pid}\t#{client_tty}", "\n"],
+    ];
+    const { mod, cleanup } = loadSharedProcessWithMock({
+      execFileSyncMock: makeMock(routes),
+      env: { TMUX: "/tmp/tmux-1000/default,200,5", TMUX_PANE: "%1" },
+      platform: "linux",
+    });
+    try {
+      const cfg = mod.getPlatformConfig();
+      const { stablePid, pidChain } = mod.createPidResolver({
+        platformConfig: cfg, startPid: 100,
+      })();
+      assert.ok(!pidChain.some(p => p > 200), "no client pids appended past tmux server");
+      assert.strictEqual(stablePid, 200, "falls back to lastGoodPid (tmux server)");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("(d) tmuxSocket parsed from $TMUX exposed on resolver result", () => {
+    const routes = [
+      ["ps -o ppid= -p 100", "200\n"],
+      ["ps -o comm= -p 100", "zsh\n"],
+      ["ps -o ppid= -p 200", "1\n"],
+      ["ps -o comm= -p 200", "tmux\n"],
+      ["tmux list-clients -t %1 -F #{client_pid}\t#{client_tty}", "\n"],
+    ];
+    const { mod, cleanup } = loadSharedProcessWithMock({
+      execFileSyncMock: makeMock(routes),
+      env: { TMUX: "/tmp/tmux-1000/work,200,5", TMUX_PANE: "%1" },
+      platform: "linux",
+    });
+    try {
+      const cfg = mod.getPlatformConfig();
+      const result = mod.createPidResolver({ platformConfig: cfg, startPid: 100 })();
+      assert.strictEqual(result.tmuxSocket, "/tmp/tmux-1000/work");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("(e) default socket path is preserved for -S focus", () => {
+    const routes = [
+      ["ps -o ppid= -p 100", "1\n"],
+      ["ps -o comm= -p 100", "zsh\n"],
+    ];
+    const { mod, cleanup } = loadSharedProcessWithMock({
+      execFileSyncMock: makeMock(routes),
+      env: { TMUX: "/tmp/tmux-1000/default,200,5", TMUX_PANE: "%1" },
+      platform: "linux",
+    });
+    try {
+      const cfg = mod.getPlatformConfig();
+      const result = mod.createPidResolver({
+        platformConfig: cfg, startPid: 100, maxDepth: 1,
+      })();
+      assert.strictEqual(result.tmuxSocket, "/tmp/tmux-1000/default");
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -348,6 +497,110 @@ describe("createPidResolver() — Windows PowerShell path", { skip: process.plat
   });
 });
 
-// readStdinJson() is not unit-tested here — it attaches listeners to
-// process.stdin (singleton) which prevents process exit. Validated by
-// real agent integration tests + the finishOnce/timeout logic is trivial.
+// ═════════════════════════════════════════════════════════════════════════════
+// readStdinJsonDetailed() — injectable stream + timeout (#583)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("readStdinJsonDetailed()", () => {
+  it("parses a complete JSON payload on EOF and reports bytes", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream });
+    stream.end('{"session_id":"abc-123","cwd":"D:\\\\x"}');
+
+    const result = await pending;
+    assert.strictEqual(result.payload.session_id, "abc-123");
+    assert.strictEqual(result.bytes, Buffer.byteLength('{"session_id":"abc-123","cwd":"D:\\\\x"}'));
+    assert.strictEqual(result.timedOut, false);
+    assert.strictEqual(result.parseError, null);
+  });
+
+  it("concatenates chunked writes before parsing", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream });
+    stream.write('{"session_id":');
+    stream.write('"chunked"');
+    stream.end("}");
+
+    const result = await pending;
+    assert.strictEqual(result.payload.session_id, "chunked");
+    assert.strictEqual(result.timedOut, false);
+  });
+
+  it("returns empty payload with bytes:0 when stdin closes with no data", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream });
+    stream.end();
+
+    const result = await pending;
+    assert.deepStrictEqual(result.payload, {});
+    assert.strictEqual(result.bytes, 0);
+    assert.strictEqual(result.timedOut, false);
+    assert.strictEqual(result.parseError, null);
+  });
+
+  it("reports a parse error for malformed JSON but still resolves {}", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream });
+    stream.end('{"session_id":"broken"');
+
+    const result = await pending;
+    assert.deepStrictEqual(result.payload, {});
+    assert.strictEqual(result.bytes, 22);
+    assert.ok(typeof result.parseError === "string" && result.parseError.length > 0);
+  });
+
+  it("times out when EOF never arrives, keeping any bytes received so far", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream, timeoutMs: 40 });
+    stream.write('{"half":');
+    // no end() — simulates an intermediary swallowing EOF
+
+    const result = await pending;
+    assert.strictEqual(result.timedOut, true);
+    assert.strictEqual(result.bytes, 8);
+    assert.deepStrictEqual(result.payload, {});
+    assert.ok(typeof result.parseError === "string" && result.parseError.length > 0);
+  });
+
+  it("parses data that arrived in full even when EOF is swallowed", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream, timeoutMs: 40 });
+    stream.write('{"session_id":"no-eof"}');
+
+    const result = await pending;
+    assert.strictEqual(result.timedOut, true);
+    assert.strictEqual(result.payload.session_id, "no-eof");
+    assert.strictEqual(result.parseError, null);
+  });
+
+  it("keeps the shared default timeout at 400ms — other agent hooks run ~800ms stdout safety timers that must win the race", () => {
+    assert.strictEqual(DEFAULT_STDIN_READ_TIMEOUT_MS, 400);
+  });
+
+  it("resolves (instead of crashing) when the stream errors mid-read, reporting a stream error", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream });
+    stream.write('{"half":');
+    stream.emit("error", new Error("boom"));
+
+    const result = await pending;
+    assert.deepStrictEqual(result.payload, {});
+    assert.strictEqual(result.bytes, 8);
+    assert.strictEqual(result.timedOut, false);
+    assert.strictEqual(result.parseError, "stream error: boom");
+  });
+
+  it("handles multi-megabyte stdin without truncation", async () => {
+    const stream = new PassThrough();
+    const pending = readStdinJsonDetailed({ stream });
+    const big = JSON.stringify({ session_id: "big-sid", blob: "z".repeat(3 * 1024 * 1024) });
+    // write in 64KB slices like a real pipe would
+    for (let i = 0; i < big.length; i += 65536) stream.write(big.slice(i, i + 65536));
+    stream.end();
+
+    const result = await pending;
+    assert.strictEqual(result.payload.session_id, "big-sid");
+    assert.strictEqual(result.bytes, Buffer.byteLength(big));
+    assert.strictEqual(result.parseError, null);
+  });
+});

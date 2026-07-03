@@ -242,7 +242,7 @@ function psSingleQuotedString(value) {
   return `'${String(value || "").replace(/'/g, "''")}'`;
 }
 
-function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = null, focusToken = "") {
+function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = null, focusToken = "", cacheCwdCandidates = cwdCandidates) {
   // Walk up the process tree (same proven logic as before).
   // Windows Terminal needs title matching because one WT process can represent
   // multiple tabs/windows. Other parent windows keep direct PID focus.
@@ -254,6 +254,10 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
       }).join(",")
     : "";
   const titleNames = psNames ? `@(${psNames})` : "@()";
+  const psCacheNames = Array.isArray(cacheCwdCandidates) && cacheCwdCandidates.length
+    ? cacheCwdCandidates.map(c => psUtf8Expression(c)).join(",")
+    : "";
+  const cacheTitleNames = psCacheNames ? `@(${psCacheNames})` : "@()";
   const cacheKey = focusCacheKey ? psUtf8Expression(focusCacheKey) : "$null";
   const wtHwndLiteral = normalizeHwndString(wtHwnd) || "0";
   const tokenLiteral = psSingleQuotedString(focusToken);
@@ -273,7 +277,6 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
                 if ($pidWindows.Count -eq 1) {
                     [WinFocus]::Focus($pidWindows[0])
                     $selectedTargetHwnd = $pidWindows[0]
-                    Save-ClawdFocusCache $pidWindows[0]
                     $focused = $true
                     $reason = 'wt-parent-pid-window'
                 } elseif ($pidWindows.Count -gt 1) {
@@ -281,6 +284,19 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
                 } else {
                     $reason = 'wt-parent-no-pid-window'
                 }
+            }
+        } elseif ($editorProcessNames -contains $proc.ProcessName) {
+            $matches = @([WinFocus]::FindByPidTitles([uint32]$curPid, [string[]]$cacheTitleNames))
+            if ($matches.Count -eq 1) {
+                [WinFocus]::Focus($matches[0])
+                $selectedTargetHwnd = $matches[0]
+                Save-ClawdFocusCache $matches[0]
+                $focused = $true
+                $reason = 'editor-parent-title-match'
+            } elseif ($matches.Count -gt 1) {
+                $reason = 'editor-parent-title-ambiguous'
+            } else {
+                $reason = 'editor-parent-no-title-match'
             }
         } else {
             [WinFocus]::Focus($proc.MainWindowHandle)
@@ -290,7 +306,9 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
             $reason = 'parent-direct'
         }
         break` : `
-        if ($wtProcessNames -notcontains $proc.ProcessName) {
+        if ($editorProcessNames -contains $proc.ProcessName) {
+            $reason = 'editor-parent-no-title'
+        } elseif ($wtProcessNames -notcontains $proc.ProcessName) {
             [WinFocus]::Focus($proc.MainWindowHandle)
             $selectedTargetHwnd = $proc.MainWindowHandle
             Save-ClawdFocusCache $proc.MainWindowHandle
@@ -330,7 +348,6 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
         if ($pidWindows.Count -eq 1) {
             [WinFocus]::Focus($pidWindows[0])
             $selectedTargetHwnd = $pidWindows[0]
-            Save-ClawdFocusCache $pidWindows[0]
             $focused = $true
             $reason = 'wt-title-mismatch-pid-window'
         } elseif ($pidWindows.Count -gt 1) {
@@ -340,7 +357,6 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
             if ($singleWtWindows.Count -eq 1) {
                 [WinFocus]::Focus($singleWtWindows[0])
                 $selectedTargetHwnd = $singleWtWindows[0]
-                Save-ClawdFocusCache $singleWtWindows[0]
                 $focused = $true
                 $reason = 'wt-title-mismatch-single-wt-window'
             } elseif ($singleWtWindows.Count -gt 1) {
@@ -355,29 +371,72 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
   return `
 $focusToken = ${tokenLiteral}
 $titleNames = ${titleNames}
+$cacheTitleNames = ${cacheTitleNames}
 $wtProcessNames = @('WindowsTerminal', 'WindowsTerminalPreview')
+$editorProcessNames = @('Code', 'Cursor')
 $chainWindowsTerminalPids = @()
 $focusCacheKey = ${cacheKey}
+$focusCacheSourcePid = [int64]${sourcePid}
 $wtHwndFromHook = [IntPtr]([int64]${wtHwndLiteral})
 if ($null -eq $global:ClawdFocusWindowCache) {
     $global:ClawdFocusWindowCache = @{}
 }
+function Test-ClawdWindowTitleMatch([IntPtr]$hwnd, [string[]]$names) {
+    if ($hwnd -eq [IntPtr]::Zero -or -not $names -or $names.Count -eq 0) { return $false }
+    $len = [WinFocus]::GetWindowTextLength($hwnd)
+    if ($len -le 0) { return $false }
+    $sb = New-Object System.Text.StringBuilder -ArgumentList ($len + 1)
+    [void][WinFocus]::GetWindowText($hwnd, $sb, $sb.Capacity)
+    $title = $sb.ToString()
+    foreach ($name in @($names)) {
+        if (-not [string]::IsNullOrWhiteSpace($name) -and $title.IndexOf($name, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            return $true
+        }
+    }
+    return $false
+}
 function Save-ClawdFocusCache([IntPtr]$hwnd) {
     if (-not $focusCacheKey -or $hwnd -eq [IntPtr]::Zero) { return }
-    $global:ClawdFocusWindowCache[$focusCacheKey] = $hwnd.ToInt64()
+    if (-not $cacheTitleNames -or $cacheTitleNames.Count -eq 0) { return }
+    $global:ClawdFocusWindowCache[$focusCacheKey] = @{
+        hwnd = $hwnd.ToInt64()
+        sourcePid = $focusCacheSourcePid
+        titleNames = @($cacheTitleNames)
+    }
 }
 function Get-ClawdCachedWindow() {
     if (-not $focusCacheKey) { return [IntPtr]::Zero }
     if (-not $global:ClawdFocusWindowCache.ContainsKey($focusCacheKey)) { return [IntPtr]::Zero }
+    $rawEntry = $global:ClawdFocusWindowCache[$focusCacheKey]
+    $rawHwnd = $rawEntry
+    $entrySourcePid = 0
+    if ($rawEntry -is [System.Collections.IDictionary]) {
+        $rawHwnd = $rawEntry['hwnd']
+        try { $entrySourcePid = [int64]$rawEntry['sourcePid'] } catch { $entrySourcePid = 0 }
+    }
     try {
-        $hwnd = [IntPtr]([int64]$global:ClawdFocusWindowCache[$focusCacheKey])
+        $hwnd = [IntPtr]([int64]$rawHwnd)
     } catch {
         $global:ClawdFocusWindowCache.Remove($focusCacheKey)
         return [IntPtr]::Zero
     }
-    if ([WinFocus]::IsUsableWindow($hwnd)) { return $hwnd }
-    $global:ClawdFocusWindowCache.Remove($focusCacheKey)
-    return [IntPtr]::Zero
+    if (-not [WinFocus]::IsUsableWindow($hwnd)) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    if ($entrySourcePid -gt 0 -and $focusCacheSourcePid -gt 0 -and $entrySourcePid -ne $focusCacheSourcePid) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    if (-not $cacheTitleNames -or $cacheTitleNames.Count -eq 0) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    if (-not (Test-ClawdWindowTitleMatch $hwnd ([string[]]$cacheTitleNames))) {
+        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        return [IntPtr]::Zero
+    }
+    return $hwnd
 }
 function Get-ClawdVisiblePidWindows([int[]]$pids) {
     $windows = @()
@@ -469,7 +528,6 @@ if (-not $focused -and $pendingConsoleHwnd -ne [IntPtr]::Zero) {
         $reason -eq 'wt-title-mismatch-no-pid-window') {
         [WinFocus]::Focus($pendingConsoleHwnd)
         $selectedTargetHwnd = $pendingConsoleHwnd
-        Save-ClawdFocusCache $pendingConsoleHwnd
         $focused = $true
         $reason = 'legacy-conhost-window'
     }
@@ -505,12 +563,22 @@ let psProc = null;
 // macOS Accessibility/System Events calls can pile up fast, so serialize focus attempts.
 const MAC_FOCUS_THROTTLE_MS = 1500;
 const MAC_FOCUS_TIMEOUT_MS = 1500;
+// The generic frontmost fallback can block on the macOS Automation consent
+// dialog on first use; killing it early dismisses the dialog before the user
+// can answer (#465), so that one script gets a human-scale timeout.
+const MAC_FOCUS_CONSENT_TIMEOUT_MS = 15000;
+const MAC_OPEN_TIMEOUT_MS = 3000;
+// Ghostty's stone focus can return before WindowServer finishes committing the
+// Space switch. Real-device reload tests still yanked the window at 150ms;
+// Space animations are roughly 300-400ms, so keep a conservative settle gap.
+const GHOSTTY_STEP_SETTLE_MS = 600;
 const WINDOWS_FOCUS_DEDUP_MS = 400;
 const WINDOWS_FOCUS_RESULT_TIMEOUT_MS = 3000;
 const WINDOWS_FOCUS_POSITIVE_REASONS = new Set([
   "legacy-conhost-window",
   "parent-direct",
   "parent-direct-no-title",
+  "editor-parent-title-match",
   "wt-parent-title-match",
   "wt-title-match",
 ]);
@@ -545,6 +613,21 @@ function normalizeGhosttyTerminalId(value) {
   return text;
 }
 
+function normalizeTmuxSocket(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 4096 || /[\0\r\n]/.test(trimmed)) return null;
+  if (trimmed.startsWith("/")) return trimmed;
+  return trimmed !== "default" && /^[\w.-]{1,64}$/.test(trimmed) ? trimmed : null;
+}
+
+function normalizeTmuxClient(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 256 || trimmed.startsWith("-")) return null;
+  return /^[\w./:-]+$/.test(trimmed) ? trimmed : null;
+}
+
 function normalizeFocusRequest(sourcePidOrRequest, cwd, editor, pidChain, meta = {}) {
   if (sourcePidOrRequest && typeof sourcePidOrRequest === "object" && !Array.isArray(sourcePidOrRequest)) {
     const request = sourcePidOrRequest;
@@ -558,6 +641,8 @@ function normalizeFocusRequest(sourcePidOrRequest, cwd, editor, pidChain, meta =
       agentId: typeof request.agentId === "string" ? request.agentId : null,
       requestSource: typeof request.requestSource === "string" ? request.requestSource : null,
       ghosttyTerminalId: normalizeGhosttyTerminalId(request.ghosttyTerminalId ?? request.ghostty_terminal_id),
+      tmuxSocket: normalizeTmuxSocket(request.tmuxSocket ?? request.tmux_socket),
+      tmuxClient: normalizeTmuxClient(request.tmuxClient ?? request.tmux_client),
     };
   }
 
@@ -571,6 +656,8 @@ function normalizeFocusRequest(sourcePidOrRequest, cwd, editor, pidChain, meta =
     agentId: meta && typeof meta.agentId === "string" ? meta.agentId : null,
     requestSource: meta && typeof meta.requestSource === "string" ? meta.requestSource : null,
     ghosttyTerminalId: normalizeGhosttyTerminalId(meta && (meta.ghosttyTerminalId ?? meta.ghostty_terminal_id)),
+    tmuxSocket: normalizeTmuxSocket(meta && (meta.tmuxSocket ?? meta.tmux_socket)),
+    tmuxClient: normalizeTmuxClient(meta && (meta.tmuxClient ?? meta.tmux_client)),
   };
 }
 
@@ -877,6 +964,141 @@ function buildGhosttyCwdCandidates(cwd) {
   return candidates;
 }
 
+// Bringing an OFF-SCREEN NSWindow on-screen attaches it to the *current*
+// Space. Both Ghostty's `focus` (makeKeyAndOrderFront) and `select tab`
+// (native tab swap) do this when the target terminal lives in a non-selected
+// tab of a window on another Space — the window gets yanked to the user
+// instead of the user switching Spaces. The only verified-safe operation is
+// focusing a terminal in the window's currently-SELECTED tab.
+//
+// So these read-only probes report how to reach the target: "direct" when
+// its tab is already selected, "via:<terminal-id>" naming the selected tab's
+// terminal as a stepping stone otherwise. The caller focuses the stepping
+// stone first (safe Space switch), then the target — the tab swap then
+// happens within the now-active Space and nothing is yanked.
+function buildGhosttyCwdProbeScript(cwdCandidates) {
+  const literalList = buildAppleScriptStringList(cwdCandidates);
+  return `
+      tell application "Ghostty"
+        set targetCwds to {${literalList}}
+        repeat with cwdLiteral in targetCwds
+          repeat with w in windows
+            repeat with t in tabs of w
+              try
+                set matches to (every terminal of t whose working directory is (contents of cwdLiteral))
+                if (count of matches) > 0 then
+                  set targetTerm to item 1 of matches
+                  if selected of t is true then return "direct:" & ((id of targetTerm) as text)
+                  return "via:" & ((id of (focused terminal of (selected tab of w))) as text) & "|" & ((id of targetTerm) as text)
+                end if
+              end try
+            end repeat
+          end repeat
+        end repeat
+        return "miss"
+      end tell`;
+}
+
+function buildGhosttyIdProbeScript(terminalId) {
+  const id = normalizeGhosttyTerminalId(terminalId);
+  if (!id) return null;
+  return `
+      tell application "Ghostty"
+        set targetId to "${escapeAppleScriptString(id)}"
+        repeat with w in windows
+          repeat with t in tabs of w
+            try
+              set matches to (every terminal of t whose id is targetId)
+              if (count of matches) > 0 then
+                if selected of t is true then return "direct:" & targetId
+                return "via:" & ((id of (focused terminal of (selected tab of w))) as text) & "|" & targetId
+              end if
+            end try
+          end repeat
+        end repeat
+        return "miss"
+      end tell`;
+}
+
+// Probe + stone in one script: finds the target terminal, and if its tab is
+// not selected, immediately focuses the stone terminal before returning the
+// target id. Real-device tests showed that WindowServer may still be settling
+// the Space switch when this callback fires, so the caller waits before target
+// focus. This still saves one IPC round-trip vs. separate probe -> stone calls.
+function buildGhosttyIdProbeAndStoneScript(terminalId) {
+  const id = normalizeGhosttyTerminalId(terminalId);
+  if (!id) return null;
+  return `
+      tell application "Ghostty"
+        set targetId to "${escapeAppleScriptString(id)}"
+        repeat with w in windows
+          repeat with t in tabs of w
+            try
+              set matches to (every terminal of t whose id is targetId)
+              if (count of matches) > 0 then
+                if selected of t is true then return "direct:" & targetId
+                set stoneTerminal to (focused terminal of (selected tab of w))
+                focus stoneTerminal
+                return "via:" & ((id of stoneTerminal) as text) & "|" & targetId
+              end if
+            end try
+          end repeat
+        end repeat
+        return "miss"
+      end tell`;
+}
+
+function buildGhosttyCwdProbeAndStoneScript(cwdCandidates) {
+  const literalList = buildAppleScriptStringList(cwdCandidates);
+  return `
+      tell application "Ghostty"
+        set targetCwds to {${literalList}}
+        repeat with cwdLiteral in targetCwds
+          repeat with w in windows
+            repeat with t in tabs of w
+              try
+                set matches to (every terminal of t whose working directory is (contents of cwdLiteral))
+                if (count of matches) > 0 then
+                  set targetTerm to item 1 of matches
+                  if selected of t is true then return "direct:" & ((id of targetTerm) as text)
+                  set stoneTerminal to (focused terminal of (selected tab of w))
+                  focus stoneTerminal
+                  return "via:" & ((id of stoneTerminal) as text) & "|" & ((id of targetTerm) as text)
+                end if
+              end try
+            end repeat
+          end repeat
+        end repeat
+        return "miss"
+      end tell`;
+}
+
+// Combines stone focus and target focus in a single AppleScript call.
+// AppleScript commands execute synchronously, so by the time the stone's
+// `focus` returns, the WindowServer has committed the Space switch — no
+// setTimeout needed. The target focus then runs in the already-active Space.
+function buildGhosttyStoneAndFocusScript(stoneId, targetId) {
+  const sid = normalizeGhosttyTerminalId(stoneId);
+  const tid = normalizeGhosttyTerminalId(targetId);
+  if (!sid || !tid) return null;
+  return `
+      tell application "Ghostty"
+        repeat with t in terminals
+          if id of t is "${escapeAppleScriptString(sid)}" then
+            focus t
+            exit repeat
+          end if
+        end repeat
+        repeat with t in terminals
+          if id of t is "${escapeAppleScriptString(tid)}" then
+            focus t
+            return "ok-id-via"
+          end if
+        end repeat
+        return "miss-id-via"
+      end tell`;
+}
+
 function buildGhosttyCwdFocusScript(cwdCandidates) {
   const literalList = buildAppleScriptStringList(cwdCandidates);
   return `
@@ -1088,6 +1310,96 @@ function scheduleITermTabFocus(sourcePid, pidChain) {
   });
 }
 
+let _resolvedTmuxBin = null;
+let _tmuxBinOverride = null;
+function __setTmuxBin(p) { _tmuxBinOverride = (typeof p === "string") ? p : null; _resolvedTmuxBin = null; }
+
+function resolveTmuxBin() {
+  if (_tmuxBinOverride !== null) return _tmuxBinOverride;
+  if (_resolvedTmuxBin !== null) return _resolvedTmuxBin;
+  const home = process.env.HOME || os.homedir() || "";
+  const candidates = [
+    "/opt/homebrew/bin/tmux",
+    "/usr/local/bin/tmux",
+    "/opt/local/bin/tmux",
+    "/usr/bin/tmux",
+    "/bin/tmux",
+    "/run/current-system/sw/bin/tmux",
+    home ? path.join(home, ".nix-profile/bin/tmux") : "",
+  ];
+  for (const p of candidates) {
+    if (!p) continue;
+    try { if (fs.statSync(p).isFile()) { _resolvedTmuxBin = p; return p; } } catch {}
+  }
+  _resolvedTmuxBin = "";
+  return "";
+}
+
+function buildTmuxSocketArgs(tmuxSocket) {
+  const socket = normalizeTmuxSocket(tmuxSocket);
+  if (!socket) return [];
+  if (socket.startsWith("/")) return ["-S", socket];
+  return socket !== "default" ? ["-L", socket] : [];
+}
+
+function scheduleTmuxPaneFocus(pidChain, tmuxSocket, tmuxClient) {
+  if (!Array.isArray(pidChain) || pidChain.length < 2) return;
+  const tmuxBin = resolveTmuxBin();
+  if (!tmuxBin) return;
+  const candidates = pidChain.filter(p => Number.isFinite(p) && p > 0);
+  if (candidates.length < 2) return;
+
+  const socketArgs = buildTmuxSocketArgs(tmuxSocket);
+  const tmuxClientTarget = normalizeTmuxClient(tmuxClient);
+  const clientArgs = tmuxClientTarget ? ["-c", tmuxClientTarget] : [];
+
+  const pidsArg = candidates.slice(0, 8).join(",");
+  execFile("ps", ["-o", "pid=,comm=", "-p", pidsArg], { encoding: "utf8", timeout: 500 }, (err, stdout) => {
+    if (err || !stdout) return;
+    const tmuxPids = new Set();
+    for (const line of stdout.trim().split("\n")) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 2 && path.basename(parts[parts.length - 1]).toLowerCase() === "tmux") {
+        tmuxPids.add(parseInt(parts[0], 10));
+      }
+    }
+    if (!tmuxPids.size) return;
+
+    // The pane shell is the PID immediately before the tmux server in the chain.
+    // Collect all candidate pane PIDs (entries preceding a tmux PID that aren't tmux themselves).
+    const paneCandidates = [];
+    for (let i = 1; i < candidates.length; i++) {
+      if (tmuxPids.has(candidates[i]) && !tmuxPids.has(candidates[i - 1])) {
+        paneCandidates.push(candidates[i - 1]);
+      }
+    }
+    if (!paneCandidates.length) return;
+
+    execFile(tmuxBin, [...socketArgs, "list-panes", "-a", "-F",
+      "#{pane_pid} #{window_id} #{pane_id} #{session_name}"],
+      { encoding: "utf8", timeout: 500 }, (tmuxErr, tmuxOut) => {
+      if (tmuxErr || !tmuxOut) return;
+      for (const panePid of paneCandidates) {
+        for (const line of tmuxOut.trim().split("\n")) {
+          const parts = line.split(/\s+/);
+          if (parts.length < 4 || parseInt(parts[0], 10) !== panePid) continue;
+          const windowId = parts[1];
+          const paneId = parts[2];
+          const session = parts.slice(3).join(" ");
+          setTimeout(() => {
+            execFile(tmuxBin, [...socketArgs, "switch-client", ...clientArgs, "-t", session], { timeout: 500 }, () => {
+              execFile(tmuxBin, [...socketArgs, "select-window", "-t", windowId], { timeout: 500 }, () => {
+                execFile(tmuxBin, [...socketArgs, "select-pane", "-t", paneId], { timeout: 500 }, () => {});
+              });
+            });
+          }, 400);
+          return;
+        }
+      }
+    });
+  });
+}
+
 function scheduleCmuxWorkspaceSwitch(pidChain) {
   if (!isMac || !Array.isArray(pidChain) || !pidChain.length) return;
   const pids = pidChain.filter(p => Number.isFinite(p) && p > 0);
@@ -1251,6 +1563,7 @@ function executeMacFocusRequest(request) {
   focusTerminalWindowLegacy(request, finalize);
   scheduleTerminalTabFocus(request.editor, request.pidChain);
   scheduleITermTabFocus(request.sourcePid, request.pidChain);
+  scheduleTmuxPaneFocus(request.pidChain, request.tmuxSocket, request.tmuxClient);
   scheduleCmuxWorkspaceSwitch(request.pidChain);
   scheduleSupersetFocus(request.sourcePid, request.cwd);
   scheduleGhosttyFocus(request.sourcePid, request.cwd, request.pidChain, request.ghosttyTerminalId);
@@ -1325,6 +1638,46 @@ function scheduleGhosttyFocus(sourcePid, cwd, pidChain, ghosttyTerminalId = null
         });
       }, 400);
     };
+    // Cross-Space fix: probe+stone in one script finds the target and, if its
+    // tab is not selected, focuses the stepping-stone terminal. The stone focus
+    // can return while WindowServer is still committing the Space switch, so
+    // wait before focusing the real target to avoid yanking its window back to
+    // the current Space.
+    const runWithSteppingStone = (probeAndStoneScript, finalScript, finalLabel, thenFn) => {
+      if (!probeAndStoneScript) {
+        thenFn();
+        return;
+      }
+      const t0 = Date.now();
+      execFile("osascript", ["-e", probeAndStoneScript], { timeout: MAC_FOCUS_TIMEOUT_MS * 2 }, (err, out) => {
+        const status = err ? "error" : (String(out || "").trim() || "empty");
+        if (!status.startsWith("via:")) {
+          logGhosttyFocusResult(`probe-${status} t=${Date.now() - t0}ms`);
+          thenFn();
+          return;
+        }
+        // via:<stone-id>|<target-id> - stone was focused; let the Space switch settle.
+        const viaPayload = status.slice(4);
+        const sepIdx = viaPayload.indexOf("|");
+        const targetId = sepIdx >= 0 ? viaPayload.slice(sepIdx + 1) : null;
+        const effectiveFinal = (targetId && buildGhosttyIdFocusScript(targetId)) || finalScript;
+        if (!effectiveFinal) {
+          logGhosttyFocusResult("probe-via no-final");
+          thenFn();
+          return;
+        }
+        logGhosttyFocusResult(`probe-via t=${Date.now() - t0}ms`);
+        setTimeout(() => {
+          const tFinal = Date.now();
+          execFile("osascript", ["-e", effectiveFinal], { timeout: MAC_FOCUS_TIMEOUT_MS }, (finalErr, finalOut) => {
+            const finalStatus = normalizeGhosttyScriptStatus(finalLabel, finalErr, finalOut);
+            logGhosttyFocusResult(`${finalStatus} via-stone settle=${GHOSTTY_STEP_SETTLE_MS}ms t=${Date.now() - tFinal}ms`);
+            if (!String(finalStatus || "").startsWith("ok-")) thenFn();
+          });
+        }, GHOSTTY_STEP_SETTLE_MS);
+      });
+    };
+
     const runFallback = () => {
       if (!cwdCandidates.length) {
         logGhosttyFocusResult("no-cwd-fallback");
@@ -1332,7 +1685,9 @@ function scheduleGhosttyFocus(sourcePid, cwd, pidChain, ghosttyTerminalId = null
       }
       const script = buildGhosttyCwdFocusScript(cwdCandidates);
       logGhosttyFocusResult("cwd-fallback");
-      runGhosttyScript(script, "cwd", null);
+      runWithSteppingStone(buildGhosttyCwdProbeAndStoneScript(cwdCandidates), script, "cwd", () => {
+        runGhosttyScript(script, "cwd", null);
+      });
     };
 
     const pidCandidates = buildGhosttyPidCandidates(sourcePid, pidChain);
@@ -1369,7 +1724,9 @@ function scheduleGhosttyFocus(sourcePid, cwd, pidChain, ghosttyTerminalId = null
         runPrecisePath();
         return;
       }
-      runGhosttyScript(idScript, "id", runPrecisePath);
+      runWithSteppingStone(buildGhosttyIdProbeAndStoneScript(ghosttyTerminalId), idScript, "id", () => {
+        runGhosttyScript(idScript, "id", runPrecisePath);
+      });
     };
 
     runIdOrPrecise();
@@ -1445,6 +1802,7 @@ function focusTerminalWindow(sourcePidOrRequest, cwd, editor, pidChain, meta) {
   if (isLinux) {
     focusTerminalWindowLegacy(request);
     scheduleTerminalTabFocus(request.editor, request.pidChain);
+    scheduleTmuxPaneFocus(request.pidChain, request.tmuxSocket, request.tmuxClient);
     logFocusResult("branch=linux-command-submitted");
     return normalizeFocusResultPayload({ reason: "linux-command-submitted" });
   }
@@ -1459,6 +1817,66 @@ function focusTerminalWindow(sourcePidOrRequest, cwd, editor, pidChain, meta) {
     : normalizeFocusResultPayload({ reason: "windows-focus-unknown" });
   logFocusResult(`branch=windows reason=${result.reason || "unknown"}`);
   return result;
+}
+
+// macOS generic window focus (#465). Prefer LaunchServices activation
+// (`open <bundle>`) over System Events `set frontmost`: `open` carries
+// Dock-click reopen semantics, so it also restores minimized windows —
+// `set frontmost` activates the app but leaves them in the Dock — and it
+// needs no Automation consent. System Events stays as the fallback for
+// source processes that don't live inside an .app bundle.
+
+function extractMacAppBundlePath(commPath) {
+  const text = typeof commPath === "string" ? commPath.trim() : "";
+  if (!text.startsWith("/")) return null;
+  // Match the outermost bundle: helpers live at
+  // <bundle>.app/Contents/Frameworks/<helper>.app/Contents/MacOS/<bin>.
+  const idx = text.indexOf(".app/Contents/");
+  return idx > 0 ? text.slice(0, idx + 4) : null;
+}
+
+function resolveMacAppBundle(pidCandidates, callback) {
+  execFile("ps", ["-o", "pid=,comm=", "-p", pidCandidates.join(",")], { encoding: "utf8", timeout: 1000 }, (_err, stdout) => {
+    // ps exits non-zero when any pid in the list is already gone but still
+    // prints the live rows, so parse stdout regardless of the exit code.
+    const commByPid = new Map();
+    for (const line of String(stdout || "").split("\n")) {
+      const match = line.match(/^\s*(\d+)\s+(.+)$/);
+      if (match) commByPid.set(Number(match[1]), match[2]);
+    }
+    for (const pid of pidCandidates) {
+      const bundlePath = extractMacAppBundlePath(commByPid.get(pid));
+      if (bundlePath) return callback(bundlePath);
+    }
+    callback(null);
+  });
+}
+
+function focusMacAppViaSystemEvents(pidCandidates, onDone) {
+  const applePidList = pidCandidates.join(", ");
+  const script = `
+    tell application "System Events"
+      repeat with targetPid in {${applePidList}}
+        set pidValue to contents of targetPid
+        set pList to every process whose unix id is pidValue
+        if (count of pList) > 0 then
+          set frontmost of item 1 of pList to true
+          exit repeat
+        end if
+      end repeat
+    end tell`;
+  execFile("osascript", ["-e", script], { timeout: MAC_FOCUS_CONSENT_TIMEOUT_MS }, (err, _stdout, stderr) => {
+    if (err) {
+      const detail = String(stderr || err.message || "").split("\n")[0].slice(0, 160);
+      const reason = detail.includes("-1743")
+        ? "automation-denied"
+        : `osascript-failed:${safeLogValue(err.signal || err.code || "error")}`;
+      logFocusResult(`branch=mac-frontmost reason=${reason} detail=${safeLogValue(detail)}`);
+    } else {
+      logFocusResult("branch=mac-frontmost reason=ok");
+    }
+    if (onDone) onDone();
+  });
 }
 
 function focusTerminalWindowLegacy(request, onDone) {
@@ -1480,21 +1898,20 @@ function focusTerminalWindowLegacy(request, onDone) {
         if (pidCandidates.length >= 3) break;
       }
     }
-    const applePidList = pidCandidates.join(", ");
-    const script = `
-      tell application "System Events"
-        repeat with targetPid in {${applePidList}}
-          set pidValue to contents of targetPid
-          set pList to every process whose unix id is pidValue
-          if (count of pList) > 0 then
-            set frontmost of item 1 of pList to true
-            exit repeat
-          end if
-        end repeat
-      end tell`;
-    execFile("osascript", ["-e", script], { timeout: MAC_FOCUS_TIMEOUT_MS }, (err) => {
-      if (err) console.warn("focusTerminal macOS failed:", err.message);
-      if (onDone) onDone();
+    resolveMacAppBundle(pidCandidates, (bundlePath) => {
+      if (!bundlePath) {
+        focusMacAppViaSystemEvents(pidCandidates, onDone);
+        return;
+      }
+      execFile("/usr/bin/open", [bundlePath], { timeout: MAC_OPEN_TIMEOUT_MS }, (openErr) => {
+        if (!openErr) {
+          logFocusResult(`branch=mac-open reason=ok bundle=${safeLogValue(path.basename(bundlePath))}`);
+          if (onDone) onDone();
+          return;
+        }
+        logFocusResult(`branch=mac-open reason=open-failed bundle=${safeLogValue(path.basename(bundlePath))} error=${safeLogValue(openErr.signal || openErr.code || "error")}`);
+        focusMacAppViaSystemEvents(pidCandidates, onDone);
+      });
     });
     return true;
   }
@@ -1543,7 +1960,7 @@ function focusTerminalWindowLegacy(request, onDone) {
 
   // Windows: send command to persistent PowerShell process (near-instant)
   const titleCandidates = buildWindowsTitleCandidates(request, cwdCandidates);
-  const cmd = makeFocusCmd(sourcePid, titleCandidates, buildFocusCacheKey(request), request.wtHwnd, request.focusToken);
+  const cmd = makeFocusCmd(sourcePid, titleCandidates, buildFocusCacheKey(request), request.wtHwnd, request.focusToken, cwdCandidates);
   if (psProc && psProc.stdin.writable) {
     psProc.stdin.write(cmd + "\n");
     return true;
@@ -1583,6 +2000,7 @@ return {
   cleanup,
   __test: {
     makeFocusCmd,
+    extractMacAppBundlePath,
     buildWindowsTitleCandidates,
     confirmForeground,
     isPositiveFocusReason,
@@ -1601,6 +2019,15 @@ return {
     buildGhosttyTtyFocusScript,
     buildGhosttyPidFocusScript,
     buildGhosttyCwdFocusScript,
+    scheduleTmuxPaneFocus,
+    __setTmuxBin,
+    resolveTmuxBin,
+    buildGhosttyIdProbeScript,
+    buildGhosttyCwdProbeScript,
+    buildGhosttyIdProbeAndStoneScript,
+    buildGhosttyCwdProbeAndStoneScript,
+    buildGhosttyStoneAndFocusScript,
+    GHOSTTY_STEP_SETTLE_MS,
   },
 };
 

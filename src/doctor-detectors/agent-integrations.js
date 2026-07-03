@@ -3,9 +3,13 @@
 const fs = require("fs");
 const path = require("path");
 
-const { isAgentEnabled, isAgentPermissionsEnabled } = require("../agent-gate");
+const {
+  isAgentEnabled,
+  isAgentIntegrationInstalled,
+  isAgentPermissionsEnabled,
+} = require("../agent-gate");
 const { getAgent } = require("../../agents/registry");
-const { findHookCommands } = require("../../hooks/json-utils");
+const { commandMatchesMarker, findHookCommands } = require("../../hooks/json-utils");
 const { GEMINI_HOOK_EVENTS } = require("../../hooks/gemini-install");
 const { ANTIGRAVITY_HOOK_EVENTS, HOOK_GROUP_ID: ANTIGRAVITY_HOOK_GROUP_ID } = require("../../hooks/antigravity-install");
 const { QWEN_CODE_HOOK_EVENTS } = require("../../hooks/qwen-code-install");
@@ -15,6 +19,7 @@ const {
   isCopilotPermissionRegistrable,
 } = require("../../hooks/copilot-install");
 const { findKimiHookCommands } = require("../../hooks/kimi-install");
+const { parseTomlSections: parseCodewhaleTomlSections } = require("../../hooks/codewhale-install");
 const { getAgentDescriptors } = require("./agent-descriptors");
 const { commandContainsFragment, validateHookCommand } = require("./agent-node-bin-parser");
 const { checkCodexHookTrust, checkCodexHooksFeature } = require("./codex-features-check");
@@ -22,12 +27,6 @@ const { validateOpencodeEntry } = require("./opencode-entry-validator");
 const { validateOpenClawEntry } = require("./openclaw-entry-validator");
 const { hasIncludeDirective } = require("../../hooks/openclaw-install");
 
-const INFO_ONLY_STATUSES = new Set([
-  "disabled",
-  "manual-managed",
-  "manual-only",
-  "not-installed",
-]);
 const REPAIRABLE_AGENT_STATUSES = new Set(["not-connected", "broken-path"]);
 const GEMINI_HOOKS_DISABLED_DETAIL = "Gemini hooks are disabled in settings.json; Clawd preserves this user setting and will not receive hook events";
 const ANTIGRAVITY_HOOKS_DISABLED_DETAIL = "Antigravity Clawd hooks are disabled in hooks.json; Clawd preserves this user setting and will not receive hook events";
@@ -183,6 +182,40 @@ function statusLevel(status) {
     return "warning";
   }
   return status === "ok" ? null : "info";
+}
+
+// codex resolves commandWindows on Windows and command on POSIX
+// (openai/codex#22159). Since #544, a win32-authored hooks.json carries a
+// WSL-interop form in `command` that is only executable inside WSL, so the
+// doctor must validate the field THIS platform's codex would run — the
+// generic findHookCommands (command only) would flag every dual-field
+// Windows install as broken-path, and Repair would regenerate the same
+// fields forever.
+function resolveCodexPlatformCommand(hook, platform) {
+  if (!hook || typeof hook !== "object") return null;
+  const windowsVariant = typeof hook.commandWindows === "string" ? hook.commandWindows : null;
+  const base = typeof hook.command === "string" ? hook.command : null;
+  return platform === "win32" ? (windowsVariant || base) : base;
+}
+
+function findCodexPlatformHookCommands(settings, marker, platform) {
+  if (!settings || !settings.hooks || typeof settings.hooks !== "object") return [];
+  const commands = [];
+  const push = (hook) => {
+    const resolved = resolveCodexPlatformCommand(hook, platform);
+    if (resolved && commandMatchesMarker(resolved, marker)) commands.push(resolved);
+  };
+  for (const entries of Object.values(settings.hooks)) {
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (!entry || typeof entry !== "object") continue;
+      if (Array.isArray(entry.hooks)) {
+        for (const hook of entry.hooks) push(hook);
+      }
+      push(entry);
+    }
+  }
+  return commands;
 }
 
 function validateCommandList(descriptor, commands, options) {
@@ -606,10 +639,12 @@ function validateAntigravityHookEvents(descriptor, settings, options) {
 
 function applyCodexSupplementary(detail, descriptor, options, settings) {
   if (!descriptor.supplementary || descriptor.supplementary.key !== "hooks") return detail;
-  if (detail.status !== "ok") return detail;
 
   const supplementary = checkCodexHooksFeature(descriptor.supplementary.configPath, { fs: options.fs });
-  if (supplementary.value === "disabled") {
+  if (
+    supplementary.value === "disabled"
+    && (detail.status === "ok" || REPAIRABLE_AGENT_STATUSES.has(detail.status))
+  ) {
     return {
       ...detail,
       status: "not-connected",
@@ -622,6 +657,7 @@ function applyCodexSupplementary(detail, descriptor, options, settings) {
       detail: "Codex hooks feature is disabled",
     };
   }
+  if (detail.status !== "ok") return detail;
   const codexHookTrust = checkCodexHookTrust(
     descriptor.supplementary.configPath,
     settings,
@@ -807,6 +843,12 @@ function checkFileMode(descriptor, options) {
     detail = validateGeminiHookEvents(descriptor, settings, options);
   } else if (descriptor.agentId === "qwen-code") {
     detail = validateQwenHookEvents(descriptor, settings, options);
+  } else if (descriptor.agentId === "codex") {
+    detail = validateCommandList(
+      descriptor,
+      findCodexPlatformHookCommands(settings, descriptor.marker, options.platform || process.platform),
+      options
+    );
   } else {
     detail = validateCommandList(
       descriptor,
@@ -897,6 +939,186 @@ function checkTomlTextMode(descriptor, options) {
 
   return {
     ...validateCommandList(descriptor, findKimiHookCommands(text, descriptor.marker), options),
+    parentDirExists: true,
+    configFileExists: true,
+    configPath: descriptor.configPath,
+  };
+}
+
+function unescapeTomlDoubleQuotedValue(value) {
+  return String(value || "")
+    .replace(/\\"/g, "\"")
+    .replace(/\\\\/g, "\\");
+}
+
+function parseTomlScalarValue(raw) {
+  const value = String(raw || "").trim();
+  if (value.startsWith("'''")) {
+    const end = value.indexOf("'''", 3);
+    return end >= 0 ? value.slice(3, end) : null;
+  }
+  if (value.startsWith('"""')) {
+    const end = value.indexOf('"""', 3);
+    return end >= 0 ? unescapeTomlDoubleQuotedValue(value.slice(3, end)) : null;
+  }
+  if (value.startsWith("'")) {
+    const end = value.indexOf("'", 1);
+    return end >= 0 ? value.slice(1, end) : null;
+  }
+  if (value.startsWith("\"")) {
+    let escaped = false;
+    for (let i = 1; i < value.length; i++) {
+      const ch = value[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === "\"") {
+        return unescapeTomlDoubleQuotedValue(value.slice(1, i));
+      }
+    }
+    return null;
+  }
+  const bare = value.replace(/\s+#.*$/, "").trim();
+  return bare || null;
+}
+
+function tomlAssignmentValue(lines, key) {
+  const pattern = new RegExp(`^\\s*${key}\\s*=\\s*(.+)$`);
+  for (const line of lines) {
+    const match = String(line || "").match(pattern);
+    if (!match) continue;
+    return parseTomlScalarValue(match[1]);
+  }
+  return null;
+}
+
+function findCodewhaleHookCommandsForEvent(text, eventName, descriptor) {
+  if (typeof text !== "string" || !text) return [];
+  const sectionMarker = descriptor.marker;
+  const commandMarker = descriptor.commandMarker || "codewhale-hook.js";
+  return parseCodewhaleTomlSections(text)
+    .filter((section) => section.header === "hooks.hooks")
+    .filter((section) => section.lines.some((line) => commandContainsFragment(line, sectionMarker)))
+    .filter((section) => tomlAssignmentValue(section.lines, "event") === eventName)
+    .map((section) => tomlAssignmentValue(section.lines, "command"))
+    .filter((command) => typeof command === "string" && commandContainsFragment(command, commandMarker));
+}
+
+function codewhaleHooksExplicitlyDisabled(text) {
+  const hooksSection = parseCodewhaleTomlSections(text)
+    .find((section) => section.header === "hooks");
+  if (!hooksSection) return false;
+  return tomlAssignmentValue(hooksSection.lines, "enabled") === "false";
+}
+
+function validateCodewhaleHookEvents(descriptor, text, options) {
+  const events = Array.isArray(descriptor.hookEvents) ? descriptor.hookEvents : [];
+  const missingEvents = [];
+  let commandCount = 0;
+  let firstOk = null;
+  let firstFailure = null;
+
+  if (codewhaleHooksExplicitlyDisabled(text)) {
+    return makeDetail(descriptor, "not-connected", {
+      level: "warning",
+      detail: "CodeWhale hooks are disabled in config.toml; Clawd will not receive hook events",
+      supplementary: {
+        key: "codewhale_hooks",
+        value: "disabled",
+        detail: "[hooks].enabled is false",
+      },
+      commandCount: 0,
+    });
+  }
+
+  for (const eventName of events) {
+    const commands = findCodewhaleHookCommandsForEvent(text, eventName, descriptor);
+    commandCount += commands.length;
+    if (!commands.length) {
+      missingEvents.push(eventName);
+      continue;
+    }
+
+    const results = commands.map((command) => options.validateCommand(command, {
+      platform: options.platform,
+      fs: options.fs,
+    }));
+    const ok = results.find((result) => result.ok);
+    if (ok) {
+      if (!firstOk) firstOk = ok;
+      continue;
+    }
+    if (!firstFailure) {
+      firstFailure = {
+        eventName,
+        result: results[0] || { issue: "parse-failed" },
+        command: commands[0],
+      };
+    }
+  }
+
+  if (missingEvents.length) {
+    return makeDetail(descriptor, "not-connected", {
+      level: "warning",
+      detail: `${descriptor.configPath} missing CodeWhale hook event(s): ${missingEvents.join(", ")}`,
+      commandCount,
+      missingCodewhaleHookEvents: missingEvents,
+    });
+  }
+
+  if (firstFailure) {
+    const first = firstFailure.result;
+    return makeDetail(descriptor, "broken-path", {
+      level: "warning",
+      detail: `CodeWhale hook command failed validation for ${firstFailure.eventName}: ${first.issue || "parse-failed"}`,
+      commandCount,
+      hookCommandIssue: first.issue || "parse-failed",
+      nodeBin: first.nodeBin || null,
+      scriptPath: first.scriptPath || null,
+      commandFragment: first.fragment || String(firstFailure.command || "").slice(0, 128),
+      brokenCodewhaleHookEvent: firstFailure.eventName,
+    });
+  }
+
+  return makeDetail(descriptor, "ok", {
+    level: null,
+    detail: `${descriptor.configPath} CodeWhale hooks registered for ${events.length} events, scriptPath verified`,
+    commandCount,
+    scriptPath: firstOk && firstOk.scriptPath ? firstOk.scriptPath : null,
+  });
+}
+
+function checkCodewhaleHooksTomlMode(descriptor, options) {
+  if (!fileExists(options.fs, descriptor.configPath)) {
+    return makeDetail(descriptor, "not-connected", {
+      level: "warning",
+      parentDirExists: true,
+      configFileExists: false,
+      configPath: descriptor.configPath,
+      detail: `${descriptor.configPath} missing`,
+    });
+  }
+
+  let text;
+  try {
+    text = options.fs.readFileSync(descriptor.configPath, "utf8");
+  } catch (err) {
+    return makeDetail(descriptor, "config-corrupt", {
+      level: "warning",
+      parentDirExists: true,
+      configFileExists: true,
+      configPath: descriptor.configPath,
+      detail: err && err.message ? err.message : "CodeWhale config read failed",
+    });
+  }
+
+  return {
+    ...validateCodewhaleHookEvents(descriptor, text, options),
     parentDirExists: true,
     configFileExists: true,
     configPath: descriptor.configPath,
@@ -1466,6 +1688,13 @@ function checkPiExtensionMode(descriptor, options) {
 
 function checkAgent(descriptor, options) {
   const prefs = options.prefs || {};
+  if (!isAgentIntegrationInstalled(prefs, descriptor.agentId)) {
+    return makeDetail(descriptor, "not-managed", {
+      level: "info",
+      detail: "This integration is not installed in Settings",
+    });
+  }
+
   if (!isAgentEnabled(prefs, descriptor.agentId)) {
     return makeDetail(descriptor, "disabled", {
       level: "info",
@@ -1489,15 +1718,29 @@ function checkAgent(descriptor, options) {
     });
   }
 
-  const parentDirExists = descriptor.parentDir ? dirExists(options.fs, descriptor.parentDir) : false;
+  // Multi-generation agents (#563: kimi legacy + kimi-code) declare ordered
+  // configTargets; the first whose directory exists is the one doctor judges.
+  const activeTarget = Array.isArray(descriptor.configTargets)
+    ? descriptor.configTargets.find((target) => dirExists(options.fs, target.parentDir))
+    : null;
+  const effectiveDescriptor = activeTarget
+    ? { ...descriptor, parentDir: activeTarget.parentDir, configPath: activeTarget.configPath }
+    : descriptor;
+
+  const parentDirExists = effectiveDescriptor.parentDir
+    ? dirExists(options.fs, effectiveDescriptor.parentDir)
+    : false;
   if (!parentDirExists) {
     return makeDetail(descriptor, "not-installed", {
       level: "info",
       parentDirExists: false,
       configPath: descriptor.configPath,
-      detail: `${descriptor.parentDir} missing`,
+      detail: Array.isArray(descriptor.configTargets)
+        ? `${descriptor.configTargets.map((target) => target.parentDir).join(" / ")} missing`
+        : `${descriptor.parentDir} missing`,
     });
   }
+  descriptor = effectiveDescriptor;
 
   let detail;
   if (descriptor.configMode === "file") {
@@ -1506,6 +1749,8 @@ function checkAgent(descriptor, options) {
     detail = checkCopilotHooksMode(descriptor, options);
   } else if (descriptor.configMode === "toml-text") {
     detail = checkTomlTextMode(descriptor, options);
+  } else if (descriptor.configMode === "codewhale-hooks-toml") {
+    detail = checkCodewhaleHooksTomlMode(descriptor, options);
   } else if (descriptor.configMode === "dir") {
     detail = checkKiroDirMode(descriptor, options);
   } else if (descriptor.configMode === "pi-extension") {
@@ -1539,10 +1784,12 @@ function summarize(details) {
   if (warningCount > 0) {
     status = "warning";
     level = "warning";
-  } else if (okCount === 0 && details.every((detail) => INFO_ONLY_STATUSES.has(detail.status))) {
-    status = "critical";
-    level = "critical";
   }
+  // An all-info aggregate (every integration disabled / manual-managed / not
+  // installed) is a deliberate user or environment choice, not a fault, so the
+  // summary stays green (#490). The "nothing is wired up" hint is surfaced as
+  // info-level UI copy instead, and a genuinely broken local server is still
+  // flagged red by the separate local-server check.
   return { status, level, counts, okCount, warningCount };
 }
 
@@ -1579,6 +1826,7 @@ module.exports = {
     checkAntigravityHooksMode,
     findAntigravityHookCommandsForEvent,
     parseYamlPluginEnabled,
+    codewhaleHooksExplicitlyDisabled,
     checkTomlTextMode,
     validateCommandList,
   },

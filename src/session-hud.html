@@ -183,7 +183,7 @@ body { padding: 2px 3px 8px; }
 }
 
 .right {
-  flex: 0 1 58%;
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -192,6 +192,13 @@ body { padding: 2px 3px 8px; }
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   max-width: 58%;
+  /* Flexbox quirk: overflow:hidden makes a flex item's AUTOMATIC minimum
+     size 0, so under squeeze .right shrinks below its chips and its own
+     overflow clipping cuts them mid-glyph. min-content restores a real
+     floor: it equals bell+chips+gaps exactly, because the elapsed span
+     carries its own zero floor and contributes nothing. Squeeze order:
+     title first, then elapsed, chips never clip. */
+  min-width: min-content;
   overflow: hidden;
   white-space: nowrap;
 }

@@ -18,8 +18,10 @@ function makeWindow(bounds = { x: 10, y: 20, width: 100, height: 100 }) {
     destroyed: false,
     visible: true,
     webContents: {
+      destroyed: false,
       on: (event, cb) => listeners.set(event, cb),
       reload: () => calls.push(["reload"]),
+      isDestroyed() { return this.destroyed; },
     },
     isDestroyed: () => win.destroyed,
     isVisible: () => win.visible,
@@ -116,6 +118,10 @@ function createRuntime(overrides = {}) {
     flushRuntimeStateToPrefs: () => calls.push(["flushRuntimeStateToPrefs"]),
     handleMiniDisplayChange: () => calls.push(["handleMiniDisplayChange"]),
     exitMiniMode: () => calls.push(["exitMiniMode"]),
+    crashReloadLimit: overrides.crashReloadLimit,
+    crashReloadWindowMs: overrides.crashReloadWindowMs,
+    crashReloadLog: overrides.crashReloadLog,
+    now: overrides.now,
   });
   return {
     runtime,
@@ -169,6 +175,71 @@ describe("pet-window-runtime", () => {
     ]);
   });
 
+  it("reloadWindowWebContents ignores destroyed windows and webContents", () => {
+    const harness = createRuntime();
+    const live = makeWindow();
+    const destroyedWindow = makeWindow();
+    const destroyedContents = makeWindow();
+
+    destroyedWindow.destroyed = true;
+    destroyedContents.webContents.destroyed = true;
+
+    assert.equal(harness.runtime.reloadWindowWebContents(live), true);
+    assert.equal(harness.runtime.reloadWindowWebContents(destroyedWindow), false);
+    assert.equal(harness.runtime.reloadWindowWebContents(destroyedContents), false);
+    assert.deepStrictEqual(live.calls, [["reload"]]);
+    assert.deepStrictEqual(destroyedWindow.calls, []);
+    assert.deepStrictEqual(destroyedContents.calls, []);
+  });
+
+  it("does not reload renderer windows for terminal render-process-gone reasons", () => {
+    const logs = [];
+    const harness = createRuntime({ crashReloadLog: (message) => logs.push(message) });
+    const live = makeWindow();
+
+    assert.equal(harness.runtime.reloadWindowWebContents(live, {
+      crashKey: "renderWin",
+      details: { reason: "integrity-failure" },
+    }), false);
+    assert.deepStrictEqual(live.calls, []);
+    assert.match(logs[0], /not reloading renderWin/);
+  });
+
+  it("stops reloading renderer windows after repeated crashes in the guard window", () => {
+    let now = 1000;
+    const logs = [];
+    const harness = createRuntime({
+      crashReloadLimit: 2,
+      crashReloadWindowMs: 1000,
+      crashReloadLog: (message) => logs.push(message),
+      now: () => now,
+    });
+    const live = makeWindow();
+    const options = { crashKey: "hitWin", details: { reason: "crashed" } };
+
+    assert.equal(harness.runtime.reloadWindowWebContents(live, options), true);
+    now += 100;
+    assert.equal(harness.runtime.reloadWindowWebContents(live, options), true);
+    now += 100;
+    assert.equal(harness.runtime.reloadWindowWebContents(live, options), false);
+    assert.deepStrictEqual(live.calls, [["reload"], ["reload"]]);
+    assert.match(logs[0], /stopped reloading hitWin/);
+
+    now += 1001;
+    assert.equal(harness.runtime.reloadWindowWebContents(live, options), true);
+    assert.deepStrictEqual(live.calls, [["reload"], ["reload"], ["reload"]]);
+  });
+
+  it("uses safe reload helpers for pet render-process-gone handlers", () => {
+    const runtimeSource = fs.readFileSync(path.join(SRC_DIR, "pet-window-runtime.js"), "utf8");
+    const mainSource = fs.readFileSync(path.join(SRC_DIR, "main.js"), "utf8");
+
+    assert.ok(runtimeSource.includes('reloadRuntimeWindowWebContents(hitWin, { crashKey: "hitWin", details });'));
+    assert.ok(mainSource.includes('petWindowRuntime.reloadWindowWebContents(ownedHitWin, { crashKey: "hitWin", details });'));
+    assert.ok(mainSource.includes('petWindowRuntime.reloadWindowWebContents(win, { crashKey: "renderWin", details });'));
+    assert.doesNotMatch(mainSource, /ownedHitWin\.webContents\.reload\(\)/);
+  });
+
   it("creates the render window as non-focusable and materializes the initial virtual bounds", () => {
     const instances = [];
     const harness = createRuntime();
@@ -198,6 +269,52 @@ describe("pet-window-runtime", () => {
       { x: 40, y: 0, width: 120, height: 120 },
     ]);
     assert.equal(harness.runtime.getViewportOffsetY(), 25);
+  });
+
+  it("flushes runtime prefs once during Windows session end", () => {
+    const instances = [];
+    const harness = createRuntime();
+
+    harness.runtime.createRenderWindow({
+      BrowserWindow: makeBrowserWindow(instances),
+      size: { width: 120, height: 120 },
+      initialWindowBounds: { x: 40, y: 0, width: 120, height: 120 },
+      initialVirtualBounds: { x: 40, y: 0, width: 120, height: 120 },
+      preloadPath: "preload.js",
+      loadFilePath: "index.html",
+      themeConfig: { ok: true },
+      setRenderWindow: harness.setRenderWin,
+      isQuitting: () => false,
+    });
+
+    instances[0].emit("query-session-end");
+    instances[0].emit("session-end");
+
+    assert.deepStrictEqual(harness.calls.filter((call) => call[0] === "flushRuntimeStateToPrefs"), [
+      ["flushRuntimeStateToPrefs"],
+    ]);
+  });
+
+  it("does not flush runtime prefs for session-end events on non-Windows platforms", () => {
+    const instances = [];
+    const harness = createRuntime({ isWin: false });
+
+    harness.runtime.createRenderWindow({
+      BrowserWindow: makeBrowserWindow(instances),
+      size: { width: 120, height: 120 },
+      initialWindowBounds: { x: 40, y: 0, width: 120, height: 120 },
+      initialVirtualBounds: { x: 40, y: 0, width: 120, height: 120 },
+      preloadPath: "preload.js",
+      loadFilePath: "index.html",
+      themeConfig: { ok: true },
+      setRenderWindow: harness.setRenderWin,
+      isQuitting: () => false,
+    });
+
+    instances[0].emit("query-session-end");
+    instances[0].emit("session-end");
+
+    assert.deepStrictEqual(harness.calls.filter((call) => call[0] === "flushRuntimeStateToPrefs"), []);
   });
 
   it("keeps Linux hit windows non-focusable", () => {
@@ -366,6 +483,44 @@ describe("pet-window-runtime", () => {
       ["handleMiniDisplayChange"],
       ["repositionAnchoredSurfaces"],
     ]);
+  });
+
+  it("snaps the pet back to the frozen size when live bounds drift on display-metrics-changed (#408)", () => {
+    // Windows sleep/wake can resize the pet without moving it (DPI flux).
+    // Even when the clamped position is unchanged, the runtime must re-apply
+    // the frozen size — otherwise keepSize silently absorbs the drift.
+    const renderWin = makeWindow({ x: 200, y: 100, width: 140, height: 140 });
+    const harness = createRuntime({
+      renderWin,
+      effectivePixelSize: { width: 100, height: 100 },
+      currentPixelSize: { width: 100, height: 100 },
+      keepSizeAcrossDisplays: true,
+      proportional: true,
+    });
+
+    harness.runtime.handleDisplayMetricsChanged();
+
+    const setBoundsCalls = renderWin.calls.filter((call) => call[0] === "setBounds");
+    assert.equal(setBoundsCalls.length, 1);
+    assert.deepEqual(setBoundsCalls[0][1], { x: 200, y: 100, width: 100, height: 100 });
+  });
+
+  it("leaves the pet alone when live bounds already match the frozen size and no clamp is needed (#408)", () => {
+    // Regression guard for the sizeDrifted branch: in steady state we must
+    // not write bounds unnecessarily.
+    const renderWin = makeWindow({ x: 200, y: 100, width: 100, height: 100 });
+    const harness = createRuntime({
+      renderWin,
+      effectivePixelSize: { width: 100, height: 100 },
+      currentPixelSize: { width: 100, height: 100 },
+      keepSizeAcrossDisplays: true,
+      proportional: true,
+    });
+
+    harness.runtime.handleDisplayMetricsChanged();
+
+    const setBoundsCalls = renderWin.calls.filter((call) => call[0] === "setBounds");
+    assert.equal(setBoundsCalls.length, 0);
   });
 
   it("brings the pet to primary display and flushes runtime prefs", () => {

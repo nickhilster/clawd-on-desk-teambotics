@@ -254,6 +254,9 @@
         self._setState("connected"); log("Connected", self.name);
         var persisted = document.querySelectorAll(".toast-persist");
         for (var i = 0; i < persisted.length; i++) { persisted[i].remove(); }
+        // Strip query params from URL so stale ?token= from QR codes
+        // won't overwrite a rotated token in history on next auto-connect.
+        if (window.location.search) { history.replaceState(null, "", window.location.pathname); }
       };
       socket.onmessage = function(event) {
         if (socket !== self.ws) return;

@@ -36,6 +36,20 @@ const DEFAULT_EDITOR_PATH_CHECKS = [
 const WINDOWS_TERMINAL_WINDOW_CLASS = "CASCADIA_HOSTING_WINDOW_CLASS";
 const WINDOWS_TERMINAL_PROCESS_NAMES = new Set(["windowsterminal.exe", "windowsterminalpreview.exe"]);
 
+function normalizeTmuxSocketPath(value) {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.length > 4096 || !text.startsWith("/")) return null;
+  return /[\0\r\n]/.test(text) ? null : text;
+}
+
+function normalizeTmuxClientTarget(value) {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.length > 256 || text.startsWith("-")) return null;
+  return /^[\w./:-]+$/.test(text) ? text : null;
+}
+
 // ── getPlatformConfig ────────────────────────────────────────────────────────
 // Returns { terminalNames: Set, systemBoundary: Set, editorMap: Object, editorPathChecks: Array }
 // Options:
@@ -271,40 +285,137 @@ function createPidResolver(options) {
       pid = parentPid;
     }
 
-    _cached = { stablePid: terminalPid || lastGoodPid, agentPid, agentCommandLine, detectedEditor, pidChain, foregroundWtHwnd };
+    let tmuxClient = null;
+    if (!isWin && !terminalPid && process.env.TMUX && process.env.TMUX_PANE) {
+      const tmuxParts = process.env.TMUX.split(",");
+      const tmuxServerPid = tmuxParts.length >= 2 ? parseInt(tmuxParts[1], 10) : 0;
+      const walkReachedTmux = tmuxServerPid > 1 && pidChain.includes(tmuxServerPid);
+      if (walkReachedTmux) {
+        try {
+          const raw = execFileSync(
+            "tmux", ["list-clients", "-t", process.env.TMUX_PANE, "-F", "#{client_pid}\t#{client_tty}"],
+            { encoding: "utf8", timeout: 500 }
+          );
+          const clients = raw.split("\n")
+            .map((line) => {
+              const parts = line.split("\t");
+              const pid = parseInt((parts[0] || "").trim(), 10);
+              return {
+                pid,
+                target: normalizeTmuxClientTarget(parts.slice(1).join("\t")),
+              };
+            })
+            .filter(c => Number.isFinite(c.pid) && c.pid > 1);
+          outer: for (const client of clients) {
+            let walkPid = client.pid;
+            const localAdds = [];
+            for (let t = 0; t < 4; t++) {
+              let tName, tParent;
+              try {
+                const tComm = execFileSync("ps", ["-o", "comm=", "-p", String(walkPid)],
+                  { encoding: "utf8", timeout: 500 }).trim();
+                tName = require("path").basename(tComm).toLowerCase();
+                tParent = parseInt(
+                  execFileSync("ps", ["-o", "ppid=", "-p", String(walkPid)],
+                    { encoding: "utf8", timeout: 500 }).trim(), 10);
+              } catch { break; }
+              if (terminalNames.has(tName)) {
+                terminalPid = walkPid;
+                tmuxClient = client.target;
+                pidChain.push(...localAdds, walkPid);
+                break outer;
+              }
+              if (!tParent || tParent <= 1 || tParent === walkPid) break;
+              localAdds.push(walkPid);
+              walkPid = tParent;
+            }
+          }
+        } catch {}
+      }
+    }
+
+    let tmuxSocket = null;
+    if (process.env.TMUX) {
+      const socketPath = process.env.TMUX.split(",")[0];
+      tmuxSocket = normalizeTmuxSocketPath(socketPath);
+    }
+
+    _cached = { stablePid: terminalPid || lastGoodPid, agentPid, agentCommandLine, detectedEditor, pidChain, foregroundWtHwnd, tmuxSocket, tmuxClient };
     return _cached;
   };
 }
 
 // ── readStdinJson ────────────────────────────────────────────────────────────
-// Reads stdin, parses JSON, returns Promise<Object>.
-// 400ms timeout + finishOnce protection. Returns {} on parse failure or timeout.
+// Reads stdin until EOF, parses JSON. EOF-driven with a safety-net timer.
+// The default stays at 400ms: several agent hooks (cursor, codebuddy, gemini,
+// reasonix) run their own ~800ms stdout safety timers and non-async hot-path
+// registrations, so a longer shared default would let those timers win the
+// race and drop payloads that used to be parsed at 400ms. Callers whose agent
+// registration tolerates a longer stall (claude-code: async + 5s hook timeout)
+// opt in via options.timeoutMs. Returns {} on parse failure or timeout.
+//
+// readStdinJsonDetailed() additionally reports what the read saw (bytes
+// received, timed out, parse/stream error, duration) so a missing session_id
+// can be triaged from logs: "never arrived" (bytes:0, timeout) vs "arrived
+// broken" (bytes>0, parse error) point at entirely different culprits (#583).
 
-function readStdinJson() {
+const DEFAULT_STDIN_READ_TIMEOUT_MS = 400;
+
+function readStdinJsonDetailed(options = {}) {
+  const stream = options.stream || process.stdin;
+  const timeoutMs = Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+    ? options.timeoutMs
+    : DEFAULT_STDIN_READ_TIMEOUT_MS;
   return new Promise((resolve) => {
+    const startedAt = Date.now();
     const chunks = [];
     let done = false;
     let timer = null;
+    let streamError = null;
 
     const onData = (c) => chunks.push(c);
-    function finish() {
+    const onEnd = () => finish(false);
+    // Without this, an emitted 'error' would crash the hook (unhandled stream
+    // error) and the promise would never settle. Resolve with what we have.
+    const onError = (err) => {
+      streamError = String((err && err.message) || "stream error").slice(0, 120);
+      finish(false);
+    };
+    function finish(timedOut) {
       if (done) return;
       done = true;
       if (timer) clearTimeout(timer);
-      process.stdin.off("data", onData);
-      process.stdin.off("end", finish);
+      stream.off("data", onData);
+      stream.off("end", onEnd);
+      stream.off("error", onError);
+      const raw = Buffer.concat(chunks);
       let payload = {};
+      let parseError = null;
       try {
-        const raw = Buffer.concat(chunks).toString();
-        if (raw.trim()) payload = JSON.parse(raw);
-      } catch {}
-      resolve(payload);
+        const text = raw.toString();
+        if (text.trim()) payload = JSON.parse(text);
+      } catch (err) {
+        parseError = String((err && err.message) || "parse error").slice(0, 120);
+      }
+      if (streamError) parseError = `stream error: ${streamError}`;
+      resolve({
+        payload,
+        bytes: raw.length,
+        timedOut: timedOut === true,
+        parseError,
+        durationMs: Date.now() - startedAt,
+      });
     }
 
-    process.stdin.on("data", onData);
-    process.stdin.on("end", finish);
-    timer = setTimeout(finish, 400);
+    stream.on("data", onData);
+    stream.on("end", onEnd);
+    stream.on("error", onError);
+    timer = setTimeout(() => finish(true), timeoutMs);
   });
+}
+
+function readStdinJson() {
+  return readStdinJsonDetailed().then((result) => result.payload);
 }
 
 function buildElectronLaunchConfig(projectDir, options = {}) {
@@ -331,5 +442,7 @@ module.exports = {
   getPlatformConfig,
   createPidResolver,
   readStdinJson,
+  readStdinJsonDetailed,
+  DEFAULT_STDIN_READ_TIMEOUT_MS,
   buildElectronLaunchConfig,
 };
