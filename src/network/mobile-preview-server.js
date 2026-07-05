@@ -100,6 +100,7 @@ function initMobilePreviewServer(ctx) {
   const writeTokenState = ctx && typeof ctx.writeTokenState === "function"
     ? ctx.writeTokenState
     : atomicWrite;
+  const clientTimeoutMs = (ctx && ctx.clientTimeoutMs) || CLIENT_TIMEOUT_MS;
   const tokenState = loadOrCreateTokenState(tokenPath, now, writeTokenState);
   const machineId = tokenState.machineId;
   const machineName = os.hostname() || "clawd";
@@ -162,13 +163,21 @@ function initMobilePreviewServer(ctx) {
     return true;
   }
 
+  function hasActiveClients() {
+    const nowMs = now();
+    for (const meta of clientMeta.values()) {
+      if (nowMs - meta.lastPong < clientTimeoutMs) return true;
+    }
+    return false;
+  }
+
   function scheduleRotation() {
     if (tokenState.rotationPending) return;
     if (rotationTimer) clearTimeout(rotationTimer);
     const msUntilRotate = Math.max(0, (tokenState.rotatedAt + ROTATION_INTERVAL_MS) - now());
     rotationTimer = setTimeout(() => {
       rotationTimer = null;
-      if (clients.size > 0) {
+      if (hasActiveClients()) {
         if (!performRotation()) {
           scheduleRotationRetry();
           return;
