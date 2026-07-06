@@ -1,9 +1,20 @@
-// Vendored from three@0.185.1's examples/jsm/loaders/GLTFLoader.js verbatim.
+// Vendored from three@0.185.1's examples/jsm/loaders/GLTFLoader.js.
 // electron-builder's default packaging strips `examples/`-named directories
 // out of node_modules, so this file (and its two sibling utils imports)
 // silently vanished from packaged builds — vendoring under src/ sidesteps
-// that heuristic since src/**/* is always included. Re-copy from
-// node_modules/three/examples/jsm/loaders/GLTFLoader.js on three.js upgrades.
+// that heuristic since src/**/* is always included.
+//
+// One deliberate change from the original: the `from 'three'` bare-specifier
+// import was rewritten to a relative path. This app has no bundler and no
+// working import-map support (this Electron/Chromium version doesn't honor
+// external `<script type="importmap" src="...">`, and CSP blocks the inline
+// form), so a bare specifier fails module resolution outright — it throws
+// "Failed to resolve module specifier" and GLTFLoader never actually loads,
+// silently leaving the theme on its 2D fallback with no visible error.
+// On a three.js upgrade: re-copy from
+// node_modules/three/examples/jsm/loaders/GLTFLoader.js and reapply this
+// same import-path rewrite (see BufferGeometryUtils.js / SkeletonUtils.js
+// for the other two files that need the identical treatment).
 import {
 	AnimationClip,
 	Bone,
@@ -70,7 +81,7 @@ import {
 	VectorKeyframeTrack,
 	SRGBColorSpace,
 	InstancedBufferAttribute
-} from 'three';
+} from '../../../../node_modules/three/build/three.module.js';
 import { toTrianglesDrawMode } from '../utils/BufferGeometryUtils.js';
 import { clone } from '../utils/SkeletonUtils.js';
 

@@ -135,6 +135,30 @@ test("built-in contexts prefer theme-local assets and expose relative renderer p
   }
 });
 
+test("getRendererConfig exposes render3d modelUrl resolved against the source assets path, or null when absent", () => {
+  const fixture = makeRoot();
+  try {
+    const themeDir = path.join(fixture.root, "themes", "robo-test");
+    fs.mkdirSync(path.join(themeDir, "assets"), { recursive: true });
+
+    const withModel = makeTheme({
+      _id: "robo-test",
+      _builtin: true,
+      _themeDir: themeDir,
+      render3d: { model: "model.glb", clips: { idle: "Bounce" } },
+    });
+    assert.deepStrictEqual(createThemeContext(withModel, fixture).getRendererConfig().render3d, {
+      modelUrl: "../themes/robo-test/assets/model.glb",
+      clips: { idle: "Bounce" },
+    });
+
+    const withoutModel = makeTheme({ _id: "no-3d", render3d: null });
+    assert.strictEqual(createThemeContext(withoutModel, fixture).getRendererConfig().render3d, null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("external renderer asset path keeps the legacy default when file URL is absent", () => {
   const fixture = makeRoot();
   try {

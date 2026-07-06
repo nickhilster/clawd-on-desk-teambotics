@@ -170,6 +170,24 @@ describe("theme schema defaults and normalization", () => {
     assert.deepStrictEqual(external.rendering, { svgChannel: "auto" });
   });
 
+  it("normalizes render3d model/clips or returns null for missing/invalid input", () => {
+    const withModel = schema.mergeDefaults(validThemeJson({
+      render3d: { model: "../model.glb", clips: { idle: "Idle", working: 42, error: "" } },
+    }), "external", false);
+    assert.deepStrictEqual(withModel.render3d, { model: "model.glb", clips: { idle: "Idle" } });
+
+    const noModel = schema.mergeDefaults(validThemeJson({
+      render3d: { clips: { idle: "Idle" } },
+    }), "external", false);
+    assert.strictEqual(noModel.render3d, null);
+
+    const notAnObject = schema.mergeDefaults(validThemeJson({ render3d: "model.glb" }), "external", false);
+    assert.strictEqual(notAnObject.render3d, null);
+
+    const absent = schema.mergeDefaults(validThemeJson(), "external", false);
+    assert.strictEqual(absent.render3d, null);
+  });
+
   it("collectRequiredAssetFiles returns unique basename-only references", () => {
     const files = schema.collectRequiredAssetFiles({
       states: { idle: ["../idle.svg"], working: ["working.svg"] },
