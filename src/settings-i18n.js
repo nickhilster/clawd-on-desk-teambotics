@@ -663,7 +663,6 @@
       mobileRegenerateConfirm: "Regenerate token? All connected devices will be disconnected and will need to re-pair.",
       mobileReset: "Reset Mobile Access",
       mobileResetConfirm: "Reset mobile access? All connected devices will be disconnected and a new token will be generated.",
-      aboutEasterEggToast: "\u{1F980} Coding shouldn't feel lonely. — Ruller_Lulu / \u9e7f\u9e7f",
       aboutOpenExternalFailed: "Couldn't open the link in your browser.",
     },
     zh: {
@@ -1325,7 +1324,6 @@
       mobileRegenerateConfirm: "确定重新生成令牌？所有已连接设备将断开，需要重新配对。",
       mobileReset: "重置移动端访问",
       mobileResetConfirm: "确定重置移动端访问？所有设备将断开并生成新令牌。",
-      aboutEasterEggToast: "\u{1F980} Coding shouldn't feel lonely. — Ruller_Lulu / \u9e7f\u9e7f",
       aboutOpenExternalFailed: "无法在浏览器中打开链接。",
     },
     "zh-TW": {
@@ -1987,7 +1985,6 @@
       mobileRegenerateConfirm: "確定重新生成令牌？所有已連線裝置將斷線，需要重新配對。",
       mobileReset: "重置行動裝置存取",
       mobileResetConfirm: "確定重置行動裝置存取？所有裝置將斷線並產生新令牌。",
-      aboutEasterEggToast: "\u{1F980} Coding shouldn't feel lonely. — Ruller_Lulu / 鹿鹿",
       aboutOpenExternalFailed: "無法開啟瀏覽器連結。",
     },
     ko: {
@@ -2649,7 +2646,6 @@
       mobileRegenerateConfirm: "토큰을 재생성하시겠습니까? 연결된 모든 기기가 연결 해제되며 다시 페어링해야 합니다.",
       mobileReset: "모바일 액세스 초기화",
       mobileResetConfirm: "모바일 액세스를 초기화하시겠습니까? 모든 기기가 연결 해제되고 새 토큰이 생성됩니다.",
-      aboutEasterEggToast: "\u{1F980} Coding shouldn't feel lonely. — Ruller_Lulu / \u9e7f\u9e7f",
       aboutOpenExternalFailed: "링크를 브라우저에서 열 수 없습니다.",
     },
     ja: {
@@ -3313,13 +3309,12 @@
       mobileRegenerateConfirm: "トークンを再生成しますか？接続中のすべてのデバイスが切断され、再ペアリングが必要になります。",
       mobileReset: "モバイルアクセスをリセット",
       mobileResetConfirm: "モバイルアクセスをリセットしますか？すべてのデバイスが切断され、新しいトークンが生成されます。",
-      aboutEasterEggToast: "\u{1F980} Coding shouldn't feel lonely. — Ruller_Lulu / 鹿鹿",
       aboutOpenExternalFailed: "ブラウザでリンクを開けませんでした。",
     },
   };
 
   const MAINTAINERS = [
-    "rullerzhou-afk", "YOIMIYA66", "Bynlk",
+    "rullerzhou-afk", "nickhilster", "YOIMIYA66", "Bynlk",
   ];
 
   const CONTRIBUTORS = [

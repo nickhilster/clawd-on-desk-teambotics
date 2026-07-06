@@ -47,11 +47,11 @@ internal fun AboutSection() {
         "?"
     }
     AboutRow(stringResource(R.string.about_version), "v$versionName", ClawdIcons.Activity)
-    AboutRow(stringResource(R.string.about_repo), "https://github.com/rullerzhou-afk/clawd-on-desk", ClawdIcons.Folder)
+    AboutRow(stringResource(R.string.about_repo), "https://github.com/nickhilster/deskbuddy", ClawdIcons.Folder)
     AboutRow(stringResource(R.string.about_fork), "https://github.com/Bynlk/clawd-on-desk", ClawdIcons.Folder)
     AboutRow(stringResource(R.string.about_license), "AGPL-3.0 · © 2026 Ruller_Lulu", ClawdIcons.Shield)
     AboutRow(stringResource(R.string.about_author), stringResource(R.string.about_author_name), ClawdIcons.Robot)
-    AboutRow(stringResource(R.string.about_maintainer), "@rullerzhou-afk, @YOIMIYA66", ClawdIcons.Pencil)
+    AboutRow(stringResource(R.string.about_maintainer), "@rullerzhou-afk, @nickhilster, @YOIMIYA66", ClawdIcons.Pencil)
     AboutRow(stringResource(R.string.about_mobile_maintainer), "@Bynlk", ClawdIcons.Pencil)
 
     Spacer(modifier = Modifier.height(12.dp))

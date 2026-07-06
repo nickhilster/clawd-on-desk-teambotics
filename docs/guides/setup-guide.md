@@ -144,7 +144,7 @@ networkingMode=mirrored
 Clawd auto-registers Claude Code hooks to `~/.claude/settings.json` on Windows startup. But if your agent runs in WSL, hooks need to be registered in WSL's own home directory. Run inside WSL:
 
 ```bash
-git clone https://github.com/rullerzhou-afk/clawd-on-desk.git
+git clone https://github.com/nickhilster/deskbuddy.git
 cd deskbuddy
 
 # Claude Code
@@ -202,6 +202,6 @@ node hooks/openclaw-install.js
 ## Linux Notes
 
 - **From source** (`npm start`): the Electron sandbox is enabled by default. If your Linux dev environment still fails chrome-sandbox initialization, use `CLAWD_DISABLE_SANDBOX=1 npm start` as a temporary workaround.
-- **Packages**: AppImage and `.deb` are available from [GitHub Releases](https://github.com/rullerzhou-afk/clawd-on-desk/releases). After deb install, the app icon appears in GNOME's app menu.
+- **Packages**: AppImage and `.deb` are available from [GitHub Releases](https://github.com/nickhilster/deskbuddy/releases). After deb install, the app icon appears in GNOME's app menu.
 - **Terminal focus**: uses `wmctrl` or `xdotool` (whichever is available). Install one for session terminal jumping to work: `sudo apt install wmctrl` or `sudo apt install xdotool`.
 - **Auto-update**: when running from a cloned repo, "Check for Updates" performs `git pull` + `npm install` (if dependencies changed) and restarts the app automatically.

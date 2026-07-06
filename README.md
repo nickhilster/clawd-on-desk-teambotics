@@ -12,14 +12,14 @@
   <a href="README.ja-JP.md">日本語</a>
 </p>
 <p align="center">
-  <sub>🌏 Don't see your language? <a href="https://github.com/rullerzhou-afk/clawd-on-desk/pulls">Open a PR</a> to add one — Español, Français, Deutsch, etc. all welcome.</sub>
+  <sub>🌏 Don't see your language? <a href="https://github.com/nickhilster/deskbuddy/pulls">Open a PR</a> to add one — Español, Français, Deutsch, etc. all welcome.</sub>
 </p>
 <p align="center">
-  <a href="https://github.com/rullerzhou-afk/clawd-on-desk/releases"><img src="https://img.shields.io/github/v/release/rullerzhou-afk/clawd-on-desk" alt="Version"></a>
+  <a href="https://github.com/nickhilster/deskbuddy/releases"><img src="https://img.shields.io/github/v/release/nickhilster/deskbuddy" alt="Version"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
 </p>
 <p align="center">
-  <a href="https://github.com/rullerzhou-afk/clawd-on-desk/stargazers"><img src="https://img.shields.io/github/stars/rullerzhou-afk/clawd-on-desk?style=flat&logo=github&color=yellow" alt="Stars"></a>
+  <a href="https://github.com/nickhilster/deskbuddy/stargazers"><img src="https://img.shields.io/github/stars/nickhilster/deskbuddy?style=flat&logo=github&color=yellow" alt="Stars"></a>
   <a href="https://github.com/hesreallyhim/awesome-claude-code"><img src="https://awesome.re/mentioned-badge-flat.svg" alt="Mentioned in Awesome Claude Code"></a>
 </p>
 
@@ -142,7 +142,7 @@ Clawd adapts to multi-monitor setups: proportional sizing uses the display Clawd
 
 ## Quick Start
 
-For normal use, download the latest prebuilt installer from **[GitHub Releases](https://github.com/rullerzhou-afk/clawd-on-desk/releases/latest)**:
+For normal use, download the latest prebuilt installer from **[GitHub Releases](https://github.com/nickhilster/deskbuddy/releases/latest)**:
 
 - **Windows**: `Clawd-on-Desk-Setup-<version>-x64.exe` or `Clawd-on-Desk-Setup-<version>-arm64.exe`
 - **macOS**: `.dmg`
@@ -154,7 +154,7 @@ Run from source only if you're contributing, testing unreleased code, or debuggi
 
 ```bash
 # Clone the repo
-git clone https://github.com/rullerzhou-afk/clawd-on-desk.git
+git clone https://github.com/nickhilster/deskbuddy.git
 cd deskbuddy
 
 # Install dependencies
@@ -213,13 +213,14 @@ Some things we'd like to explore in the future:
 
 ## Contributing
 
-DeskBuddy is a community-driven project. Bug reports, feature ideas, and pull requests are all welcome — open an [issue](https://github.com/rullerzhou-afk/clawd-on-desk/issues) to discuss or submit a PR directly.
+DeskBuddy is a community-driven project. Bug reports, feature ideas, and pull requests are all welcome — open an [issue](https://github.com/nickhilster/deskbuddy/issues) to discuss or submit a PR directly.
 
 ### Maintainers
 
 <table>
   <tr>
     <td align="center" valign="top" width="140"><a href="https://github.com/rullerzhou-afk"><img src="https://github.com/rullerzhou-afk.png" width="72" style="border-radius:50%" /><br /><sub><b>@rullerzhou-afk</b><br />鹿鹿 · creator</sub></a></td>
+    <td align="center" valign="top" width="140"><a href="https://github.com/nickhilster"><img src="https://github.com/nickhilster.png" width="72" style="border-radius:50%" /><br /><sub><b>@nickhilster</b><br />maintainer · Teambotics</sub></a></td>
     <td align="center" valign="top" width="140"><a href="https://github.com/YOIMIYA66"><img src="https://github.com/YOIMIYA66.png" width="72" style="border-radius:50%" /><br /><sub><b>@YOIMIYA66</b><br />maintainer</sub></a></td>
     <td align="center" valign="top" width="140"><a href="https://github.com/Bynlk"><img src="https://github.com/Bynlk.png" width="72" style="border-radius:50%" /><br /><sub><b>@Bynlk</b><br />core contributor · Mobile / PWA</sub></a></td>
   </tr>

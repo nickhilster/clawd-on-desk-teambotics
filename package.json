@@ -59,7 +59,7 @@
     "electron",
     "claude-code"
   ],
-  "author": "rullerzhou-afk",
+  "author": "Teambotics",
   "license": "AGPL-3.0-only",
   "type": "commonjs",
   "build": {
