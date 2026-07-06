@@ -350,7 +350,7 @@ function registerSettingsIpc(options = {}) {
   handle("settings:list-themes", () => {
     try {
       const activeTheme = getActiveTheme();
-      const activeId = activeTheme ? activeTheme._id : "clawd";
+      const activeId = activeTheme ? activeTheme._id : "spark";
       return themeLoader.listThemesWithMetadata().map((theme) =>
         codexPetMain.decorateThemeMetadata({
           ...theme,

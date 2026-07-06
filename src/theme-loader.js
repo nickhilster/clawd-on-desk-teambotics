@@ -141,7 +141,7 @@ function _scanThemesDir(dir, builtin, themes, seen) {
 /**
  * Load a theme by ID without activating it.
  *
- * Strict mode throws on missing/invalid; lenient falls back to "clawd".
+ * Strict mode throws on missing/invalid; lenient falls back to "spark".
  * Callers detect fallback by comparing the requested id against
  * `returnedTheme._id` / `returnedTheme._variantId` — no synthetic flag needed.
  *
@@ -162,8 +162,8 @@ function loadTheme(themeId, opts = {}) {
     const msg = `Theme "${themeId}" not found`;
     if (strict) throw new Error(msg);
     console.error(`[theme-loader] ${msg}`);
-    if (themeId !== "clawd") return loadTheme("clawd");
-    throw new Error("Default theme 'clawd' not found");
+    if (themeId !== "spark") return loadTheme("spark");
+    throw new Error("Default theme 'spark' not found");
   }
 
   const errors = validateTheme(raw);
@@ -171,7 +171,7 @@ function loadTheme(themeId, opts = {}) {
     const msg = `Theme "${themeId}" validation errors: ${errors.join("; ")}`;
     if (strict) throw new Error(msg);
     console.error(`[theme-loader] ${msg}`);
-    if (themeId !== "clawd") return loadTheme("clawd");
+    if (themeId !== "spark") return loadTheme("spark");
   }
 
   // Resolve variant + apply patch BEFORE mergeDefaults so that geometry

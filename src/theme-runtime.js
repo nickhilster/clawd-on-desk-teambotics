@@ -79,7 +79,7 @@ function createThemeRuntime(options = {}) {
     return activeThemeContext;
   }
 
-  function getActiveThemeId(fallback = "clawd") {
+  function getActiveThemeId(fallback = "spark") {
     return activeTheme ? activeTheme._id : fallback;
   }
 
