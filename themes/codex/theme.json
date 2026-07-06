@@ -25,15 +25,15 @@
   },
 
   "states": {
-    "idle":         { "fallbackTo": "attention" },
-    "thinking":     { "fallbackTo": "working" },
+    "idle":         ["codex-working-flow.svg"],
+    "thinking":     ["codex-working-flow.svg"],
     "working":      ["codex-working-flow.svg"],
-    "juggling":     { "fallbackTo": "working" },
+    "juggling":     ["codex-working-flow.svg"],
     "error":        { "fallbackTo": "attention" },
     "attention":    ["codex-working-flow.svg"],
     "notification": { "fallbackTo": "attention" },
     "sleeping":     { "fallbackTo": "attention" },
-    "waking":       { "fallbackTo": "attention" }
+    "waking":       ["codex-working-flow.svg"]
   },
 
   "sleepSequence": { "mode": "direct" },

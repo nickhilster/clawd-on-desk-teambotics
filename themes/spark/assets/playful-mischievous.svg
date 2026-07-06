@@ -3,24 +3,23 @@
 
   <ellipse cx="7.5" cy="15" rx="6.2" ry="2" fill="rgba(0,0,0,0.15)"/>
 
+  <!-- Arms in playful pose (one up, one back) -->
+  <g>
+    <!-- Left arm up -->
+    <line x1="2" y1="2.5" x2="-0.5" y2="0" stroke="#4A90E2" stroke-width="0.9" stroke-linecap="round"/>
+    <circle cx="-1.2" cy="-0.5" r="0.7" fill="#6BA3F5"/>
+
+    <!-- Right arm back (pointing) -->
+    <line x1="13" y1="3" x2="15.2" y2="3.5" stroke="#4A90E2" stroke-width="0.9" stroke-linecap="round"/>
+    <circle cx="15.8" cy="3.7" r="0.7" fill="#6BA3F5"/>
+  </g>
+
   <!-- Body (slight lean, playful tilt) -->
   <g transform="rotate(8 7.5 4)">
     <rect x="2" y="-2" width="11" height="11" rx="2" fill="#4A90E2" opacity="0.95"/>
     <circle cx="4" cy="-3" r="1.2" fill="#4A90E2"/>
     <circle cx="10" cy="-3" r="1.2" fill="#4A90E2"/>
     <rect x="3.5" y="1" width="8" height="5" rx="1.5" fill="#6BA3F5" opacity="0.7"/>
-
-    <!-- Playful Eyes (one winking) -->
-    <g>
-      <!-- Left eye open and mischievous -->
-      <circle cx="5" cy="3" r="1.8" fill="white"/>
-      <circle cx="5" cy="3" r="1.2" fill="#000000"/>
-      <circle cx="5.4" cy="2.6" r="0.6" fill="white" opacity="0.9"/>
-
-      <!-- Right eye winking -->
-      <circle cx="10" cy="3" r="1.8" fill="white" opacity="0.7"/>
-      <path d="M 8.8 3.2 Q 10 3.8 11.2 3.2" stroke="#000000" stroke-width="0.8" fill="#4A90E2"/>
-    </g>
 
     <!-- CHEEKY GRIN -->
     <path d="M 5.5 5.8 Q 7.5 6.8 9.5 5.8" stroke="#000000" stroke-width="0.4" fill="none" stroke-linecap="round"/>
@@ -34,16 +33,17 @@
     <!-- Blush marks (cheeky) -->
     <circle cx="2" cy="4.5" r="1" fill="#FF9999" opacity="0.5"/>
     <circle cx="13" cy="4.5" r="1" fill="#FF9999" opacity="0.5"/>
-  </g>
 
-  <!-- Arms in playful pose (one up, one back) -->
-  <g>
-    <!-- Left arm up -->
-    <line x1="2" y1="2.5" x2="-0.5" y2="0" stroke="#4A90E2" stroke-width="0.9" stroke-linecap="round"/>
-    <circle cx="-1.2" cy="-0.5" r="0.7" fill="#6BA3F5"/>
+    <!-- Playful Eyes (one winking) -->
+    <g>
+      <!-- Left eye open and mischievous -->
+      <circle cx="5" cy="3" r="1.8" fill="white"/>
+      <circle cx="5" cy="3" r="1.2" fill="#000000"/>
+      <circle cx="5.4" cy="2.6" r="0.6" fill="white" opacity="0.9"/>
 
-    <!-- Right arm back (pointing) -->
-    <line x1="13" y1="3" x2="15.2" y2="3.5" stroke="#4A90E2" stroke-width="0.9" stroke-linecap="round"/>
-    <circle cx="15.8" cy="3.7" r="0.7" fill="#6BA3F5"/>
+      <!-- Right eye winking -->
+      <circle cx="10" cy="3" r="1.8" fill="white" opacity="0.7"/>
+      <path d="M 8.8 3.2 Q 10 3.8 11.2 3.2" stroke="#000000" stroke-width="0.8" fill="#4A90E2"/>
+    </g>
   </g>
 </svg>

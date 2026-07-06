@@ -5,10 +5,24 @@
 
   <!-- Body (spinning) -->
   <g transform="rotate(45 7.5 4)">
+    <!-- Arms flailing up -->
+    <line x1="2.5" y1="2" x2="0" y2="-1" stroke="#6BA3F5" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="-0.5" cy="-1.5" r="0.6" fill="#6BA3F5"/>
+    <line x1="12.5" y1="2" x2="15" y2="-1" stroke="#6BA3F5" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="15.5" cy="-1.5" r="0.6" fill="#6BA3F5"/>
+
     <rect x="2" y="-2" width="11" height="11" rx="2" fill="#4A90E2" opacity="0.9"/>
     <circle cx="4" cy="-3" r="1.2" fill="#4A90E2"/>
     <circle cx="10" cy="-3" r="1.2" fill="#4A90E2"/>
     <rect x="3.5" y="1" width="8" height="5" rx="1.5" fill="#6BA3F5" opacity="0.6"/>
+
+    <!-- Dizzy X mouth -->
+    <path d="M 6.5 5.5 L 8.5 6.5" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+    <path d="M 8.5 5.5 L 6.5 6.5" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
+
+    <!-- Overwhelmed eyebrows (angled up) -->
+    <path d="M 3.8 1.2 L 5.5 0.5" stroke="#2E5C8A" stroke-width="0.3" stroke-linecap="round"/>
+    <path d="M 8.5 0.5 L 10.2 1.2" stroke="#2E5C8A" stroke-width="0.3" stroke-linecap="round"/>
 
     <!-- DIZZY SPINNING EYES -->
     <g>
@@ -22,20 +36,6 @@
       <path d="M 9.5 2.5 Q 10 3 10.5 2.5" stroke="#000000" stroke-width="0.8" fill="none"/>
       <path d="M 9.5 3.5 Q 10 3 10.5 3.5" stroke="#000000" stroke-width="0.8" fill="none"/>
     </g>
-
-    <!-- Dizzy X mouth -->
-    <path d="M 6.5 5.5 L 8.5 6.5" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
-    <path d="M 8.5 5.5 L 6.5 6.5" stroke="#000000" stroke-width="0.4" stroke-linecap="round"/>
-
-    <!-- Overwhelmed eyebrows (angled up) -->
-    <path d="M 3.8 1.2 L 5.5 0.5" stroke="#2E5C8A" stroke-width="0.3" stroke-linecap="round"/>
-    <path d="M 8.5 0.5 L 10.2 1.2" stroke="#2E5C8A" stroke-width="0.3" stroke-linecap="round"/>
-
-    <!-- Arms flailing up -->
-    <line x1="2.5" y1="2" x2="0" y2="-1" stroke="#6BA3F5" stroke-width="0.8" stroke-linecap="round"/>
-    <circle cx="-0.5" cy="-1.5" r="0.6" fill="#6BA3F5"/>
-    <line x1="12.5" y1="2" x2="15" y2="-1" stroke="#6BA3F5" stroke-width="0.8" stroke-linecap="round"/>
-    <circle cx="15.5" cy="-1.5" r="0.6" fill="#6BA3F5"/>
   </g>
 
   <!-- Spinning stars around head -->

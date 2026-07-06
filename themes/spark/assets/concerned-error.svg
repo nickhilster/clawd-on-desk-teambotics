@@ -3,12 +3,28 @@
 
   <ellipse cx="7.5" cy="15" rx="6" ry="2" fill="rgba(0,0,0,0.15)"/>
 
+  <!-- Concerned hand on chest/chin -->
+  <g>
+    <line x1="2" y1="4" x2="0.5" y2="3" stroke="#6BA3F5" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="0" cy="2.5" r="0.6" fill="#6BA3F5"/>
+  </g>
+
   <!-- Body (slightly down, concerned posture) -->
   <g transform="translate(0, 0.5)">
     <rect x="2" y="-2" width="11" height="11" rx="2" fill="#4A90E2" opacity="0.9"/>
     <circle cx="4" cy="-3" r="1.2" fill="#4A90E2"/>
     <circle cx="10" cy="-3" r="1.2" fill="#4A90E2"/>
     <rect x="3.5" y="1" width="8" height="5" rx="1.5" fill="#6BA3F5" opacity="0.6"/>
+
+    <!-- Concerned mouth (frown) -->
+    <path d="M 6 6.2 Q 7.5 5.5 9 6.2" stroke="#000000" stroke-width="0.3" fill="none" stroke-linecap="round"/>
+
+    <!-- Worried eyebrows (angled down toward center) -->
+    <path d="M 3.8 1.2 Q 5 0.5 6 1.5" stroke="#2E5C8A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
+    <path d="M 10 1.2 Q 9 0.5 8 1.5" stroke="#2E5C8A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
+
+    <!-- Red error tint -->
+    <rect x="2" y="-2" width="11" height="11" rx="2" fill="#FF6B6B" opacity="0.1"/>
 
     <!-- Worried Eyes -->
     <g>
@@ -28,22 +44,6 @@
       <path d="M 10 4.8 L 10 5.3" stroke="#6BA3F5" stroke-width="0.3"/>
       <circle cx="10" cy="5.5" r="0.3" fill="#6BA3F5"/>
     </g>
-
-    <!-- Concerned mouth (frown) -->
-    <path d="M 6 6.2 Q 7.5 5.5 9 6.2" stroke="#000000" stroke-width="0.3" fill="none" stroke-linecap="round"/>
-
-    <!-- Worried eyebrows (angled down toward center) -->
-    <path d="M 3.8 1.2 Q 5 0.5 6 1.5" stroke="#2E5C8A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
-    <path d="M 10 1.2 Q 9 0.5 8 1.5" stroke="#2E5C8A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
-
-    <!-- Red error tint -->
-    <rect x="2" y="-2" width="11" height="11" rx="2" fill="#FF6B6B" opacity="0.1"/>
-  </g>
-
-  <!-- Concerned hand on chest/chin -->
-  <g>
-    <line x1="2" y1="4" x2="0.5" y2="3" stroke="#6BA3F5" stroke-width="0.8" stroke-linecap="round"/>
-    <circle cx="0" cy="2.5" r="0.6" fill="#6BA3F5"/>
   </g>
 
   <!-- Error symbol (broken heart or !) -->

@@ -4,6 +4,17 @@
   <!-- Shadow (trackable) -->
   <ellipse id="shadow-js" cx="7.5" cy="15" rx="6" ry="2" fill="rgba(0,0,0,0.15)"/>
 
+  <!-- Arms (show playful stance) -->
+  <g>
+    <!-- Left arm -->
+    <line x1="2.5" y1="4" x2="0.5" y2="5" stroke="#4A90E2" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="0.3" cy="5.2" r="0.6" fill="#6BA3F5"/>
+
+    <!-- Right arm -->
+    <line x1="12.5" y1="4" x2="14.5" y2="5" stroke="#4A90E2" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="14.7" cy="5.2" r="0.6" fill="#6BA3F5"/>
+  </g>
+
   <!-- Body Group (trackable for subtle rotation) -->
   <g id="body-js">
     <!-- Main body: rounded square -->
@@ -15,6 +26,13 @@
 
     <!-- Belly accent -->
     <rect x="3.5" y="1" width="8" height="5" rx="1.5" fill="#6BA3F5" opacity="0.6"/>
+
+    <!-- Mouth: playful smile -->
+    <path d="M 6 5.5 Q 7.5 6.2 9 5.5" stroke="#000000" stroke-width="0.3" fill="none" stroke-linecap="round"/>
+
+    <!-- Playful eyebrows (curious tilt) -->
+    <path d="M 4 1.5 Q 5 1 6 1.2" stroke="#2E5C8A" stroke-width="0.3" fill="none" stroke-linecap="round"/>
+    <path d="M 9 1.2 Q 10 1 11 1.5" stroke="#2E5C8A" stroke-width="0.3" fill="none" stroke-linecap="round"/>
 
     <!-- Eyes Group (trackable for following) -->
     <g id="eyes-js">
@@ -28,23 +46,5 @@
       <circle cx="10" cy="3" r="1.2" fill="#000000"/>
       <circle cx="10.3" cy="2.7" r="0.5" fill="white" opacity="0.8"/>
     </g>
-
-    <!-- Mouth: playful smile -->
-    <path d="M 6 5.5 Q 7.5 6.2 9 5.5" stroke="#000000" stroke-width="0.3" fill="none" stroke-linecap="round"/>
-
-    <!-- Playful eyebrows (curious tilt) -->
-    <path d="M 4 1.5 Q 5 1 6 1.2" stroke="#2E5C8A" stroke-width="0.3" fill="none" stroke-linecap="round"/>
-    <path d="M 9 1.2 Q 10 1 11 1.5" stroke="#2E5C8A" stroke-width="0.3" fill="none" stroke-linecap="round"/>
-  </g>
-
-  <!-- Arms (show playful stance) -->
-  <g>
-    <!-- Left arm -->
-    <line x1="2.5" y1="4" x2="0.5" y2="5" stroke="#4A90E2" stroke-width="0.8" stroke-linecap="round"/>
-    <circle cx="0.3" cy="5.2" r="0.6" fill="#6BA3F5"/>
-
-    <!-- Right arm -->
-    <line x1="12.5" y1="4" x2="14.5" y2="5" stroke="#4A90E2" stroke-width="0.8" stroke-linecap="round"/>
-    <circle cx="14.7" cy="5.2" r="0.6" fill="#6BA3F5"/>
   </g>
 </svg>
