@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "name": "Shifu",
+  "author": "Nikhil Hilster",
+  "version": "1.0.0",
+  "description": "A stern, disciplined mentor companion who's always watching your work",
+
+  "viewBox": { "x": -15, "y": -25, "width": 45, "height": 45 },
+
+  "layout": {
+    "contentBox": { "x": -4, "y": -3, "width": 23, "height": 20 },
+    "centerX": 7.5,
+    "baselineY": 17,
+    "visibleHeightRatio": 0.58,
+    "baselineBottomRatio": 0.05
+  },
+
+  "eyeTracking": {
+    "enabled": true,
+    "states": ["idle"],
+    "eyeRatioX": 0.5,
+    "eyeRatioY": 0.5,
+    "maxOffset": 3,
+    "bodyScale": 0.33,
+    "shadowStretch": 0.15,
+    "shadowShift": 0.3,
+    "ids": { "eyes": "eyes-js", "body": "body-js", "shadow": "shadow-js" },
+    "shadowOrigin": "7.5px 16px"
+  },
+
+  "states": {
+    "idle": ["idle-curious.svg"],
+    "thinking": ["thinking-confused.apng"],
+    "working": ["working-watch.apng"],
+    "juggling": ["working-watch.apng"],
+    "error": { "fallbackTo": "attention" },
+    "attention": ["working-watch.apng"],
+    "notification": { "fallbackTo": "attention" },
+    "sleeping": ["sleeping.svg"],
+    "waking": ["waking-stretch.apng"],
+    "yawning": ["yawning.apng"],
+    "dozing": ["dozing.apng"],
+    "collapsing": ["collapsing.apng"]
+  },
+
+  "sleepSequence": { "mode": "full" },
+
+  "timings": { "mouseIdleTimeout": 20000, "mouseSleepTimeout": 60000 },
+
+  "hitBoxes": {
+    "default": { "x": -1, "y": 5, "w": 15, "h": 12 },
+    "sleeping": { "x": -1, "y": 9, "w": 16, "h": 7 }
+  },
+  "sleepingHitboxFiles": ["sleeping.svg"],
+
+  "miniMode": { "supported": false },
+
+  "objectScale": {
+    "widthRatio": 1.85,
+    "heightRatio": 1.35,
+    "offsetX": -0.45,
+    "offsetY": -0.3
+  }
+}
