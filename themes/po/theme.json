@@ -33,10 +33,10 @@
     "thinking": ["thinking-confused.apng"],
     "working": ["working-watch.apng"],
     "juggling": ["juggling-play.apng"],
-    "error": ["concerned-error.svg"],
+    "error": ["concerned-error.apng"],
     "attention": ["happy-excited.apng"],
     "notification": ["notification-alert.apng"],
-    "sleeping": ["sleeping.svg"],
+    "sleeping": ["sleeping.apng"],
     "waking": ["waking-stretch.apng"],
     "yawning": ["yawning.apng"],
     "dozing": ["dozing.apng"],
@@ -69,7 +69,7 @@
     "default": { "x": -1, "y": 5, "w": 18, "h": 13 },
     "sleeping": { "x": -2, "y": 9, "w": 20, "h": 8 }
   },
-  "sleepingHitboxFiles": ["sleeping.svg"],
+  "sleepingHitboxFiles": ["sleeping.apng"],
 
   "reactions": {
     "drag": {
