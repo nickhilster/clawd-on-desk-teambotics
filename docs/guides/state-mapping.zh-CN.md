@@ -46,7 +46,7 @@ Kimi Code CLI（Kimi-CLI）现已采用 hook-only 集成（`~/.kimi/config.toml`
 
 ## Pi Extension 事件
 
-Pi 使用全局 extension（`~/.pi/agent/extensions/clawd-on-desk`），会把交互式会话生命周期事件映射到 Clawd 的共享状态：
+Pi 使用全局 extension（`~/.pi/agent/extensions/deskbuddy`），会把交互式会话生命周期事件映射到 Clawd 的共享状态：
 
 | Pi Extension Event | Clawd Event | 状态 |
 |---|---|---|

@@ -16,22 +16,22 @@
 
 ## Manual configuration (fallback)
 
-Create `<copilot-home>/hooks/hooks.json` and replace `/path/to/clawd-on-desk` with your actual install path:
+Create `<copilot-home>/hooks/hooks.json` and replace `/path/to/deskbuddy` with your actual install path:
 
 ```json
 {
   "version": 1,
   "hooks": {
-    "sessionStart":         [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js sessionStart",         "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js sessionStart",         "timeoutSec": 5 }],
-    "userPromptSubmitted":  [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js userPromptSubmitted",  "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js userPromptSubmitted",  "timeoutSec": 5 }],
-    "preToolUse":           [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js preToolUse",           "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js preToolUse",           "timeoutSec": 5 }],
-    "postToolUse":          [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js postToolUse",          "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js postToolUse",          "timeoutSec": 5 }],
-    "sessionEnd":           [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js sessionEnd",           "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js sessionEnd",           "timeoutSec": 5 }],
-    "errorOccurred":        [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js errorOccurred",        "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js errorOccurred",        "timeoutSec": 5 }],
-    "agentStop":            [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js agentStop",            "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js agentStop",            "timeoutSec": 5 }],
-    "subagentStart":        [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js subagentStart",        "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js subagentStart",        "timeoutSec": 5 }],
-    "subagentStop":         [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js subagentStop",         "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js subagentStop",         "timeoutSec": 5 }],
-    "preCompact":           [{ "type": "command", "bash": "node /path/to/clawd-on-desk/hooks/copilot-hook.js preCompact",           "powershell": "node /path/to/clawd-on-desk/hooks/copilot-hook.js preCompact",           "timeoutSec": 5 }]
+    "sessionStart":         [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js sessionStart",         "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js sessionStart",         "timeoutSec": 5 }],
+    "userPromptSubmitted":  [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js userPromptSubmitted",  "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js userPromptSubmitted",  "timeoutSec": 5 }],
+    "preToolUse":           [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js preToolUse",           "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js preToolUse",           "timeoutSec": 5 }],
+    "postToolUse":          [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js postToolUse",          "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js postToolUse",          "timeoutSec": 5 }],
+    "sessionEnd":           [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js sessionEnd",           "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js sessionEnd",           "timeoutSec": 5 }],
+    "errorOccurred":        [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js errorOccurred",        "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js errorOccurred",        "timeoutSec": 5 }],
+    "agentStop":            [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js agentStop",            "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js agentStop",            "timeoutSec": 5 }],
+    "subagentStart":        [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js subagentStart",        "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js subagentStart",        "timeoutSec": 5 }],
+    "subagentStop":         [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js subagentStop",         "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js subagentStop",         "timeoutSec": 5 }],
+    "preCompact":           [{ "type": "command", "bash": "node /path/to/deskbuddy/hooks/copilot-hook.js preCompact",           "powershell": "node /path/to/deskbuddy/hooks/copilot-hook.js preCompact",           "timeoutSec": 5 }]
   }
 }
 ```

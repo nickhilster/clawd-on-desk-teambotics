@@ -76,7 +76,7 @@ opencode 状态同步（in-process plugin，~0ms 延迟）：
 
 Pi 状态同步（global extension，state-only）：
   Pi 触发 session_start / before_agent_start / tool_call / tool_result / agent_end 等事件
-    → ~/.pi/agent/extensions/clawd-on-desk/index.ts（Pi extension runtime）
+    → ~/.pi/agent/extensions/deskbuddy/index.ts（Pi extension runtime）
     → hooks/pi-extension-core.js 映射为 PascalCase Clawd event 名
     → HTTP POST 127.0.0.1:23333/state
     → 同上状态机（agent_id: pi）
@@ -193,11 +193,11 @@ opencode、OpenClaw 和 Hermes 是 plugin 形式集成的 agent；OpenClaw Phase
 - 打包后需要把 `app.asar/` 重写为 `app.asar.unpacked/`
 - Hermes plugin 使用同步 POST，避免短命 `hermes -z` 进程退出前丢事件；Clawd 未启动时有短 cooldown，避免反复扫端口
 - Hermes 的 `agent_pid` 当前是 plugin worker 进程 PID；`source_pid` 来自异步进程树解析，给终端聚焦使用
-- Hermes config.yaml 是用户 YAML，不做 line-oriented 编辑；安装只复制托管 plugin 文件并调用 `hermes plugins enable clawd-on-desk`
+- Hermes config.yaml 是用户 YAML，不做 line-oriented 编辑；安装只复制托管 plugin 文件并调用 `hermes plugins enable deskbuddy`
 
 ## Pi Notes
 
-- Pi 使用 global extension 目录 `~/.pi/agent/extensions/clawd-on-desk`；安装器复制 `pi-extension.ts` 和自包含的 `pi-extension-core.js`
+- Pi 使用 global extension 目录 `~/.pi/agent/extensions/deskbuddy`；安装器复制 `pi-extension.ts` 和自包含的 `pi-extension-core.js`
 - Extension 运行目录不在 Clawd repo 内，不能依赖 `hooks/shared-process.js`；需要的进程树和 HTTP 逻辑保持在 extension 文件内
 - 只在 `ctx.hasUI === true` 或交互式 TTY 模式上报状态，避免 print/RPC 模式污染桌宠状态
 - Pi 是 state-only：`tool_call` 只上报 `PreToolUse` 状态，不等待 Clawd `/permission`，不弹权限气泡，也不调用 `ctx.ui.confirm()`
@@ -241,4 +241,4 @@ opencode、OpenClaw 和 Hermes 是 plugin 形式集成的 agent；OpenClaw Phase
 
 - 支持 en / zh / ko
 - 文案集中在 `src/i18n.js`
-- 语言偏好持久化到 `clawd-prefs.json`，启动时通过 `hydrate()` 灌入 controller
+- 语言偏好持久化到 `deskbuddy-prefs.json`，启动时通过 `hydrate()` 灌入 controller

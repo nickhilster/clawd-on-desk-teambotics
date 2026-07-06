@@ -20,9 +20,9 @@ A Clawd theme is a folder whose top level contains `theme.json`. The folder name
    If unzipping creates `pixel-cat/pixel-cat/theme.json`, move the inner folder into the themes directory.
 
 3. Put the theme folder in your Clawd user themes directory:
-   - Windows: `%APPDATA%/clawd-on-desk/themes/pixel-cat/`
-   - macOS: `~/Library/Application Support/clawd-on-desk/themes/pixel-cat/`
-   - Linux: `~/.config/clawd-on-desk/themes/pixel-cat/`
+   - Windows: `%APPDATA%/deskbuddy/themes/pixel-cat/`
+   - macOS: `~/Library/Application Support/deskbuddy/themes/pixel-cat/`
+   - Linux: `~/.config/deskbuddy/themes/pixel-cat/`
 
 4. Open `Settings...` -> `Theme` and select the theme. If Clawd was already open and the theme does not appear, restart Clawd.
 
@@ -35,9 +35,9 @@ Avoid using a folder id that matches a built-in theme (`clawd`, `calico`, or `cl
    node scripts/create-theme.js my-theme
    ```
    The script writes to your Clawd user themes directory by default:
-   - Windows: `%APPDATA%/clawd-on-desk/themes/my-theme/`
-   - macOS: `~/Library/Application Support/clawd-on-desk/themes/my-theme/`
-   - Linux: `~/.config/clawd-on-desk/themes/my-theme/`
+   - Windows: `%APPDATA%/deskbuddy/themes/my-theme/`
+   - macOS: `~/Library/Application Support/deskbuddy/themes/my-theme/`
+   - Linux: `~/.config/deskbuddy/themes/my-theme/`
    - No argument also works: it creates the next available `my-theme` scaffold automatically
 
 2. (Optional) Customize the generated metadata:
@@ -53,7 +53,7 @@ Avoid using a folder id that matches a built-in theme (`clawd`, `calico`, or `cl
 
 6. (Optional) Validate:
    ```bash
-   node scripts/validate-theme.js ~/.config/clawd-on-desk/themes/my-theme
+   node scripts/validate-theme.js ~/.config/deskbuddy/themes/my-theme
    ```
 
 If you prefer the manual route, copying `themes/template/` yourself still works. The scaffold script just automates the same starting point and patches `name` / `author` for you.
@@ -584,9 +584,9 @@ The validator checks:
 ### As a zip file
 1. Zip the theme folder (the folder containing `theme.json`)
 2. Users extract to `{userData}/themes/`
-   - Windows: `%APPDATA%/clawd-on-desk/themes/`
-   - macOS: `~/Library/Application Support/clawd-on-desk/themes/`
-   - Linux: `~/.config/clawd-on-desk/themes/`
+   - Windows: `%APPDATA%/deskbuddy/themes/`
+   - macOS: `~/Library/Application Support/deskbuddy/themes/`
+   - Linux: `~/.config/deskbuddy/themes/`
 
 ## Theme Installation (User Side)
 

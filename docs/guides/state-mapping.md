@@ -55,7 +55,7 @@ Gemini CLI stays on hook-only integration, but two Gemini-native events are inte
 
 ## Pi Extension Events
 
-Pi uses a global extension (`~/.pi/agent/extensions/clawd-on-desk`) and maps interactive-session lifecycle events to shared Clawd states:
+Pi uses a global extension (`~/.pi/agent/extensions/deskbuddy`) and maps interactive-session lifecycle events to shared Clawd states:
 
 | Pi Extension Event | Clawd Event | State |
 |---|---|---|

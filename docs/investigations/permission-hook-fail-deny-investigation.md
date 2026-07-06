@@ -29,7 +29,7 @@ CC 2.1.100 现在给 Edit/Write/Bash 等所有需要权限的工具都发 `Permi
 
 ### 1. CC 给 Edit/Write 发 PermissionRequest（实证）
 
-`%APPDATA%/clawd-on-desk/permission-debug.log` 行 `2026-04-10T10:56:59.529Z`：
+`%APPDATA%/deskbuddy/permission-debug.log` 行 `2026-04-10T10:56:59.529Z`：
 
 ```
 [2026-04-10T10:56:59.529Z] showing bubble: tool=Write session=807e3e37-...
