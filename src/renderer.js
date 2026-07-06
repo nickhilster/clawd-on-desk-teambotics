@@ -4,6 +4,7 @@
 
 const container = document.getElementById("pet-container");
 const clipLayer = document.getElementById("pet-clip");
+const motionLayer = document.getElementById("pet-motion");
 let clawdEl = document.getElementById("clawd");
 let pendingNext = null;
 const LOW_POWER_IDLE_PAUSE_MS = 5000;
@@ -74,9 +75,31 @@ function initWithConfig(cfg) {
   _transitions = tc.transitions || {};
   _miniFlipAssets = !!tc.miniFlipAssets;
   _hasRoamVisual = !!tc.hasRoamVisual;
+  _ballTheme = tc.ballTheme || null;
+  _ballSport = (_ballTheme && _ballTheme.defaultSport) || null;
+  applyBallMotionTransform();
 
   applyObjectScaleStyle(clawdEl, getObjectSvgName(clawdEl), null);
   applyObjectScaleStyle(pendingNext, getObjectSvgName(pendingNext), null);
+}
+
+function applyBallMotionTransform() {
+  if (!motionLayer) return;
+  if (!_ballTheme) {
+    motionLayer.style.transform = "";
+    return;
+  }
+  motionLayer.style.transform = `rotate(${_ballRotationDeg}deg)`;
+}
+
+function resolveBallAsset(file, state) {
+  if (!_ballTheme || !_ballSport) return file;
+  const sport = _ballTheme.sports && _ballTheme.sports[_ballSport];
+  if (!sport) return file;
+  if (typeof state === "string" && state.startsWith("mini-")) {
+    return sport.miniFile || sport.file || file;
+  }
+  return sport.file || file;
 }
 
 function applyObjectScaleStyle(el, file, state) {
@@ -379,6 +402,9 @@ let _transitions = {};  // per-file fade config: { "file.apng": { in: 400, out: 
 let _miniFlipAssets = false; // theme's mini assets drawn in reverse direction
 let _hasRoamVisual = false;  // theme binds a dedicated roam visual (≠ idle)
 let _roamHeadingLeft = false; // current walk direction; roam visuals are drawn facing right
+let _ballTheme = null;
+let _ballSport = null;
+let _ballRotationDeg = 0;
 let _inMiniMode = false;
 let _miniPreEntryMode = false;
 let _viewportOffsetY = 0;
@@ -741,7 +767,7 @@ function fadeOutAndRemove(el, durationMs) {
 }
 
 function getPetMediaElements() {
-  return [...container.querySelectorAll("object, img.clawd-img")];
+  return [...motionLayer.querySelectorAll("object, img.clawd-img")];
 }
 
 function isVisiblyOpaque(el) {
@@ -827,6 +853,7 @@ function swapToFile(file, state, useObjectChannel, options = {}) {
   const allowImageFallback = options.allowImageFallback !== false;
   cancelPendingSwap();
 
+  file = resolveBallAsset(file, state);
   pendingSvgFile = file; // track what's loading for dedup
   const useObj = useObjectChannel !== undefined ? useObjectChannel : needsObjectChannel(state, file);
   const url = getAssetUrl(file);
@@ -868,7 +895,7 @@ function swapToFile(file, state, useObjectChannel, options = {}) {
       }
       next.style.opacity = "1";
 
-      for (const child of [...container.querySelectorAll("object, img.clawd-img")]) {
+      for (const child of [...motionLayer.querySelectorAll("object, img.clawd-img")]) {
         if (child !== next) {
           if (fadeOutMs > 0) fadeOutAndRemove(child, fadeOutMs);
           else if (child.tagName === "OBJECT") releaseObject(child);
@@ -902,7 +929,7 @@ function swapToFile(file, state, useObjectChannel, options = {}) {
     // /pendingAssetUrl) stays keyed on the base `url`, not the busted one.
     const cacheBust = `${Date.now()}-${++_imgCacheBustSeq}`;
     next.data = `${url}${url.includes("?") ? "&" : "?"}_t=${cacheBust}`;
-    container.appendChild(next);
+    motionLayer.appendChild(next);
     pendingNext = next;
     scheduleSwapVisibilityRescue(swapToken, file, state);
     setTimeout(() => {
@@ -945,7 +972,7 @@ function swapToFile(file, state, useObjectChannel, options = {}) {
       }
       next.style.opacity = "1";
 
-      for (const child of [...container.querySelectorAll("object, img.clawd-img")]) {
+      for (const child of [...motionLayer.querySelectorAll("object, img.clawd-img")]) {
         if (child !== next) {
           if (fadeOutMs > 0) fadeOutAndRemove(child, fadeOutMs);
           else if (child.tagName === "OBJECT") releaseObject(child);
@@ -974,7 +1001,7 @@ function swapToFile(file, state, useObjectChannel, options = {}) {
     // HTTP cache; only the in-memory SVG document is rebuilt.
     const cacheBust = `${Date.now()}-${++_imgCacheBustSeq}`;
     next.src = `${url}${url.includes("?") ? "&" : "?"}_t=${cacheBust}`;
-    container.appendChild(next);
+    motionLayer.appendChild(next);
     pendingNext = next;
     scheduleSwapVisibilityRescue(swapToken, file, state);
     // Timeout fallback for images that fail to load
@@ -995,6 +1022,7 @@ function renderStateFile(state, svg) {
   const requestedSvg = svg;
   const lowPowerStaticImageOverride = resolveLowPowerStaticImageOverride(state, requestedSvg);
   const effectiveSvg = lowPowerStaticImageOverride || requestedSvg;
+  const resolvedSvg = resolveBallAsset(effectiveSvg, state);
   noteLowPowerActivity();
 
   // ── Roam state: add walk animation class for visual movement ──
@@ -1013,13 +1041,13 @@ function renderStateFile(state, svg) {
   // Dedup only when the same file resolves to the same asset URL. Imported
   // Codex Pet themes reuse filenames, so filename-only dedup can keep showing
   // the previous theme until a drag/click forces a different animation.
-  const desiredObjectChannel = lowPowerStaticImageOverride ? false : needsObjectChannel(state, effectiveSvg);
-  const desiredAssetUrl = getAssetUrl(effectiveSvg);
+  const desiredObjectChannel = lowPowerStaticImageOverride ? false : needsObjectChannel(state, resolvedSvg);
+  const desiredAssetUrl = getAssetUrl(resolvedSvg);
   const alreadyDisplayed = clawdEl && clawdEl.isConnected
-    && currentDisplayedSvg === effectiveSvg
+    && currentDisplayedSvg === resolvedSvg
     && currentDisplayedAssetUrl === desiredAssetUrl;
   const displayedChannelMatches = !alreadyDisplayed || ((clawdEl.tagName === "OBJECT") === desiredObjectChannel);
-  const alreadyPending = pendingSvgFile === effectiveSvg
+  const alreadyPending = pendingSvgFile === resolvedSvg
     && pendingNext
     && pendingAssetUrl === desiredAssetUrl;
   const pendingChannelMatches = !alreadyPending || ((pendingNext.tagName === "OBJECT") === desiredObjectChannel);
@@ -1042,7 +1070,7 @@ function renderStateFile(state, svg) {
       }
       scheduleLowPowerIdlePause();
     }
-    currentIdleSvg = effectiveSvg;
+    currentIdleSvg = resolvedSvg;
     return;
   }
 
@@ -1050,8 +1078,8 @@ function renderStateFile(state, svg) {
   cancelPendingSwap();
   detachEyeTracking();
 
-  swapToFile(effectiveSvg, state, lowPowerStaticImageOverride ? false : undefined);
-  currentIdleSvg = effectiveSvg;
+  swapToFile(resolvedSvg, state, lowPowerStaticImageOverride ? false : undefined);
+  currentIdleSvg = resolvedSvg;
 }
 
 function refreshCurrentStateForLowPowerStaticImage() {
@@ -1575,6 +1603,23 @@ if (window.electronAPI && typeof window.electronAPI.onRoamHeading === "function"
     // creation is stale — refresh both the on-screen and the pending element.
     applyMiniFlip(clawdEl, currentState);
     if (pendingNext) applyMiniFlip(pendingNext, currentState);
+  });
+}
+
+if (window.electronAPI && typeof window.electronAPI.onBallRotation === "function") {
+  window.electronAPI.onBallRotation((rotationDeg) => {
+    _ballRotationDeg = Number.isFinite(rotationDeg) ? rotationDeg : 0;
+    applyBallMotionTransform();
+  });
+}
+
+if (window.electronAPI && typeof window.electronAPI.onBallSport === "function") {
+  window.electronAPI.onBallSport((sportId) => {
+    if (typeof sportId !== "string" || !sportId) return;
+    _ballSport = sportId;
+    if (currentState && currentRequestedSvg) {
+      renderStateFile(currentState, currentRequestedSvg);
+    }
   });
 }
 

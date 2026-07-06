@@ -3,6 +3,7 @@
 const defaultFs = require("fs");
 const defaultPath = require("path");
 const { pathToFileURL: defaultPathToFileURL } = require("url");
+const { buildRendererBallTheme } = require("./ball-physics");
 
 function createThemeContext(theme, options = {}) {
   const fs = options.fs || defaultFs;
@@ -94,6 +95,8 @@ function createThemeContext(theme, options = {}) {
       rendering: theme.rendering || { svgChannel: "auto" },
       objectScale: theme.objectScale,
       transitions: theme.transitions || {},
+      movement: theme.movement || "roam",
+      ballTheme: buildRendererBallTheme(theme),
     };
   }
 

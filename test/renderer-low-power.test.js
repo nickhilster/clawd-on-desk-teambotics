@@ -94,15 +94,20 @@ function createRendererHarness(options = {}) {
   const container = new FakeElement("div");
   container.id = "pet-container";
   container.isConnected = true;
+  const motionLayer = new FakeElement("div");
+  motionLayer.id = "pet-motion";
+  motionLayer.isConnected = true;
+  container.appendChild(motionLayer);
   const clawd = new FakeElement("object");
   clawd.id = "clawd";
   clawd.data = "../assets/svg/current.svg";
   clawd.style.opacity = "0";
-  container.appendChild(clawd);
+  motionLayer.appendChild(clawd);
 
   const document = {
     getElementById(id) {
       if (id === "pet-container") return container;
+      if (id === "pet-motion") return motionLayer;
       if (id === "clawd") return clawd;
       return null;
     },
@@ -187,6 +192,7 @@ globalThis.__rendererTest = {
   return {
     context,
     container,
+    motionLayer,
     clawd,
     timers,
     audioInstances,
@@ -650,8 +656,8 @@ describe("renderer object-channel selection", () => {
     assert.ok(source.includes("if (!lowPowerIdleMode) return null;"));
     assert.ok(source.includes("const lowPowerStaticImageOverride = resolveLowPowerStaticImageOverride(state, requestedSvg);"));
     assert.ok(source.includes("const effectiveSvg = lowPowerStaticImageOverride || requestedSvg;"));
-    assert.ok(source.includes("const desiredObjectChannel = lowPowerStaticImageOverride ? false : needsObjectChannel(state, effectiveSvg);"));
-    assert.ok(source.includes("swapToFile(effectiveSvg, state, lowPowerStaticImageOverride ? false : undefined);"));
+    assert.ok(source.includes("const desiredObjectChannel = lowPowerStaticImageOverride ? false : needsObjectChannel(state, resolvedSvg);"));
+    assert.ok(source.includes("swapToFile(resolvedSvg, state, lowPowerStaticImageOverride ? false : undefined);"));
   });
 
   it("refreshes the current sleeping media when low-power static image mode changes", () => {
@@ -709,7 +715,7 @@ describe("renderer object-channel selection", () => {
 
     assert.ok(source.includes("let currentDisplayedAssetUrl = null;"));
     assert.ok(source.includes("let pendingAssetUrl = null;"));
-    assert.ok(source.includes("const desiredAssetUrl = getAssetUrl(effectiveSvg);"));
+    assert.ok(source.includes("const desiredAssetUrl = getAssetUrl(resolvedSvg);"));
     assert.ok(source.includes("currentDisplayedAssetUrl === desiredAssetUrl"));
     assert.ok(source.includes("pendingAssetUrl === desiredAssetUrl"));
   });
@@ -724,7 +730,7 @@ describe("renderer object-channel selection", () => {
     assert.strictEqual(harness.api.pendingNext.tagName, "IMG");
     assert.strictEqual(harness.api.pendingSvgFile, "next.svg");
     assert.strictEqual(
-      harness.container.querySelectorAll().some((el) => el.tagName === "OBJECT" && el !== harness.clawd),
+      harness.motionLayer.querySelectorAll().some((el) => el.tagName === "OBJECT" && el !== harness.clawd),
       false
     );
   });

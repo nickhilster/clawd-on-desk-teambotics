@@ -1456,6 +1456,16 @@ function updateSession(sessionId, state, event, opts = {}) {
   const isSubagentStop = event === "SubagentStop" || event === "subagentStop";
   const preservedState = preserveState && existing ? existing.state : null;
   const duplicateCompletionVisualAtEntry = shouldSuppressDuplicateCompletionVisual(existing, state, event);
+  if (event === "SessionStart" && typeof ctx.onSessionLifecycleEvent === "function") {
+    try {
+      ctx.onSessionLifecycleEvent({
+        sessionId,
+        event,
+        agentId: srcAgentId,
+        sessionTitle: srcSessionTitle,
+      });
+    } catch {}
+  }
 
   // #406 Stop completion gate — Claude Code only; other agents keep their own
   // completion semantics (Codex task_complete + remote exit probes, etc.). A

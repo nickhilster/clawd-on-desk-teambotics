@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "name": "Ball",
+  "author": "OpenAI Codex",
+  "version": "1.0.0",
+  "description": "A physics-driven sports ball desktop pet.",
+  "viewBox": {
+    "x": 0,
+    "y": 0,
+    "width": 64,
+    "height": 64
+  },
+  "layout": {
+    "contentBox": {
+      "x": 6,
+      "y": 6,
+      "width": 52,
+      "height": 52
+    },
+    "centerX": 32,
+    "baselineY": 58,
+    "visibleHeightRatio": 0.78,
+    "baselineBottomRatio": 0.02
+  },
+  "movement": "physics",
+  "ballPhysics": {
+    "defaultSport": "tennis",
+    "sports": {
+      "tennis": {
+        "file": "ball-tennis.svg",
+        "miniFile": "ball-tennis.svg",
+        "gravity": 0.22,
+        "restitution": 0.86,
+        "rollingFriction": 0.03,
+        "airDrag": 0.004,
+        "spinFactor": 0.24,
+        "radius": 26
+      },
+      "cricket": {
+        "file": "ball-cricket.svg",
+        "miniFile": "ball-cricket.svg",
+        "gravity": 0.24,
+        "restitution": 0.68,
+        "rollingFriction": 0.06,
+        "airDrag": 0.006,
+        "spinFactor": 0.18,
+        "radius": 26
+      },
+      "football": {
+        "file": "ball-football.svg",
+        "miniFile": "ball-football.svg",
+        "gravity": 0.18,
+        "restitution": 0.58,
+        "rollingFriction": 0.025,
+        "airDrag": 0.003,
+        "spinFactor": 0.12,
+        "radius": 26
+      }
+    }
+  },
+  "states": {
+    "idle": ["ball-tennis.svg"],
+    "roam": ["ball-tennis.svg"],
+    "yawning": ["ball-tennis.svg"],
+    "dozing": ["ball-tennis.svg"],
+    "collapsing": ["ball-tennis.svg"],
+    "thinking": ["ball-tennis.svg"],
+    "working": ["ball-tennis.svg"],
+    "juggling": ["ball-tennis.svg"],
+    "sweeping": ["ball-tennis.svg"],
+    "error": ["ball-tennis.svg"],
+    "attention": ["ball-tennis.svg"],
+    "notification": ["ball-tennis.svg"],
+    "carrying": ["ball-tennis.svg"],
+    "sleeping": ["ball-tennis.svg"],
+    "waking": ["ball-tennis.svg"],
+    "dizzy": ["ball-tennis.svg"]
+  },
+  "miniMode": {
+    "supported": true,
+    "viewBox": {
+      "x": 0,
+      "y": 0,
+      "width": 64,
+      "height": 64
+    },
+    "states": {
+      "mini-idle": ["ball-tennis.svg"],
+      "mini-enter": ["ball-tennis.svg"],
+      "mini-enter-sleep": ["ball-tennis.svg"],
+      "mini-crabwalk": ["ball-tennis.svg"],
+      "mini-peek": ["ball-tennis.svg"],
+      "mini-alert": ["ball-tennis.svg"],
+      "mini-happy": ["ball-tennis.svg"],
+      "mini-sleep": ["ball-tennis.svg"]
+    }
+  },
+  "timings": {
+    "minDisplay": {
+      "attention": 2500,
+      "error": 4500,
+      "notification": 2200,
+      "carrying": 1800,
+      "working": 1000,
+      "thinking": 1000,
+      "dizzy": 4000
+    },
+    "autoReturn": {
+      "attention": 2500,
+      "error": 4500,
+      "notification": 2200,
+      "carrying": 1800,
+      "dizzy": 5000
+    }
+  },
+  "hitBoxes": {
+    "default": {
+      "x": 2,
+      "y": 2,
+      "w": 12,
+      "h": 12
+    },
+    "sleeping": {
+      "x": 2,
+      "y": 4,
+      "w": 12,
+      "h": 10
+    },
+    "wide": {
+      "x": 1,
+      "y": 1,
+      "w": 14,
+      "h": 14
+    }
+  },
+  "objectScale": {
+    "widthRatio": 1.35,
+    "heightRatio": 1.35,
+    "offsetX": -0.175,
+    "offsetY": -0.175
+  },
+  "transitions": {
+    "ball-tennis.svg": { "in": 120, "out": 120 },
+    "ball-cricket.svg": { "in": 120, "out": 120 },
+    "ball-football.svg": { "in": 120, "out": 120 }
+  }
+}

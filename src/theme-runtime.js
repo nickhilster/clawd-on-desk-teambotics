@@ -32,6 +32,7 @@ function createThemeRuntime(options = {}) {
   const getStateRuntime = options.getStateRuntime || (() => null);
   const getTickRuntime = options.getTickRuntime || (() => null);
   const getMiniRuntime = options.getMiniRuntime || (() => null);
+  const getBallPhysicsRuntime = options.getBallPhysicsRuntime || (() => null);
   const getAnimationOverridesRuntime = options.getAnimationOverridesRuntime || (() => null);
   const getFadeSequencer = options.getFadeSequencer || (() => null);
   const getPetWindowBounds = options.getPetWindowBounds || (() => null);
@@ -164,11 +165,15 @@ function createThemeRuntime(options = {}) {
     const stateRuntime = getStateRuntime();
     const tickRuntime = getTickRuntime();
     const miniRuntime = getMiniRuntime();
+    const ballPhysicsRuntime = getBallPhysicsRuntime();
     let preservedVirtualBounds = getPetWindowBounds();
 
     callMethod(stateRuntime, "cleanup");
     callMethod(tickRuntime, "cleanup");
     callMethod(miniRuntime, "cleanup");
+    if (ballPhysicsRuntime && typeof ballPhysicsRuntime.cleanup === "function") {
+      ballPhysicsRuntime.cleanup();
+    }
     // Do not clear pending permission bubbles, sessions, or displayHint here;
     // those are runtime concepts that survive a theme asset reload.
 
@@ -185,6 +190,9 @@ function createThemeRuntime(options = {}) {
     callMethod(miniRuntime, "refreshTheme");
     callMethod(stateRuntime, "refreshTheme");
     callMethod(tickRuntime, "refreshTheme");
+    if (ballPhysicsRuntime && typeof ballPhysicsRuntime.refreshTheme === "function") {
+      ballPhysicsRuntime.refreshTheme();
+    }
     if (typeof miniRuntime.getMiniMode === "function" && miniRuntime.getMiniMode()) {
       callMethod(miniRuntime, "handleDisplayChange");
     }

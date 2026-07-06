@@ -119,6 +119,7 @@ const createTopmostRuntime = require("./topmost-runtime");
 const { WIN_TOPMOST_LEVEL } = createTopmostRuntime;
 const createThemeFadeSequencer = require("./theme-fade-sequencer");
 const createThemeRuntime = require("./theme-runtime");
+const { createBallPhysics } = require("./ball-physics");
 const createAgentRuntimeMain = require("./agent-runtime-main");
 const createFloatingWindowRuntime = require("./floating-window-runtime");
 const createPetWindowRuntime = require("./pet-window-runtime");
@@ -527,6 +528,7 @@ themeRuntime = createThemeRuntime({
   getStateRuntime: () => _state,
   getTickRuntime: () => _tick,
   getMiniRuntime: () => _mini,
+  getBallPhysicsRuntime: () => movementController,
   getAnimationOverridesRuntime: () => animationOverridesMain,
   getFadeSequencer: () => themeFadeSequencer,
   getPetWindowBounds,
@@ -1018,6 +1020,9 @@ function syncHitStateAfterLoad() {
 function syncRendererStateAfterLoad({ includeStartupRecovery = true } = {}) {
   syncSoundPreloads();
   sendToRenderer("low-power-idle-mode-change", lowPowerIdleMode);
+  if (movementController && typeof movementController.syncRendererState === "function") {
+    movementController.syncRendererState();
+  }
   if (_mini.getMiniMode()) {
     sendToRenderer("mini-mode-change", true, _mini.getMiniEdge());
     // mini-clip is a renderer inline style — a renderer/theme reload (and
@@ -1416,6 +1421,7 @@ function syncSessionHudVisibilityAndBubbles() {
 let showDashboard = () => {};
 let broadcastDashboardSessionSnapshot = () => {};
 let sendDashboardI18n = () => {};
+let movementController = null;
 
 // Forward hook for the #329 updater scheduler. State/mini ctxs reference
 // this via notifyUpdaterSilentExit; the actual implementation is wired
@@ -1494,6 +1500,11 @@ const _stateCtx = {
     const stateMap = themeMap && themeMap.states;
     const entry = (stateMap && stateMap[stateKey]) || (themeMap && themeMap[stateKey]);
     return !!(entry && entry.disabled === true);
+  },
+  onSessionLifecycleEvent: (payload) => {
+    if (movementController && typeof movementController.noteSessionLifecycle === "function") {
+      movementController.noteSessionLifecycle(payload);
+    }
   },
   get sessionHudCleanupDetached() { return sessionHudCleanupDetached; },
   getStaleConfig: () => ({
@@ -3080,7 +3091,7 @@ const SETTINGS_MIRROR_SETTERS = {
   keepAwakeWhileWorking: (v) => { keepAwakeWhileWorking = v; },
   allowEdgePinning: (v) => { allowEdgePinningCached = v; }, disableMiniMode: (v) => { disableMiniModeCached = v; }, keepSizeAcrossDisplays: (v) => { keepSizeAcrossDisplaysCached = v; resetKeepSizeFrozen(); },
   fullscreenOverlay: (v) => { fullscreenOverlayCached = v; },
-  freeRoam: (v) => { _roam.setEnabled(v); },
+  freeRoam: (v) => { movementController.setEnabled(v); },
   textScale: (v) => { textScale = v; textScalePreview = null; },
   textScaleByDisplay: (v) => { textScaleByDisplay = v; textScalePreview = null; },
 };
@@ -3692,12 +3703,77 @@ const _roamCtx = {
   setRoamHeading: (headingLeft) => sendToRenderer("roam-heading", !!headingLeft),
 };
 const _roam = require("./roam")(_roamCtx);
+const _ballPhysicsCtx = {
+  getTheme: () => getActiveTheme(),
+  get win() { return win; },
+  getPetWindowBounds,
+  applyPetWindowBounds,
+  syncHitWin: () => syncHitWin(),
+  repositionAnchoredSurfaces: () => repositionAnchoredFloatingSurfaces(),
+  repositionBubbles: () => repositionFloatingBubbles(),
+  get bubbleFollowPet() { return bubbleFollowPet; },
+  get pendingPermissions() { return pendingPermissions; },
+  getNearestWorkArea,
+  getMiniMode: () => _mini.getMiniMode(),
+  getCurrentState: () => _state.getCurrentState(),
+  get miniTransitioning() { return _mini.getMiniTransitioning(); },
+  getDragLocked: () => petWindowRuntime.isDragLocked(),
+  applyState: (state, svgOverride, opts) => _state.applyState(state, svgOverride, opts),
+  setState: (state, svgOverride, opts) => _state.setState(state, svgOverride, opts),
+  setBallRotation: (rotationDeg) => sendToRenderer("ball-rotation", rotationDeg),
+  setBallSport: (sportId) => sendToRenderer("ball-sport", sportId),
+};
+const _ballPhysics = createBallPhysics(_ballPhysicsCtx);
+
+function isPhysicsThemeActive() {
+  const theme = getActiveTheme();
+  return !!(theme && theme.movement === "physics");
+}
+
+let movementEnabled = false;
+movementController = {
+  setEnabled(value) {
+    movementEnabled = value === true;
+    const physicsActive = movementEnabled && isPhysicsThemeActive();
+    _roam.setEnabled(movementEnabled && !physicsActive);
+    _ballPhysics.setEnabled(physicsActive);
+  },
+  cancelRoam() {
+    if (isPhysicsThemeActive()) _ballPhysics.cancelRoam();
+    else _roam.cancelRoam();
+  },
+  tick() {
+    if (isPhysicsThemeActive()) _ballPhysics.tick();
+    else _roam.tick();
+  },
+  refreshTheme() {
+    _ballPhysics.refreshTheme();
+    this.setEnabled(movementEnabled);
+  },
+  cleanup() {
+    _roam.cancelRoam();
+    _ballPhysics.cleanup();
+  },
+  noteSessionLifecycle(payload) {
+    if (isPhysicsThemeActive()) _ballPhysics.noteSessionLifecycle(payload);
+  },
+  syncRendererState() {
+    if (isPhysicsThemeActive()) {
+      _ballPhysics.syncRendererState();
+    } else {
+      sendToRenderer("ball-rotation", 0);
+    }
+  },
+  get enabled() {
+    return movementEnabled;
+  },
+};
 
 // Free roam: initialize from prefs and react to toggle changes
-_roam.setEnabled(_settingsController.get("freeRoam") === true);
+movementController.setEnabled(_settingsController.get("freeRoam") === true);
 try {
   _settingsController.subscribeKey("freeRoam", (value) => {
-    _roam.setEnabled(value === true);
+    movementController.setEnabled(value === true);
   });
 } catch (err) {
   console.warn("Clawd: freeRoam subscribeKey failed:", err && err.message);

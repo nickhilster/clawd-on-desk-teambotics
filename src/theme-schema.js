@@ -78,6 +78,7 @@ function validateTheme(cfg) {
   const errors = [];
   const sleepMode = deriveSleepMode(cfg);
   const normalizedStates = normalizeStateBindings(cfg && cfg.states);
+  const movementMode = cfg && cfg.movement === "physics" ? "physics" : "roam";
 
   if (cfg.schemaVersion !== 1) {
     errors.push(`schemaVersion must be 1, got ${cfg.schemaVersion}`);
@@ -176,6 +177,35 @@ function validateTheme(cfg) {
       && cfg.rendering.svgChannel !== "object"
     ) {
       errors.push(`rendering.svgChannel must be "auto" or "object", got ${cfg.rendering.svgChannel}`);
+    }
+  }
+
+  if (cfg.movement !== undefined && cfg.movement !== "roam" && cfg.movement !== "physics") {
+    errors.push(`movement must be "roam" or "physics", got ${cfg.movement}`);
+  }
+  if (movementMode === "physics") {
+    if (!isPlainObject(cfg.ballPhysics)) {
+      errors.push("movement=physics requires ballPhysics");
+    } else {
+      const sports = isPlainObject(cfg.ballPhysics.sports) ? cfg.ballPhysics.sports : null;
+      if (!sports || Object.keys(sports).length === 0) {
+        errors.push("ballPhysics.sports must be a non-empty object when movement=physics");
+      } else {
+        for (const [sportId, sport] of Object.entries(sports)) {
+          if (!isPlainObject(sport)) {
+            errors.push(`ballPhysics.sports.${sportId} must be an object`);
+            continue;
+          }
+          if (typeof sport.file !== "string" || !sport.file) {
+            errors.push(`ballPhysics.sports.${sportId}.file must be a non-empty string`);
+          }
+          for (const key of ["gravity", "restitution", "rollingFriction", "airDrag", "spinFactor", "radius"]) {
+            if (!Number.isFinite(sport[key])) {
+              errors.push(`ballPhysics.sports.${sportId}.${key} must be finite`);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -361,6 +391,7 @@ function buildCapabilities(cfg, options = {}) {
     idleMode: deriveIdleMode(cfg),
     sleepMode: deriveSleepMode(cfg),
     powerProfile: derivePowerProfile(cfg, options),
+    movement: cfg && cfg.movement === "physics" ? "physics" : "roam",
   };
 }
 
@@ -418,6 +449,13 @@ function collectRequiredAssetFiles(theme) {
       if (!isPlainObject(override)) continue;
       if (typeof override.from === "string") addThemeAssetFile(files, override.from);
       if (typeof override.to === "string") addThemeAssetFile(files, override.to);
+    }
+  }
+  if (theme && theme.ballPhysics && isPlainObject(theme.ballPhysics.sports)) {
+    for (const sport of Object.values(theme.ballPhysics.sports)) {
+      if (!isPlainObject(sport)) continue;
+      if (typeof sport.file === "string") addThemeAssetFile(files, sport.file);
+      if (typeof sport.miniFile === "string") addThemeAssetFile(files, sport.miniFile);
     }
   }
   return [...files];
@@ -673,6 +711,32 @@ function mergeDefaults(raw, themeId, isBuiltin) {
 
   // reactions
   theme.reactions = raw.reactions || null;
+  theme.movement = raw.movement === "physics" ? "physics" : "roam";
+  if (isPlainObject(raw.ballPhysics) && isPlainObject(raw.ballPhysics.sports)) {
+    const sports = {};
+    for (const [sportId, rawSport] of Object.entries(raw.ballPhysics.sports)) {
+      if (!isPlainObject(rawSport)) continue;
+      const file = basenameOnly(rawSport.file);
+      if (!file) continue;
+      sports[sportId] = {
+        gravity: Number(rawSport.gravity),
+        restitution: Number(rawSport.restitution),
+        rollingFriction: Number(rawSport.rollingFriction),
+        airDrag: Number(rawSport.airDrag),
+        spinFactor: Number(rawSport.spinFactor),
+        radius: Number(rawSport.radius),
+        file,
+      };
+      const miniFile = basenameOnly(rawSport.miniFile);
+      if (miniFile) sports[sportId].miniFile = miniFile;
+    }
+    theme.ballPhysics = {
+      defaultSport: typeof raw.ballPhysics.defaultSport === "string" ? raw.ballPhysics.defaultSport : null,
+      sports,
+    };
+  } else {
+    theme.ballPhysics = null;
+  }
 
   // workingTiers / jugglingTiers — auto sort descending by minSessions
   if (theme.workingTiers) {
