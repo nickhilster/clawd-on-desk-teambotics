@@ -129,23 +129,23 @@ function makeHttpsRequestMock(routes) {
   return { request, calls };
 }
 
-test("parses clawd import URLs and rejects unsafe remote hosts", () => {
+test("parses deskbuddy import URLs and rejects unsafe remote hosts", () => {
   const parsed = importer.parseClawdImportUrl(
-    "clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fpets%2Ftiny%2Fpet.json"
+    "deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fpets%2Ftiny%2Fpet.json"
   );
   assert.strictEqual(parsed.action, "import-pet");
   assert.strictEqual(parsed.url, "https://example.test/pets/tiny/pet.json");
   const idn = importer.parseClawdImportUrl(
-    `clawd://import-pet?url=${encodeURIComponent("https://例え.テスト/pets/tiny/pet.json")}`
+    `deskbuddy://import-pet?url=${encodeURIComponent("https://例え.テスト/pets/tiny/pet.json")}`
   );
   assert.match(idn.asciiHostname, /^xn--/);
 
   assert.throws(
-    () => importer.parseClawdImportUrl("clawd://import-pet?url=http%3A%2F%2Fexample.test%2Fpet.json"),
+    () => importer.parseClawdImportUrl("deskbuddy://import-pet?url=http%3A%2F%2Fexample.test%2Fpet.json"),
     /https/
   );
   assert.throws(
-    () => importer.parseClawdImportUrl("clawd://import-pet?url=https%3A%2F%2Flocalhost%2Fpet.json"),
+    () => importer.parseClawdImportUrl("deskbuddy://import-pet?url=https%3A%2F%2Flocalhost%2Fpet.json"),
     /blocked/
   );
 });

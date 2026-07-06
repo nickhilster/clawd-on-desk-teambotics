@@ -8,7 +8,7 @@ const defaultCodexPetAdapter = require("./codex-pet-adapter");
 const defaultCodexPetImporter = require("./codex-pet-importer");
 
 const REGISTER_PROTOCOL_DEV_ARG = "--register-protocol";
-const CLAWD_PROTOCOL_SCHEME = "clawd";
+const CLAWD_PROTOCOL_SCHEME = "deskbuddy";
 
 function emptyCodexPetSyncSummary(overrides = {}) {
   return {
@@ -317,7 +317,7 @@ function createCodexPetMain(options = {}) {
         return app.setAsDefaultProtocolClient(CLAWD_PROTOCOL_SCHEME, process.execPath, [appRoot]);
       }
     } catch (err) {
-      console.warn("Clawd: failed to register clawd:// protocol:", err && err.message);
+      console.warn("DeskBuddy: failed to register deskbuddy:// protocol:", err && err.message);
     }
     return false;
   }

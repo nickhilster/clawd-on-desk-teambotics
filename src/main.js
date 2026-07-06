@@ -226,7 +226,7 @@ const {
   isAllBubblesHidden,
 } = require("./bubble-policy");
 const loginItemHelpers = require("./login-item");
-const PREFS_PATH = path.join(app.getPath("userData"), "clawd-prefs.json");
+const PREFS_PATH = path.join(app.getPath("userData"), "deskbuddy-prefs.json");
 const _initialPrefsLoad = prefsModule.load(PREFS_PATH);
 
 // Lazy helpers — these run inside the action `effect` callbacks at click time,
@@ -508,7 +508,7 @@ function safeConsoleError(...args) {
   } catch (err) {
     try {
       const line = `${new Date().toISOString()} ${args.map((x) => String(x)).join(" ")}\n`;
-      fs.appendFileSync(path.join(app.getPath("userData"), "clawd-main.log"), line);
+      fs.appendFileSync(path.join(app.getPath("userData"), "deskbuddy-main.log"), line);
     } catch {}
   }
 }
@@ -3770,7 +3770,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   if (process.argv.includes(REGISTER_PROTOCOL_DEV_ARG)) {
     const protocolRegistered = codexPetMain.registerProtocolClient();
-    console.log(`Clawd: clawd:// dev protocol registration ${protocolRegistered ? "succeeded" : "failed"}`);
+    console.log(`DeskBuddy: deskbuddy:// dev protocol registration ${protocolRegistered ? "succeeded" : "failed"}`);
   }
   // Another instance is already running — quit silently
   app.quit();
@@ -3865,7 +3865,7 @@ if (!gotTheLock) {
 
     const protocolRegistered = codexPetMain.registerProtocolClient();
     if (process.argv.includes(REGISTER_PROTOCOL_DEV_ARG)) {
-      console.log(`Clawd: clawd:// dev protocol registration ${protocolRegistered ? "succeeded" : "failed"}`);
+      console.log(`DeskBuddy: deskbuddy:// dev protocol registration ${protocolRegistered ? "succeeded" : "failed"}`);
       app.quit();
       return;
     }

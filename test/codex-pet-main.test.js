@@ -84,18 +84,18 @@ test("Codex Pet main helpers merge sync summaries without dropping diagnostics",
   assert.strictEqual(summary.diagnostics.length, 2);
 });
 
-test("Codex Pet main helpers detect clawd protocol args case-insensitively", () => {
+test("Codex Pet main helpers detect deskbuddy protocol args case-insensitively", () => {
   const { extractClawdProtocolUrls } = createCodexPetMain.__test;
   assert.deepStrictEqual(
     extractClawdProtocolUrls([
-      "Clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json",
+      "Deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json",
       "--flag",
       "https://example.test",
-      "clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fother.json",
+      "deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fother.json",
     ]),
     [
-      "Clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json",
-      "clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fother.json",
+      "Deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json",
+      "deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fother.json",
     ]
   );
 });
@@ -237,14 +237,14 @@ test("Codex Pet import URLs queued before app ready do not flush until explicitl
   };
   try {
     const { runtime, parseCalls, showMessageBoxCalls } = createQueueRuntime();
-    runtime.enqueueImportUrl("clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json");
+    runtime.enqueueImportUrl("deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json");
 
     assert.strictEqual(immediateCalls, 0);
     assert.deepStrictEqual(parseCalls, []);
     assert.deepStrictEqual(showMessageBoxCalls, []);
 
     await runtime.flushPendingImportUrls();
-    assert.deepStrictEqual(parseCalls, ["clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json"]);
+    assert.deepStrictEqual(parseCalls, ["deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json"]);
     assert.strictEqual(showMessageBoxCalls.length, 1);
     assert.strictEqual(showMessageBoxCalls[0].options.type, "question");
   } finally {
@@ -259,7 +259,7 @@ test("Codex Pet import dialog uses zh-TW strings", async () => {
     },
   });
 
-  runtime.enqueueImportUrl("clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json");
+  runtime.enqueueImportUrl("deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json");
   await runtime.flushPendingImportUrls();
 
   assert.strictEqual(showMessageBoxCalls.length, 1);
@@ -356,23 +356,23 @@ test("Codex Pet import queue ignores overlapping flush calls while the first dra
     },
   });
 
-  runtime.enqueueImportUrl("clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fone.json");
-  runtime.enqueueImportUrl("clawd://import-pet?url=https%3A%2F%2Fexample.test%2Ftwo.json");
+  runtime.enqueueImportUrl("deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fone.json");
+  runtime.enqueueImportUrl("deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Ftwo.json");
 
   const firstFlush = runtime.flushPendingImportUrls();
   await firstImportStartedPromise;
   const secondFlush = runtime.flushPendingImportUrls();
   await secondFlush;
 
-  assert.deepStrictEqual(parseCalls, ["clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fone.json"]);
+  assert.deepStrictEqual(parseCalls, ["deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fone.json"]);
   assert.strictEqual(importCalls.length, 1);
 
   releaseFirstImport();
   await firstFlush;
 
   assert.deepStrictEqual(parseCalls, [
-    "clawd://import-pet?url=https%3A%2F%2Fexample.test%2Fone.json",
-    "clawd://import-pet?url=https%3A%2F%2Fexample.test%2Ftwo.json",
+    "deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fone.json",
+    "deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Ftwo.json",
   ]);
   assert.strictEqual(importCalls.length, 2);
 });

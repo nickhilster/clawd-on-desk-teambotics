@@ -13,7 +13,7 @@ const tempDirs = [];
 function makeTempPath() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-controller-"));
   tempDirs.push(dir);
-  return path.join(dir, "clawd-prefs.json");
+  return path.join(dir, "deskbuddy-prefs.json");
 }
 afterEach(() => {
   while (tempDirs.length) {

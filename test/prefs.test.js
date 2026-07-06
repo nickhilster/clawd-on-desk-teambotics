@@ -10,7 +10,7 @@ const prefs = require("../src/prefs");
 
 const tempDirs = [];
 
-function makeTempPath(name = "clawd-prefs.json") {
+function makeTempPath(name = "deskbuddy-prefs.json") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-prefs-"));
   tempDirs.push(dir);
   return path.join(dir, name);
