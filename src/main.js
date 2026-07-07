@@ -1499,6 +1499,7 @@ const _stateCtx = {
       try { telegramCompanion.onSnapshot(snapshot); } catch {}
     }
     if (_lanWss) { try { _lanWss.onSnapshot(); } catch {} }
+    if (_vscodeBridge) { try { _vscodeBridge.onSnapshot(); } catch {} }
   },
   // Phase 3b: 读 prefs.themeOverrides 判断某个 oneshot state 是否被用户禁用。
   // state.js gate 调这个做 early-return。不做白名单校验——settings-actions
@@ -1724,6 +1725,13 @@ const _dashboard = require("./dashboard")({
 showDashboard = _dashboard.showDashboard;
 broadcastDashboardSessionSnapshot = _dashboard.broadcastSessionSnapshot;
 sendDashboardI18n = _dashboard.sendI18n;
+
+const { initVscodeBridge } = require("./network/vscode-bridge");
+const _vscodeBridge = initVscodeBridge({
+  getSessionSnapshot: () => _state.buildSessionSnapshot(),
+  get pendingPermissions() { return pendingPermissions; },
+  resolvePermissionEntry: (...args) => resolvePermissionEntry(...args),
+});
 
 // ── First-run onboarding tutorial ──
 // Buckets the installable agents for the tutorial's step 2. We call the
