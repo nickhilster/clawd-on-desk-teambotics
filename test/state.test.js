@@ -85,6 +85,7 @@ function update(api, o = {}) {
       contextUsage: o.contextUsage ?? null,
       antigravityQuota: o.antigravityQuota ?? null,
       claudeQuota: o.claudeQuota ?? null,
+      todos: o.todos ?? null,
       platform: o.platform ?? null,
       model: o.model ?? null,
       provider: o.provider ?? null,
@@ -1726,6 +1727,49 @@ describe("updateSession()", () => {
       percent: 19,
       source: "codex",
     });
+  });
+
+  it("stores todos from updateSession opts", () => {
+    update(api, {
+      id: "s1",
+      state: "working",
+      todos: [
+        { content: "Write the failing test", status: "completed" },
+        { content: "Implement the feature", status: "in_progress", activeForm: "Implementing the feature" },
+      ],
+    });
+
+    assert.deepStrictEqual(api.sessions.get("s1").todos, [
+      { content: "Write the failing test", status: "completed" },
+      { content: "Implement the feature", status: "in_progress", activeForm: "Implementing the feature" },
+    ]);
+  });
+
+  it("keeps todos sticky when later events omit them", () => {
+    update(api, { id: "s1", state: "thinking", todos: [{ content: "A", status: "pending" }] });
+    update(api, { id: "s1", state: "working" });
+
+    assert.deepStrictEqual(api.sessions.get("s1").todos, [{ content: "A", status: "pending" }]);
+  });
+
+  it("replaces the full todos list on a fresh TodoWrite call rather than merging", () => {
+    update(api, { id: "s1", state: "working", todos: [{ content: "A", status: "completed" }] });
+    update(api, { id: "s1", state: "working", todos: [{ content: "B", status: "pending" }] });
+
+    assert.deepStrictEqual(api.sessions.get("s1").todos, [{ content: "B", status: "pending" }]);
+  });
+
+  it("drops malformed todos entries and caps unreasonably long lists", () => {
+    const tooMany = Array.from({ length: 60 }, (_, i) => ({ content: `item ${i}`, status: "pending" }));
+    update(api, {
+      id: "s1",
+      state: "working",
+      todos: [{ content: "" }, { status: "pending" }, ...tooMany],
+    });
+
+    const stored = api.sessions.get("s1").todos;
+    assert.ok(Array.isArray(stored));
+    assert.strictEqual(stored.length, 50);
   });
 
   it("stores antigravityQuota from updateSession opts", () => {

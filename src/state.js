@@ -1093,6 +1093,34 @@ function normalizeClaudeQuota(value) {
   return normalizeQuotaGroup(value, CLAUDE_QUOTA_FIELDS);
 }
 
+const TODO_STATUSES = new Set(["pending", "in_progress", "completed"]);
+const TODOS_MAX = 50;
+const TODO_TEXT_MAX = 200;
+
+function normalizeTodoText(value) {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text) return null;
+  return text.length > TODO_TEXT_MAX ? text.slice(0, TODO_TEXT_MAX) : text;
+}
+
+function normalizeTodos(value) {
+  if (!Array.isArray(value)) return null;
+  const out = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const content = normalizeTodoText(item.content);
+    if (!content) continue;
+    const status = TODO_STATUSES.has(item.status) ? item.status : "pending";
+    const entry = { content, status };
+    const activeForm = normalizeTodoText(item.activeForm);
+    if (activeForm) entry.activeForm = activeForm;
+    out.push(entry);
+    if (out.length >= TODOS_MAX) break;
+  }
+  return out.length ? out : null;
+}
+
 function updateSessionFocusMetadata(sessionId, opts = {}) {
   const id = typeof sessionId === "string" ? sessionId : "";
   if (!id) return false;
@@ -1304,6 +1332,7 @@ function updateSession(sessionId, state, event, opts = {}) {
     contextUsage = null,
     antigravityQuota = null,
     claudeQuota = null,
+    todos = null,
     assistantLastOutput = null,
     assistantLastOutputTruncated = false,
     toolName = null,
@@ -1378,6 +1407,7 @@ function updateSession(sessionId, state, event, opts = {}) {
       const srcGhosttyTerminalId = normalizeGhosttyTerminalId(ghosttyTerminalId) || (existing && existing.ghosttyTerminalId) || null;
       const srcSessionTitle = normalizeTitle(sessionTitle) || (existing && existing.sessionTitle) || null;
       const srcContextUsage = normalizeContextUsage(contextUsage) || (existing && existing.contextUsage) || null;
+      const srcTodos = normalizeTodos(todos) || (existing && existing.todos) || null;
       // PermissionRequest should flash the pet via setState("notification"),
       // but a brand-new Codex permission session must not persist as
       // notification. Otherwise, if the prompt is resolved remotely and no
@@ -1410,6 +1440,7 @@ function updateSession(sessionId, state, event, opts = {}) {
         ghosttyTerminalId: srcGhosttyTerminalId,
         sessionTitle: srcSessionTitle,
         contextUsage: srcContextUsage,
+        todos: srcTodos,
         recentEvents,
         pidReachable: resolvePidReachable(existing, srcAgentPid, srcPid),
         resumeState: (existing && existing.resumeState) || null,
@@ -1447,6 +1478,7 @@ function updateSession(sessionId, state, event, opts = {}) {
   const srcContextUsage = normalizeContextUsage(contextUsage) || (existing && existing.contextUsage) || null;
   const srcAntigravityQuota = normalizeAntigravityQuota(antigravityQuota) || (existing && existing.antigravityQuota) || null;
   const srcClaudeQuota = normalizeClaudeQuota(claudeQuota) || (existing && existing.claudeQuota) || null;
+  const srcTodos = normalizeTodos(todos) || (existing && existing.todos) || null;
   const srcAssistantLastOutput = normalizeAssistantOutput(assistantLastOutput);
   const srcAssistantLastOutputTruncated = !!(srcAssistantLastOutput && assistantLastOutputTruncated === true);
   const srcToolName = normalizeToolName(toolName) || (existing && existing.lastToolName) || null;
@@ -1586,7 +1618,7 @@ function updateSession(sessionId, state, event, opts = {}) {
   // silently reset its freshness stamp, or stale carried-over quota would
   // win display arbitration on updatedAt alone.
   const srcMetadataUpdatedAt = existing && Number.isFinite(existing.metadataUpdatedAt) ? existing.metadataUpdatedAt : null;
-  const base = { sourcePid: srcPid, wtHwnd: srcWtHwnd, cwd: srcCwd, editor: srcEditor, pidChain: srcPidChain, tmuxSocket: srcTmuxSocket, tmuxClient: srcTmuxClient, agentPid: srcAgentPid, agentId: srcAgentId, host: srcHost, headless: srcHeadless, platform: srcPlatform, model: srcModel, provider: srcProvider, codexOriginator: srcCodexOriginator, codexSource: srcCodexSource, ghosttyTerminalId: srcGhosttyTerminalId, sessionTitle: srcSessionTitle, contextUsage: srcContextUsage, antigravityQuota: srcAntigravityQuota, claudeQuota: srcClaudeQuota, metadataUpdatedAt: srcMetadataUpdatedAt, assistantLastOutput: srcAssistantLastOutput, assistantLastOutputTruncated: srcAssistantLastOutputTruncated, lastToolName: srcToolName, transcriptPath: srcTranscriptPath, recentEvents, pidReachable, lastToolBoundaryAt: srcLastToolBoundaryAt, lastStopAt: srcLastStopAt, awaitingInputSinceStop: resolveAwaitingInputSinceStop(existing, event), muteNotificationSound: state === "notification" && muteNotificationSound === true };
+  const base = { sourcePid: srcPid, wtHwnd: srcWtHwnd, cwd: srcCwd, editor: srcEditor, pidChain: srcPidChain, tmuxSocket: srcTmuxSocket, tmuxClient: srcTmuxClient, agentPid: srcAgentPid, agentId: srcAgentId, host: srcHost, headless: srcHeadless, platform: srcPlatform, model: srcModel, provider: srcProvider, codexOriginator: srcCodexOriginator, codexSource: srcCodexSource, ghosttyTerminalId: srcGhosttyTerminalId, sessionTitle: srcSessionTitle, contextUsage: srcContextUsage, antigravityQuota: srcAntigravityQuota, claudeQuota: srcClaudeQuota, todos: srcTodos, metadataUpdatedAt: srcMetadataUpdatedAt, assistantLastOutput: srcAssistantLastOutput, assistantLastOutputTruncated: srcAssistantLastOutputTruncated, lastToolName: srcToolName, transcriptPath: srcTranscriptPath, recentEvents, pidReachable, lastToolBoundaryAt: srcLastToolBoundaryAt, lastStopAt: srcLastStopAt, awaitingInputSinceStop: resolveAwaitingInputSinceStop(existing, event), muteNotificationSound: state === "notification" && muteNotificationSound === true };
   if (preserveCompletionAck) base.requiresCompletionAck = true;
 
   // Evict oldest session if at capacity and this is a new session.
