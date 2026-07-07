@@ -156,6 +156,11 @@ function activate(context) {
   context.subscriptions.push(
     vscode.commands.registerCommand("deskbuddy.openDashboard", () => showDeskBuddyDashboard(context))
   );
+
+  const totalTabs = vscode.window.tabGroups.all.reduce((count, group) => count + group.tabs.length, 0);
+  if (totalTabs === 0) {
+    showDeskBuddyDashboard(context);
+  }
 }
 
 function deactivate() {

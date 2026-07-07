@@ -54,3 +54,12 @@ test("extension.js scaffolds the dashboard panel and port discovery", () => {
   assert.match(source, /createWebviewPanel/);
   assert.match(source, /retainContextWhenHidden:\s*true/);
 });
+
+test("activation auto-opens the dashboard when no tabs are open", () => {
+  const source = fs.readFileSync(
+    path.join(repoRoot, "extensions", "vscode", "extension.js"),
+    "utf8"
+  );
+  assert.match(source, /tabGroups\.all/);
+  assert.match(source, /showDeskBuddyDashboard\(context\)/g);
+});
