@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 45">
+  <defs><style>
+    .breathe { animation: kf-breathe 3.6s infinite ease-in-out; }
+    @keyframes kf-breathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.015,0.985); } }
+    .blink { animation: kf-blink 4.2s infinite ease-in-out; }
+    @keyframes kf-blink { 0%,92%,100% { transform: scaleY(1); } 96% { transform: scaleY(0.08); } }
+    .badge-pulse { animation: kf-badge 2.6s infinite ease-in-out; }
+    @keyframes kf-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.8; } }
+
+    .stack-sway { animation: kf-ssway 2.6s infinite ease-in-out; }
+    @keyframes kf-ssway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+    .top-teeter { animation: kf-teeter 2.6s infinite ease-in-out; animation-delay: -0.3s; }
+    @keyframes kf-teeter { 0%,100% { transform: rotate(-4.5deg); } 50% { transform: rotate(4.5deg); } }
+    .stagger { animation: kf-stag 3.4s infinite ease-in-out; }
+    @keyframes kf-stag { 0%,100% { transform: translateX(-0.7px); } 50% { transform: translateX(0.7px); } }
+    .sweat-fall { animation: kf-sw 1.8s infinite ease-in; }
+    @keyframes kf-sw { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 0.9; } 80% { transform: translateY(4px); opacity: 0.9; } 100% { transform: translateY(5px); opacity: 0; } }
+    .flutter { animation: kf-flut 4s infinite; }
+    @keyframes kf-flut { 0%,8% { transform: translate(0,0) rotate(0deg); opacity: 0; } 12% { opacity: 1; } 30% { transform: translate(4px,5px) rotate(38deg); } 50% { transform: translate(7px,11px) rotate(62deg); opacity: 1; } 62% { transform: translate(9px,15px) rotate(80deg); opacity: 0; } 100% { opacity: 0; } }
+  </style></defs>
+<g class="stagger" style="transform-origin:7.5px 10px">
+  <ellipse id="mdm_shadow" cx="7.5" cy="15.3" rx="6.2" ry="1.3" fill="#0f172a" opacity="0.16"/>
+  <g id="mdm_legs_group" fill="#0f172a"><rect x="3.4" y="10" width="2.6" height="4.2" rx="1"/><rect x="9" y="10" width="2.6" height="4.2" rx="1"/></g>
+  <g id="body-js"><g class="breathe" style="transform-origin:7.5px 6px">
+    <rect id="mdm_body" x="2" y="2" width="11" height="8.4" rx="1.6" fill="#ffffff" stroke="#0f172a" stroke-width="0.4"/>
+    <path id="mdm_tie" d="M7 2.4 L8.3 2.4 L9 5 L7.5 9.6 L6 5 Z" fill="#1d4ed8"/>
+    <rect x="10" y="3.4" width="2" height="2.4" rx="0.3" fill="#dfe9fb" stroke="#0f172a" stroke-width="0.25"/>
+    <rect x="10.7" y="3" width="0.55" height="1.2" rx="0.2" fill="#dc2626"/></g>
+  </g>
+    <rect id="mdm_head_document" x="1" y="-9" width="13" height="11" rx="2.4" fill="#ffffff" stroke="#0f172a" stroke-width="0.4"/>
+    <path id="mdm_corner_fold" d="M11.6 -9 L14 -9 L14 -6.6 Z" fill="#dfe9fb" stroke="#0f172a" stroke-width="0.3"/>
+    <g class="badge-pulse">
+      <rect id="mdm_badge" x="2.1" y="-8.1" width="3.6" height="3.6" rx="0.6" fill="#1d4ed8"/>
+      <path d="M2.9 -5.3 V-7.4 L3.9 -6.1 L4.9 -7.4 V-5.3" stroke="#ffffff" stroke-width="0.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="mdm_brows_group"><path d="M3.4 -6.7 q1.6 -1 3 -0.2" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+         <path d="M8.6 -6.9 q1.6 0.8 3 -0.1" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/></g>
+    <g id="eyes-js"><g class="blink" style="transform-origin:7.5px -3.5px"><g id="mdm_eyes_group">
+    <ellipse cx="5" cy="-3.8" rx="1.1" ry="1.3" fill="#ffffff" stroke="#0f172a" stroke-width="0.35"/>
+    <ellipse cx="10.5" cy="-3.8" rx="1.1" ry="1.3" fill="#ffffff" stroke="#0f172a" stroke-width="0.35"/><circle cx="5" cy="-3.8" r="0.5" fill="#0f172a"/><circle cx="10.5" cy="-3.8" r="0.5" fill="#0f172a"/></g></g></g>
+    <g id="mdm_mouth_group"><path d="M6 -1.1 h3" stroke="#dc2626" stroke-width="0.7" stroke-linecap="round"/><path d="M6.7 -1.5 v0.8 M7.5 -1.5 v0.8 M8.3 -1.5 v0.8" stroke="#ffffff" stroke-width="0.25"/></g>
+    <g class="sweat-fall" style="transform-origin:12px -8px"><path d="M12 -8.4 q0.9 1.3 0 2.2 q-0.9 -0.3 -0.9 -1.1 q0 -0.7 0.9 -1.1 z" fill="#38bdf8" opacity="0.9"/></g><path id="mdm_left_arm" d="M2 3.5 Q1.1 5.0 3.4 6.6" stroke="#ffffff" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+    <circle id="mdm_left_hand" cx="3.4" cy="6.6" r="0.75" fill="#ffffff" stroke="#0f172a" stroke-width="0.3"/><path id="mdm_right_arm" d="M13 3.5 Q13.9 5.0 11.6 6.6" stroke="#ffffff" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+    <circle id="mdm_right_hand" cx="11.6" cy="6.6" r="0.75" fill="#ffffff" stroke="#0f172a" stroke-width="0.3"/><g transform="translate(2.6,6.4)"><g class="stack-sway" style="transform-origin:4.9px 1px">
+      <g transform="translate(0,0)"><rect x="0" y="0" width="9.8" height="1.7" rx="0.3" fill="#1d4ed8" stroke="#0f172a" stroke-width="0.28"/><rect x="8.4" y="0.45" width="0.9" height="0.8" rx="0.15" fill="#ffffff" opacity="0.85"/></g>
+      <g transform="translate(0.3,-1.9)"><rect x="0" y="0" width="9.2" height="1.7" rx="0.3" fill="#2563eb" stroke="#0f172a" stroke-width="0.28"/><rect x="7.799999999999999" y="0.45" width="0.9" height="0.8" rx="0.15" fill="#ffffff" opacity="0.85"/></g>
+      <g transform="translate(-0.2,-3.8)"><rect x="0" y="0" width="9.8" height="1.7" rx="0.3" fill="#1d4ed8" stroke="#0f172a" stroke-width="0.28"/><rect x="8.4" y="0.45" width="0.9" height="0.8" rx="0.15" fill="#ffffff" opacity="0.85"/></g>
+      <g transform="translate(0.4,-5.7)"><rect x="0" y="0" width="9" height="1.7" rx="0.3" fill="#2563eb" stroke="#0f172a" stroke-width="0.28"/><rect x="7.6" y="0.45" width="0.9" height="0.8" rx="0.15" fill="#ffffff" opacity="0.85"/></g>
+      <g transform="translate(0.1,-7.6)"><g class="top-teeter" style="transform-origin:4.6px 1.7px"><rect x="0" y="0" width="9.4" height="1.7" rx="0.3" fill="#f2b632" stroke="#0f172a" stroke-width="0.28"/><rect x="8" y="0.45" width="0.9" height="0.8" rx="0.15" fill="#ffffff" opacity="0.85"/></g></g></g></g><g transform="translate(11,-2.4)"><g class="flutter"><rect x="0" y="0" width="2.6" height="1.8" rx="0.15" fill="#f4f8ff" stroke="#0f172a" stroke-width="0.22"/></g></g></g>
+</svg>
