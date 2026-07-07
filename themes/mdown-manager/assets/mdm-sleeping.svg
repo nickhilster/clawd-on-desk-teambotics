@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 45">
+  <defs><style>
+    .breathe { animation: kf-breathe 3.6s infinite ease-in-out; }
+    @keyframes kf-breathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.015,0.985); } }
+    .blink { animation: kf-blink 4.2s infinite ease-in-out; }
+    @keyframes kf-blink { 0%,92%,100% { transform: scaleY(1); } 96% { transform: scaleY(0.08); } }
+    .badge-pulse { animation: kf-badge 2.6s infinite ease-in-out; }
+    @keyframes kf-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.8; } }
+
+    .deep-breathe { animation: kf-deep 4.6s infinite ease-in-out; }
+    @keyframes kf-deep { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.03,0.965); } }
+    .z1 { animation: kf-z 3.6s infinite ease-out; }
+    .z2 { animation: kf-z 3.6s infinite ease-out; animation-delay: -1.2s; }
+    .z3 { animation: kf-z 3.6s infinite ease-out; animation-delay: -2.4s; }
+    @keyframes kf-z { 0% { transform: translate(0,0); opacity: 0; } 20% { opacity: 0.9; } 100% { transform: translate(3px,-7px); opacity: 0; } }
+  </style></defs>
+<g class="deep-breathe" style="transform-origin:7.5px 10px">
+  <ellipse id="mdm_shadow" cx="7.5" cy="15.3" rx="6.2" ry="1.3" fill="#0f172a" opacity="0.16"/>
+  <g id="mdm_legs_group" fill="#0f172a"><rect x="3.4" y="10" width="2.6" height="4.2" rx="1"/><rect x="9" y="10" width="2.6" height="4.2" rx="1"/></g>
+  <g id="body-js"><g class="" style="transform-origin:7.5px 6px">
+    <rect id="mdm_body" x="2" y="2" width="11" height="8.4" rx="1.6" fill="#ffffff" stroke="#0f172a" stroke-width="0.4"/>
+    <path id="mdm_tie" d="M7 2.4 L8.3 2.4 L9 5 L7.5 9.6 L6 5 Z" fill="#1d4ed8"/>
+    <rect x="10" y="3.4" width="2" height="2.4" rx="0.3" fill="#dfe9fb" stroke="#0f172a" stroke-width="0.25"/>
+    <rect x="10.7" y="3" width="0.55" height="1.2" rx="0.2" fill="#dc2626"/></g>
+  </g><g transform="rotate(5 7.5 0)">
+    <rect id="mdm_head_document" x="1" y="-9" width="13" height="11" rx="2.4" fill="#ffffff" stroke="#0f172a" stroke-width="0.4"/>
+    <path id="mdm_corner_fold" d="M11.6 -9 L14 -9 L14 -6.6 Z" fill="#dfe9fb" stroke="#0f172a" stroke-width="0.3"/>
+    <g class="badge-pulse">
+      <rect id="mdm_badge" x="2.1" y="-8.1" width="3.6" height="3.6" rx="0.6" fill="#1d4ed8"/>
+      <path d="M2.9 -5.3 V-7.4 L3.9 -6.1 L4.9 -7.4 V-5.3" stroke="#ffffff" stroke-width="0.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="mdm_brows_group"><path d="M3.4 -6.9 q1.6 -0.4 3 0" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+         <path d="M8.6 -6.9 q1.6 -0.4 3 0" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/></g>
+    <g id="eyes-js"><g class="blink" style="transform-origin:7.5px -3.5px"><g id="mdm_eyes_group"><path d="M4 -4 q1 0.8 2 0" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+       <path d="M9.5 -4 q1 0.8 2 0" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/></g></g></g>
+    <g id="mdm_mouth_group"><path d="M6.2 -0.9 h2.6" stroke="#dc2626" stroke-width="0.6" stroke-linecap="round"/></g>
+    </g></g>
+<path id="mdm_left_arm" d="M2 3.5 Q-1.2 6.2 -1.2 8.8" stroke="#ffffff" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+    <circle id="mdm_left_hand" cx="-1.2" cy="8.8" r="0.85" fill="#ffffff" stroke="#0f172a" stroke-width="0.3"/>
+<path id="mdm_right_arm" d="M13 3.5 Q16.2 6.2 16.2 8.8" stroke="#ffffff" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+    <circle id="mdm_right_hand" cx="16.2" cy="8.8" r="0.85" fill="#ffffff" stroke="#0f172a" stroke-width="0.3"/>
+<g font-family="Arial, sans-serif" font-weight="bold" fill="#1d4ed8">
+    <text class="z1" x="14.5" y="-9" font-size="2.6">z</text>
+    <text class="z2" x="16" y="-11" font-size="2">z</text>
+    <text class="z3" x="17.4" y="-13" font-size="1.5">z</text>
+  </g>
+</svg>

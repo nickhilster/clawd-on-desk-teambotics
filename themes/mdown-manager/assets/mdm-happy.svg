@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 45">
+  <defs><style>
+    .breathe { animation: kf-breathe 3.6s infinite ease-in-out; }
+    @keyframes kf-breathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.015,0.985); } }
+    .blink { animation: kf-blink 4.2s infinite ease-in-out; }
+    @keyframes kf-blink { 0%,92%,100% { transform: scaleY(1); } 96% { transform: scaleY(0.08); } }
+    .badge-pulse { animation: kf-badge 2.6s infinite ease-in-out; }
+    @keyframes kf-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.8; } }
+
+    .stamp-slam { animation: kf-slam 2.6s infinite; }
+    @keyframes kf-slam { 0%,20% { transform: translateY(-5.5px); } 30% { transform: translateY(-5.5px); } 36% { transform: translateY(0); animation-timing-function: ease-in; } 42% { transform: translateY(-0.4px); } 48% { transform: translateY(0); } 72% { transform: translateY(0); } 88%,100% { transform: translateY(-5.5px); } }
+    .imprint { animation: kf-imp 2.6s infinite; }
+    @keyframes kf-imp { 0%,35% { opacity: 0; } 38%,86% { opacity: 1; } 92%,100% { opacity: 0; } }
+    .burst { animation: kf-burst 2.6s infinite; }
+    @keyframes kf-burst { 0%,34% { transform: scale(0); opacity: 0; } 38% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.25); opacity: 0; } 100% { transform: scale(0); opacity: 0; } }
+    .conf1 { animation: kf-conf1 2.6s infinite; }
+    .conf2 { animation: kf-conf2 2.6s infinite; }
+    .conf3 { animation: kf-conf3 2.6s infinite; }
+    @keyframes kf-conf1 { 0%,35% { transform: translate(0,0) rotate(0deg); opacity: 0; } 38% { opacity: 1; } 70% { transform: translate(-3px,-6px) rotate(140deg); opacity: 0; } 100% { opacity: 0; } }
+    @keyframes kf-conf2 { 0%,35% { transform: translate(0,0) rotate(0deg); opacity: 0; } 38% { opacity: 1; } 70% { transform: translate(3.5px,-5px) rotate(-120deg); opacity: 0; } 100% { opacity: 0; } }
+    @keyframes kf-conf3 { 0%,35% { transform: translate(0,0) rotate(0deg); opacity: 0; } 38% { opacity: 1; } 70% { transform: translate(1px,-7px) rotate(90deg); opacity: 0; } 100% { opacity: 0; } }
+    .body-react { animation: kf-br 2.6s infinite; }
+    @keyframes kf-br { 0%,34% { transform: scale(1,1); } 38% { transform: scale(1.04,0.95); } 46%,100% { transform: scale(1,1); } }
+    .wave-arm { animation: kf-wave 2.6s infinite ease-in-out; }
+    @keyframes kf-wave { 0%,100% { transform: rotate(0deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-6deg); } }
+  </style></defs>
+<g transform="translate(6.2,9.2) rotate(-4)">
+    <rect x="0" y="0" width="8.4" height="5.6" rx="0.4" fill="#f4f8ff" stroke="#0f172a" stroke-width="0.35"/>
+    <rect x="0.8" y="0.9" width="5.4" height="0.55" fill="#dfe9fb"/>
+    <rect x="0.8" y="2" width="6.4" height="0.55" fill="#dfe9fb"/>
+    <g class="imprint">
+      <rect x="1.6" y="3" width="5" height="1.7" rx="0.25" fill="none" stroke="#dc2626" stroke-width="0.3" transform="rotate(-6 4.1 3.85)"/>
+      <text x="4.1" y="4.35" font-size="1.25" fill="#dc2626" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" transform="rotate(-6 4.1 3.85)">DONE</text>
+    </g>
+  </g>
+<g class="body-react" style="transform-origin:7.5px 10px">
+  <ellipse id="mdm_shadow" cx="7.5" cy="15.3" rx="6.2" ry="1.3" fill="#0f172a" opacity="0.16"/>
+  <g id="mdm_legs_group" fill="#0f172a"><rect x="3.4" y="10" width="2.6" height="4.2" rx="1"/><rect x="9" y="10" width="2.6" height="4.2" rx="1"/></g>
+  <g id="body-js"><g class="breathe" style="transform-origin:7.5px 6px">
+    <rect id="mdm_body" x="2" y="2" width="11" height="8.4" rx="1.6" fill="#ffffff" stroke="#0f172a" stroke-width="0.4"/>
+    <path id="mdm_tie" d="M7 2.4 L8.3 2.4 L9 5 L7.5 9.6 L6 5 Z" fill="#1d4ed8"/>
+    <rect x="10" y="3.4" width="2" height="2.4" rx="0.3" fill="#dfe9fb" stroke="#0f172a" stroke-width="0.25"/>
+    <rect x="10.7" y="3" width="0.55" height="1.2" rx="0.2" fill="#dc2626"/></g>
+  </g>
+    <rect id="mdm_head_document" x="1" y="-9" width="13" height="11" rx="2.4" fill="#ffffff" stroke="#0f172a" stroke-width="0.4"/>
+    <path id="mdm_corner_fold" d="M11.6 -9 L14 -9 L14 -6.6 Z" fill="#dfe9fb" stroke="#0f172a" stroke-width="0.3"/>
+    <g class="badge-pulse">
+      <rect id="mdm_badge" x="2.1" y="-8.1" width="3.6" height="3.6" rx="0.6" fill="#1d4ed8"/>
+      <path d="M2.9 -5.3 V-7.4 L3.9 -6.1 L4.9 -7.4 V-5.3" stroke="#ffffff" stroke-width="0.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g id="mdm_brows_group"><path d="M3.4 -7.4 q1.6 -0.6 3 0" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+         <path d="M8.6 -7.4 q1.6 -0.6 3 0" stroke="#0f172a" stroke-width="0.6" fill="none" stroke-linecap="round"/></g>
+    <g id="eyes-js"><g class="blink" style="transform-origin:7.5px -3.5px"><g id="mdm_eyes_group">
+    <ellipse cx="5" cy="-3.8" rx="1.1" ry="1.3" fill="#ffffff" stroke="#0f172a" stroke-width="0.35"/>
+    <ellipse cx="10.5" cy="-3.8" rx="1.1" ry="1.3" fill="#ffffff" stroke="#0f172a" stroke-width="0.35"/><circle cx="5" cy="-3.8" r="0.5" fill="#0f172a"/><circle cx="10.5" cy="-3.8" r="0.5" fill="#0f172a"/></g></g></g>
+    <g id="mdm_mouth_group"><ellipse cx="7.5" cy="-0.9" rx="1.1" ry="0.7" fill="#dc2626"/></g>
+    </g>
+<g class="wave-arm" style="transform-origin:2px 3.5px"><path id="mdm_left_arm" d="M2 3.5 Q-1.4 3.0 -1.6 2.4" stroke="#ffffff" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+    <circle id="mdm_left_hand" cx="-1.6" cy="2.4" r="0.85" fill="#ffffff" stroke="#0f172a" stroke-width="0.3"/></g>
+<g class="stamp-slam" style="transform-origin:11px 6px"><path id="mdm_right_arm" d="M13 3.5 Q13.7 4.3 11.2 5.2" stroke="#ffffff" stroke-width="2.1" fill="none" stroke-linecap="round"/>
+    <circle id="mdm_right_hand" cx="11.2" cy="5.2" r="0.75" fill="#ffffff" stroke="#0f172a" stroke-width="0.3"/><g transform="translate(9.4,4.4)">
+    <rect x="1" y="0" width="2.6" height="2" rx="0.35" fill="#0f172a"/>
+    <rect x="0" y="2" width="4.6" height="1.3" rx="0.25" fill="#dc2626" stroke="#0f172a" stroke-width="0.22"/></g></g>
+<g class="burst" style="transform-origin:11.6px 8.2px">
+    <path d="M8.6 7.4 l-1.6 -1.2 M11.6 6.6 l0 -1.8 M14.6 7.4 l1.6 -1.2 M9.4 9.4 l-2 0.4 M13.8 9.4 l2 0.4" stroke="#f2b632" stroke-width="0.5" stroke-linecap="round"/></g>
+<g>
+    <rect class="conf1" x="10.6" y="3.4" width="0.9" height="0.9" fill="#1d4ed8"/>
+    <rect class="conf2" x="12.2" y="3.8" width="0.8" height="0.8" fill="#16a34a"/>
+    <rect class="conf3" x="11.4" y="3" width="0.7" height="0.7" fill="#f2b632"/>
+  </g>
+</svg>
