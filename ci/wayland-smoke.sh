@@ -87,14 +87,19 @@ poll() {
 }
 
 # Electron BROWSER processes of our AppImage: cmdline runs through the squashfs
-# mountpoint (/tmp/.mount_Clawd*) and has no Chromium --type= child marker.
-# Pass "x11" to keep only those carrying --ozone-platform=x11.
+# mountpoint (/tmp/.mount_<AppName><random>, where <AppName> is derived from
+# productName — this was ".mount_Clawd*" before the DeskBuddy rebrand, now
+# ".mount_DeskBu*"). Match generically on ".mount_" instead of hardcoding the
+# app name, since this runner never mounts any AppImage but our own — this
+# way a future rename can't silently break process teardown again. Has no
+# Chromium --type= child marker. Pass "x11" to keep only those carrying
+# --ozone-platform=x11.
 browser_pids() {
   local want_flag="${1:-}" d pid cmd
   for d in /proc/[0-9]*; do
     pid="${d#/proc/}"
     cmd="$(tr '\0' ' ' <"$d/cmdline" 2>/dev/null)" || continue
-    case "$cmd" in *".mount_Clawd"*) ;; *) continue ;; esac
+    case "$cmd" in *".mount_"*) ;; *) continue ;; esac
     case "$cmd" in *"--type="*) continue ;; esac
     if [ "$want_flag" = "x11" ]; then
       case "$cmd" in *"--ozone-platform=x11"*) echo "$pid" ;; esac
@@ -118,7 +123,7 @@ kill_app() {
   for p in $(browser_pids); do kill "$p" 2>/dev/null || true; done
   sleep 1
   for p in $(browser_pids); do kill -9 "$p" 2>/dev/null || true; done
-  pkill -9 -f '\.mount_Clawd' 2>/dev/null || true
+  pkill -9 -f '\.mount_' 2>/dev/null || true
   poll 15 state_gone || fail "port 23333 still occupied after teardown"
 }
 
