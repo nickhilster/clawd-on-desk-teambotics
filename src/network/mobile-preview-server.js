@@ -492,7 +492,11 @@ function initMobilePreviewServer(ctx) {
     try {
       bonjourInstance = new Bonjour();
       bonjourService = bonjourInstance.publish({
-        name: `clawd-on-desk-${machineId.slice(0, 8)}`,
+        name: `deskbuddy-${machineId.slice(0, 8)}`,
+        // NOTE: service "type" is a discovery-protocol identifier the Android
+        // app matches against, not user-facing branding — left as "clawd" so
+        // existing mobile pairings keep working. Change both sides together
+        // if this is ever renamed.
         type: "clawd",
         protocol: "tcp",
         port: activePort,
@@ -503,7 +507,7 @@ function initMobilePreviewServer(ctx) {
           version: PROTOCOL_VERSION,
         },
       });
-      console.log(`[mobile-preview] mDNS advertised as clawd-on-desk-${machineId.slice(0, 8)}._clawd._tcp.local`);
+      console.log(`[mobile-preview] mDNS advertised as deskbuddy-${machineId.slice(0, 8)}._clawd._tcp.local`);
     } catch (err) {
       console.error("[mobile-preview] mDNS advertisement failed:", err.message);
     }

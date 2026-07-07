@@ -58,6 +58,26 @@ html, body {
   transform: scaleX(-1);
 }
 
+/* 3D render path (renderer-3d.js). Hidden until a render3d-enabled theme's
+   GLB finishes loading, at which point renderer-3d.js toggles this class on
+   #pet-container so the 2D layer never flashes if the model fails to load. */
+#clawd3d-canvas {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#pet-container.render-3d-active #pet-motion {
+  display: none;
+}
+
+#pet-container.render-3d-active #clawd3d-canvas {
+  display: block;
+}
+
 /* ── Roam walk animation ──
    When the pet is roaming (free-roam mode), add a subtle horizontal bob
    to simulate walking even if the theme doesn't have a dedicated roam SVG.

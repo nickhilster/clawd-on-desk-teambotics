@@ -542,6 +542,24 @@ function normalizeRendering(value) {
   };
 }
 
+// Optional 3D rendering block. Presence of `render3d.model` opts a theme into
+// the Three.js/GLTF renderer path; absence keeps the theme on the default
+// DOM/SVG renderer. `states.*` fallback bindings are still required by
+// validateTheme() regardless, so a 3D theme always has a safe 2D fallback if
+// the model fails to load.
+function normalizeRender3d(value) {
+  if (!isPlainObject(value)) return null;
+  const model = basenameOnly(value.model);
+  if (!model) return null;
+  const clips = {};
+  if (isPlainObject(value.clips)) {
+    for (const [state, clipName] of Object.entries(value.clips)) {
+      if (typeof clipName === "string" && clipName) clips[state] = clipName;
+    }
+  }
+  return { model, clips };
+}
+
 function warnFileViewBoxDropped(rawKey, reason) {
   console.warn(`[theme-loader] fileViewBoxes["${rawKey}"] dropped: ${reason}`);
 }
@@ -634,6 +652,7 @@ function mergeDefaults(raw, themeId, isBuiltin) {
   // trustedRuntime grants script execution capability, so it requires loader-derived built-in trust.
   theme.trustedRuntime = normalizeTrustedRuntime(raw.trustedRuntime, isBuiltin, themeId);
   theme.rendering = normalizeRendering(raw.rendering);
+  theme.render3d = normalizeRender3d(raw.render3d);
 
   // objectScale
   theme.objectScale = { ...DEFAULT_OBJECT_SCALE, ...(raw.objectScale || {}) };

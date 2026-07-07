@@ -1,0 +1,41 @@
+{
+  "_comment": "Phase 0/1 reference theme for the 3D (Three.js/GLTF) render path. model.glb is a placeholder capsule+head rig with a single 'Bounce' clip — see spike-3d/gen-test-glb.mjs for how it was generated. states.* below is the required 2D fallback, shown only if the GLB fails to load.",
+  "schemaVersion": 1,
+  "name": "Robo Test (3D)",
+  "author": "DeskBuddy",
+  "version": "0.1.0",
+  "description": "Reference implementation for render3d — placeholder GLB, not production art.",
+
+  "viewBox": { "x": -15, "y": -25, "width": 45, "height": 45 },
+
+  "eyeTracking": { "enabled": false, "states": [] },
+
+  "sleepSequence": { "mode": "direct" },
+
+  "miniMode": { "supported": false },
+
+  "states": {
+    "idle": ["placeholder.svg"],
+    "thinking": ["placeholder.svg"],
+    "working": ["placeholder.svg"],
+    "sleeping": ["placeholder.svg"]
+  },
+
+  "hitBoxes": {
+    "default": { "x": -1, "y": -20, "w": 17, "h": 35 }
+  },
+
+  "render3d": {
+    "_comment": "model is resolved relative to this theme's assets/ folder, same as raster assets. clips maps state name -> GLTF animation clip name; states not listed here fall back to the model's first animation clip.",
+    "model": "model.glb",
+    "clips": {
+      "idle": "Bounce",
+      "thinking": "Bounce",
+      "working": "Bounce",
+      "sleeping": "Bounce",
+      "attention": "Bounce",
+      "error": "Bounce",
+      "notification": "Bounce"
+    }
+  }
+}

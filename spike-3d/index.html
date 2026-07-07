@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script>
+  // GLTFLoader.js under examples/jsm is ES-module source (import/export), so it
+  // can't be require()'d as CommonJS. Expose ipcRenderer here in classic-script
+  // scope, then do the actual three.js work in a type="module" script below.
+  window.__ipc = require("electron").ipcRenderer;
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "../node_modules/three/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+  import * as THREE from "three";
+  import { GLTFLoader } from "../node_modules/three/examples/jsm/loaders/GLTFLoader.js";
+  const ipcRenderer = window.__ipc;
+
+  const width = 400, height = 400;
+
+  // Transparent-canvas renderer — validates PRD 2.1 (alpha overlay) without
+  // any Electron-level compositing tricks beyond the existing transparent BrowserWindow.
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setClearColor(0x000000, 0); // fully transparent clear
+  renderer.setSize(width, height);
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+  camera.position.set(0, 1.5, 4.5);
+  camera.lookAt(0, 1.2, 0);
+
+  // REQ-3D lighting requirement: simple ambient + directional, PBR-friendly.
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(2, 3, 2);
+  scene.add(dirLight);
+
+  // REQ-3D-001: GLTF/GLB loader pipeline. test-character.glb is generated
+  // locally by gen-test-glb.mjs (a capsule body + head with a "Bounce" clip),
+  // so this validates loading + AnimationMixer without depending on a network asset.
+  let model = null;
+  let mixer = null;
+  let triCount = 0;
+  const clickTargets = [];
+  const loader = new GLTFLoader();
+  loader.load(
+    "assets/test-character.glb",
+    (gltf) => {
+      model = gltf.scene;
+      scene.add(model);
+
+      model.traverse((obj) => {
+        if (obj.isMesh) {
+          clickTargets.push(obj);
+          triCount += obj.geometry.index
+            ? obj.geometry.index.count / 3
+            : obj.geometry.attributes.position.count / 3;
+        }
+      });
+      console.log("[spike] glb loaded, triangle count:", triCount, "clips:", gltf.animations.map((c) => c.name));
+
+      mixer = new THREE.AnimationMixer(model);
+      if (gltf.animations.length) {
+        const action = mixer.clipAction(gltf.animations[0]);
+        action.play();
+      }
+    },
+    undefined,
+    (err) => console.error("[spike] GLTF load failed:", err)
+  );
+
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  let flashUntil = 0;
+  const flashColor = new THREE.Color(0xffd166);
+  const originalColors = new Map();
+
+  window.addEventListener("click", (e) => {
+    if (!clickTargets.length) return;
+    pointer.x = (e.clientX / width) * 2 - 1;
+    pointer.y = -(e.clientY / height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(clickTargets);
+    if (hits.length) {
+      // Simulate a state-change reaction (e.g. "attention" state) on click,
+      // same trigger point the real setState()/reactions system would use.
+      for (const obj of clickTargets) {
+        if (!originalColors.has(obj)) originalColors.set(obj, obj.material.color.clone());
+        obj.material.color.copy(flashColor);
+      }
+      flashUntil = performance.now() + 400;
+    }
+  });
+
+  // Simple frame-budget + FPS instrumentation to validate the PRD's
+  // Δt ≈ 16.67ms / 60fps engine loop requirement.
+  let frames = 0;
+  let lastFpsSample = performance.now();
+  let lastFrameTime = performance.now();
+  let worstFrameMs = 0;
+
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = now - lastFrameTime;
+    lastFrameTime = now;
+    worstFrameMs = Math.max(worstFrameMs * 0.98, dt); // decaying worst-case tracker
+
+    if (mixer) mixer.update(dt / 1000);
+    if (model) model.rotation.y += 0.006;
+    if (now > flashUntil) {
+      for (const [obj, color] of originalColors) obj.material.color.copy(color);
+    }
+
+    renderer.render(scene, camera);
+
+    frames++;
+    if (now - lastFpsSample >= 1000) {
+      ipcRenderer.send("spike:fps", {
+        fps: frames,
+        worstFrameMs: Math.round(worstFrameMs * 10) / 10,
+        triCount,
+      });
+      frames = 0;
+      lastFpsSample = now;
+    }
+  }
+  requestAnimationFrame(animate);
+</script>
+</body>
+</html>

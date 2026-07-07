@@ -54,11 +54,6 @@
       };
       slot.addEventListener("animationend", onEnd);
     }
-    runtime.about.clickCount++;
-    if (runtime.about.clickCount >= 7) {
-      runtime.about.clickCount = 0;
-      ops.showToast(t("aboutEasterEggToast"), { ttl: 5000 });
-    }
   }
 
   function buildAboutLinkRow(label, url, displayText) {
@@ -156,7 +151,7 @@
 
     const title = document.createElement("h2");
     title.className = "about-title";
-    title.textContent = "Clawd on Desk";
+    title.textContent = "DeskBuddy";
 
     const buildBadge = document.createElement("span");
     buildBadge.className = "about-build-badge";

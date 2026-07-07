@@ -60,6 +60,18 @@ function createThemeContext(theme, options = {}) {
     return buildFileUrl(path.join(theme._themeDir, "assets"));
   }
 
+  // 3D themes ship their model in the same per-theme assets/ folder as raster
+  // assets, so it resolves the same way non-SVG assets do (getAssetUrl() in
+  // renderer.js prefers sourceAssetsPath for non-.svg files).
+  function getRender3dConfig() {
+    if (!theme || !theme.render3d) return null;
+    const assetsPath = getRendererSourceAssetsPath() || getRendererAssetsPath();
+    return {
+      modelUrl: `${assetsPath}/${theme.render3d.model}`,
+      clips: { ...theme.render3d.clips },
+    };
+  }
+
   function getRendererConfig() {
     if (!theme) return null;
     const trustedScriptedSvgFiles = theme._builtin && theme.trustedRuntime
@@ -97,6 +109,7 @@ function createThemeContext(theme, options = {}) {
       transitions: theme.transitions || {},
       movement: theme.movement || "roam",
       ballTheme: buildRendererBallTheme(theme),
+      render3d: getRender3dConfig(),
     };
   }
 

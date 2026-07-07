@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font: 13px/1.5 -apple-system, Segoe UI, sans-serif; padding: 12px; }
+  button { display: block; width: 100%; margin-bottom: 8px; padding: 8px; }
+  #stats { white-space: pre; background: #f2f2f2; padding: 8px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h3 style="margin-top:0">3D Spike Control</h3>
+  <button id="toggle">Toggle click-through (currently OFF)</button>
+  <button id="quit">Quit spike</button>
+  <div id="stats">waiting for frame data…</div>
+<script>
+  window.spike.onFpsUpdate((data) => {
+    document.getElementById("stats").textContent =
+      `fps: ${data.fps}\nworst frame: ${data.worstFrameMs}ms\ntris: ${data.triCount}`;
+  });
+  window.spike.onClickThroughState((state) => {
+    document.getElementById("toggle").textContent =
+      `Toggle click-through (currently ${state ? "ON" : "OFF"})`;
+  });
+  document.getElementById("toggle").addEventListener("click", () => window.spike.toggleClickThrough());
+  document.getElementById("quit").addEventListener("click", () => window.spike.quit());
+</script>
+</body>
+</html>

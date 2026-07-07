@@ -20,7 +20,11 @@ const os = require("os");
 const path = require("path");
 
 const AUTOSTART_DIR = path.join(os.homedir(), ".config", "autostart");
-const AUTOSTART_FILE = path.join(AUTOSTART_DIR, "clawd-on-desk.desktop");
+const AUTOSTART_FILE = path.join(AUTOSTART_DIR, "deskbuddy.desktop");
+// Renamed from clawd-on-desk.desktop during the DeskBuddy rebrand. Cleaned up
+// opportunistically in linuxSetOpenAtLogin() so existing installs don't end
+// up with both a stale and a current autostart entry.
+const LEGACY_AUTOSTART_FILE = path.join(AUTOSTART_DIR, "clawd-on-desk.desktop");
 
 function getLoginItemSettings({ isPackaged, openAtLogin, execPath, appPath }) {
   if (isPackaged) return { openAtLogin };
@@ -33,13 +37,18 @@ function getLoginItemSettings({ isPackaged, openAtLogin, execPath, appPath }) {
 
 function linuxGetOpenAtLogin() {
   try {
-    return fs.existsSync(AUTOSTART_FILE);
+    return fs.existsSync(AUTOSTART_FILE) || fs.existsSync(LEGACY_AUTOSTART_FILE);
   } catch {
     return false;
   }
 }
 
 function linuxSetOpenAtLogin(enable, { execCmd } = {}) {
+  try {
+    fs.unlinkSync(LEGACY_AUTOSTART_FILE);
+  } catch (err) {
+    if (err && err.code !== "ENOENT") throw err;
+  }
   if (enable) {
     if (!execCmd) {
       throw new Error("linuxSetOpenAtLogin: execCmd is required when enabling");
@@ -48,7 +57,7 @@ function linuxSetOpenAtLogin(enable, { execCmd } = {}) {
       [
         "[Desktop Entry]",
         "Type=Application",
-        "Name=Clawd on Desk",
+        "Name=DeskBuddy",
         `Exec=${execCmd}`,
         "Hidden=false",
         "NoDisplay=false",

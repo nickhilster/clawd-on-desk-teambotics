@@ -1,0 +1,40 @@
+<svg viewBox="-15 -25 45 45" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shifu: Sleeping State -->
+
+  <ellipse id="shadow-js" cx="7.5" cy="16" rx="5.5" ry="1.8" fill="rgba(0,0,0,0.15)"/>
+
+  <g>
+    <line x1="2.5" y1="4" x2="0.8" y2="6.5" stroke="#B5502A" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="0.6" cy="6.8" r="0.55" fill="#B5502A"/>
+
+    <line x1="12.5" y1="4" x2="14.2" y2="6.5" stroke="#B5502A" stroke-width="0.8" stroke-linecap="round"/>
+    <circle cx="14.4" cy="6.8" r="0.55" fill="#B5502A"/>
+  </g>
+
+  <g id="body-js" transform="translate(0 0.8) rotate(3 7.5 4)">
+    <!-- Green robe top (NOT saffron/orange; corrected against reference art) -->
+    <rect x="2.5" y="-1.5" width="10" height="7" rx="2.5" fill="#355E43"/>
+
+    <!-- Brown belt/trim band between robe top and pants -->
+    <rect x="3" y="5.3" width="9" height="1.4" rx="0.5" fill="#5C3A21"/>
+
+    <!-- Tan pants band -->
+    <rect x="2.5" y="6.7" width="10" height="3.8" rx="1.5" fill="#D9C08C"/>
+
+    <path d="M 3 -3.5 L 4.5 -1.5 L 1.5 -1.5 Z" fill="#B5502A"/>
+    <path d="M 12 -3.5 L 13.5 -1.5 L 10.5 -1.5 Z" fill="#B5502A"/>
+
+    <ellipse cx="7.5" cy="2.5" rx="4" ry="3.5" fill="#F2D9B1"/>
+
+    <path d="M 6 6.2 L 9 6.2" stroke="#1A1A1A" stroke-width="0.35" stroke-linecap="round"/>
+
+    <path d="M 4.2 0.6 L 6.4 0.4" stroke="#1A1A1A" stroke-width="0.35" stroke-linecap="round"/>
+    <path d="M 8.6 0.4 L 10.8 0.6" stroke="#1A1A1A" stroke-width="0.35" stroke-linecap="round"/>
+
+    <g id="eyes-js">
+      <path d="M 4.1 2.6 Q 5.5 3.3 6.9 2.6" stroke="#1A1A1A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
+      <path d="M 8.1 2.6 Q 9.5 3.3 10.9 2.6" stroke="#1A1A1A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
+    </g>
+  </g>
+  <g opacity="0.7"><text x="11" y="-8" font-size="2.5" font-weight="bold" fill="#5C3A21">Z</text></g>
+</svg>

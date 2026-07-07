@@ -56,6 +56,9 @@ docs/**
 !docs/releases/release-v0.10.0.md
 !docs/releases/release-v0.11.0.md
 
+# Personal reference only — internal fan-character id -> public alias (mirrors docs/** ignore pattern)
+themes/NAMING-MAP.md
+
 # Temp files from testing
 .tmp_*
 .tmp-*

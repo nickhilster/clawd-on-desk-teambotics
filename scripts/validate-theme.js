@@ -243,6 +243,10 @@ function collectFiles() {
       if (f) files.add(f);
     }
   }
+  // 3D render model (lives in the same assets/ folder as raster assets)
+  if (raw.render3d && raw.render3d.model) {
+    files.add(raw.render3d.model);
+  }
   return files;
 }
 

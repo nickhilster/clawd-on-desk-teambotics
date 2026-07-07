@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "name": "Panda Master",
+  "author": "Nikhil Hilster",
+  "version": "1.0.0",
+  "description": "A big-hearted, food-loving panda warrior companion",
+
+  "viewBox": { "x": -15, "y": -25, "width": 45, "height": 45 },
+
+  "layout": {
+    "contentBox": { "x": -4, "y": -3, "width": 23, "height": 20 },
+    "centerX": 7.5,
+    "baselineY": 17,
+    "visibleHeightRatio": 0.6,
+    "baselineBottomRatio": 0.05
+  },
+
+  "eyeTracking": {
+    "enabled": true,
+    "states": ["idle"],
+    "eyeRatioX": 0.5,
+    "eyeRatioY": 0.5,
+    "maxOffset": 3,
+    "bodyScale": 0.33,
+    "shadowStretch": 0.15,
+    "shadowShift": 0.3,
+    "ids": { "eyes": "eyes-js", "body": "body-js", "shadow": "shadow-js" },
+    "shadowOrigin": "7.5px 16px"
+  },
+
+  "states": {
+    "idle": ["idle-curious.svg"],
+    "thinking": ["thinking-confused.apng"],
+    "working": ["working-watch.apng"],
+    "juggling": ["juggling-play.apng"],
+    "error": ["concerned-error.apng"],
+    "attention": ["happy-excited.apng"],
+    "notification": ["notification-alert.apng"],
+    "sleeping": ["sleeping.apng"],
+    "waking": ["waking-stretch.apng"],
+    "yawning": ["yawning.apng"],
+    "dozing": ["dozing.apng"],
+    "collapsing": ["collapsing.apng"],
+    "sweeping": ["sweeping-tidy.apng"],
+    "carrying": ["carrying-proud.apng"]
+  },
+
+  "sleepSequence": { "mode": "full" },
+
+  "workingTiers": [
+    { "minSessions": 3, "file": "working-impressed.apng" },
+    { "minSessions": 2, "file": "working-nod.apng" },
+    { "minSessions": 1, "file": "working-watch.apng" }
+  ],
+
+  "jugglingTiers": [
+    { "minSessions": 2, "file": "juggling-dizzy.apng" },
+    { "minSessions": 1, "file": "juggling-play.apng" }
+  ],
+
+  "idleAnimations": [
+    { "file": "idle-tired-bored.apng", "duration": 5000 },
+    { "file": "idle-playful-mischievous.apng", "duration": 4500 }
+  ],
+
+  "timings": { "mouseIdleTimeout": 20000, "mouseSleepTimeout": 60000 },
+
+  "hitBoxes": {
+    "default": { "x": -1, "y": 5, "w": 18, "h": 13 },
+    "sleeping": { "x": -2, "y": 9, "w": 20, "h": 8 }
+  },
+  "sleepingHitboxFiles": ["sleeping.apng"],
+
+  "reactions": {
+    "drag": {
+      "file": "react-drag-playful.apng",
+      "fileLeft": "react-drag-left.apng",
+      "fileRight": "react-drag-right.apng"
+    },
+    "clickLeft": { "file": "react-left-cheeky.apng", "duration": 2500 },
+    "clickRight": { "file": "react-right-cheeky.apng", "duration": 2500 },
+    "double": { "files": ["react-flail.apng"], "duration": 3500 }
+  },
+
+  "miniMode": {
+    "supported": true,
+    "states": {
+      "mini-idle": ["mini-idle-peek.apng"],
+      "mini-enter": ["mini-enter-bounce.apng"],
+      "mini-enter-sleep": ["mini-sleep-cozy.apng"],
+      "mini-crabwalk": ["mini-crabwalk.apng"],
+      "mini-peek": ["mini-peek.apng"],
+      "mini-alert": ["mini-alert-excited.apng"],
+      "mini-happy": ["mini-celebrate.apng"],
+      "mini-sleep": ["mini-sleep-cozy.apng"]
+    }
+  },
+
+  "objectScale": {
+    "widthRatio": 2.05,
+    "heightRatio": 1.4,
+    "offsetX": -0.5,
+    "offsetY": -0.3
+  }
+}

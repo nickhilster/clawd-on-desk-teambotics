@@ -1,0 +1,53 @@
+<svg viewBox="-15 -25 45 45" xmlns="http://www.w3.org/2000/svg">
+  <!-- Po: Idle/Curious State with Eye Tracking -->
+
+  <!-- Shadow (trackable) -->
+  <ellipse id="shadow-js" cx="7.5" cy="16" rx="7" ry="2" fill="rgba(0,0,0,0.15)"/>
+
+  <!-- Arms (stubby panda arms, resting on belly) -->
+  <g>
+    <line x1="1" y1="5" x2="-1" y2="7" stroke="#2C2C2C" stroke-width="1.1" stroke-linecap="round"/>
+    <circle cx="-1.3" cy="7.3" r="0.9" fill="#2C2C2C"/>
+
+    <line x1="14" y1="5" x2="16" y2="7" stroke="#2C2C2C" stroke-width="1.1" stroke-linecap="round"/>
+    <circle cx="16.3" cy="7.3" r="0.9" fill="#2C2C2C"/>
+  </g>
+
+  <!-- Body Group (trackable for subtle rotation) -->
+  <g id="body-js">
+    <!-- Main body: wide rounded body, wider than Spark's -->
+    <rect x="0.5" y="-1" width="14" height="12" rx="5" fill="#F7F3E8"/>
+
+    <!-- Black shoulder/back band (accurate panda coloring) -->
+    <path d="M 0.5 -1 Q 7.5 -2.3 14.5 -1 L 14.5 1.3 Q 7.5 0.1 0.5 1.3 Z" fill="#2C2C2C"/>
+
+    <!-- Black ears -->
+    <circle cx="3" cy="-3" r="1.6" fill="#2C2C2C"/>
+    <circle cx="12" cy="-3" r="1.6" fill="#2C2C2C"/>
+
+    <!-- Black eye patches (behind eyes, drawn before eyes-js) -->
+    <ellipse cx="5" cy="2.8" rx="2.1" ry="1.8" fill="#2C2C2C"/>
+    <ellipse cx="10" cy="2.8" rx="2.1" ry="1.8" fill="#2C2C2C"/>
+
+    <!-- Black pants band (no shirt or sash; Po is bare-chested) -->
+    <rect x="1" y="8.5" width="12" height="3.5" rx="1.3" fill="#1C1C1C"/>
+
+    <!-- Mouth: content close-mouthed smile -->
+    <path d="M 5.5 6.8 Q 7.5 7.6 9.5 6.8" stroke="#1A1A1A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
+
+    <!-- Eyebrows: curious raised tilt -->
+    <path d="M 3.6 0.6 Q 5 0.1 6.2 0.5" stroke="#1A1A1A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
+    <path d="M 8.8 0.5 Q 10 0.1 11.4 0.6" stroke="#1A1A1A" stroke-width="0.35" fill="none" stroke-linecap="round"/>
+
+    <!-- Eyes Group (trackable for following) -->
+    <g id="eyes-js">
+      <circle cx="5" cy="3" r="1.7" fill="white"/>
+      <circle cx="5" cy="3" r="1.1" fill="#000000"/>
+      <circle cx="5.3" cy="2.7" r="0.45" fill="white" opacity="0.85"/>
+
+      <circle cx="10" cy="3" r="1.7" fill="white"/>
+      <circle cx="10" cy="3" r="1.1" fill="#000000"/>
+      <circle cx="10.3" cy="2.7" r="0.45" fill="white" opacity="0.85"/>
+    </g>
+  </g>
+</svg>

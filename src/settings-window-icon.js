@@ -2,8 +2,8 @@
 
 const path = require("path");
 
-const WINDOWS_APP_USER_MODEL_ID = "com.teambotics.clawd-on-desk";
-const SETTINGS_WINDOW_TITLE = "Clawd Settings — Teambotics";
+const WINDOWS_APP_USER_MODEL_ID = "com.teambotics.deskbuddy";
+const SETTINGS_WINDOW_TITLE = "DeskBuddy Settings — Teambotics";
 const SETTINGS_WINDOW_LAUNCH_ARG = "--open-settings-window";
 
 function quoteWindowsCommandArg(value) {

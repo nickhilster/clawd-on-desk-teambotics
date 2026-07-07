@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 45">
+  <!-- 2D fallback shown only if the render3d model fails to load. -->
+  <ellipse cx="7.5" cy="15" rx="6" ry="2" fill="rgba(0,0,0,0.15)"/>
+  <rect x="2" y="-5" width="11" height="16" rx="5.5" fill="#6fc3ff"/>
+  <circle cx="7.5" cy="-10" r="5" fill="#ffd166"/>
+</svg>
