@@ -290,6 +290,10 @@ const SCHEMA = {
       "reasonix": { integrationInstalled: false, enabled: false, permissionsEnabled: false, notificationHookEnabled: true },
       // QoderWork is state-only (Phase 1) — permission bubbles default off.
       "qoderwork": { integrationInstalled: false, enabled: false, permissionsEnabled: false, notificationHookEnabled: true },
+      // MDown Manager is a poller (not a coding agent) — no hooks, no
+      // permission bubbles. `enabled` also requires prefs.mdownManager.apiKey
+      // to be set before the poller actually starts (see agent-runtime-main.js).
+      "mdown-manager": { integrationInstalled: false, enabled: false, permissionsEnabled: false, notificationHookEnabled: false },
     }),
     normalize: normalizeAgents,
   },
@@ -333,6 +337,23 @@ const SCHEMA = {
     type: "object",
     defaultFactory: () => cloneDefaultTelegramApproval(),
     normalize: normalizeTelegramApproval,
+  },
+  // MDown Manager poller config — baseUrl/apiKey for its local HTTP API.
+  // Runtime is owned by agents/mdown-manager-poller.js; this field is data only.
+  mdownManager: {
+    type: "object",
+    defaultFactory: () => ({ baseUrl: "http://127.0.0.1:7734", apiKey: "" }),
+    normalize: (value) => {
+      if (!value || typeof value !== "object") {
+        return { baseUrl: "http://127.0.0.1:7734", apiKey: "" };
+      }
+      return {
+        baseUrl: typeof value.baseUrl === "string" && value.baseUrl.trim()
+          ? value.baseUrl.trim()
+          : "http://127.0.0.1:7734",
+        apiKey: typeof value.apiKey === "string" ? value.apiKey : "",
+      };
+    },
   },
   // v0.9.0 migration state. transport defaults to null (undecided) so v0.8.x
   // users upgrading without this key fall onto the "detect legacy artefacts"

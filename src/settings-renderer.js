@@ -14,6 +14,7 @@ const SIDEBAR_TABS = [
   { id: "telegram-approval", labelKey: "sidebarTelegramApproval", available: true },
   { id: "remote-ssh", labelKey: "sidebarRemoteSsh", available: true },
   { id: "mobile", labelKey: "sidebarMobile", available: true },
+  { id: "mdown-manager", labelKey: "sidebarMdownManager", available: true },
   { id: "about", labelKey: "sidebarAbout", available: true },
 ];
 
@@ -93,6 +94,7 @@ if (globalThis.ClawdSettingsTabTelegramApproval) globalThis.ClawdSettingsTabTele
 globalThis.ClawdSettingsTabAbout.init(core);
 if (globalThis.ClawdSettingsTabRemoteSsh) globalThis.ClawdSettingsTabRemoteSsh.init(core);
 if (globalThis.ClawdSettingsTabMobile) globalThis.ClawdSettingsTabMobile.init(core);
+if (globalThis.ClawdSettingsTabMdownManager) globalThis.ClawdSettingsTabMdownManager.init(core);
 
 if (window.settingsAPI && typeof window.settingsAPI.onChanged === "function") {
   window.settingsAPI.onChanged((payload) => core.ops.applyChanges(payload));
