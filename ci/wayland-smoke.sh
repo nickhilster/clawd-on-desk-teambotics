@@ -22,7 +22,7 @@
 # entirely; v4's spawn inherits stdio — asserted separately). Two extra eyes
 # for debugging: ELECTRON_ENABLE_LOGGING=file (env is inherited, so even a
 # silenced child writes Chromium logs to ELECTRON_LOG_FILE) and a /proc
-# sampler that records every Clawd/relauncher process's appearance and
+# sampler that records every DeskBuddy/relauncher process's appearance and
 # disappearance.
 
 set -u
@@ -62,7 +62,7 @@ dump_diagnostics() {
   note "diagnostics: weston log (tail)"
   tail -n 30 weston.log 2>/dev/null || true
   note "diagnostics: live processes"
-  ps ax -o pid,ppid,stat,etime,args | grep -iE 'clawd|\.mount_|relauncher' | grep -v grep || true
+  ps ax -o pid,ppid,stat,etime,args | grep -iE 'deskbuddy|\.mount_|relauncher' | grep -v grep || true
   note "diagnostics: port 23333"
   ss -tlnp 2>/dev/null | grep 23333 || echo "(nothing listening)"
   note "diagnostics: X clients on ${XDISPLAY:-unset}"
@@ -114,8 +114,8 @@ no_x11_browser() { [ -z "$(browser_pids x11)" ]; }
 state_ok() { curl -fsS --max-time 2 "$STATE_URL" >/dev/null; }
 state_gone() { ! curl -fsS --max-time 1 "$STATE_URL" >/dev/null 2>&1; }
 x_has_clawd() {
-  xlsclients -display "$XDISPLAY" -l 2>/dev/null | grep -qi clawd ||
-    xwininfo -root -tree -display "$XDISPLAY" 2>/dev/null | grep -qi clawd
+  xlsclients -display "$XDISPLAY" -l 2>/dev/null | grep -qi deskbuddy ||
+    xwininfo -root -tree -display "$XDISPLAY" 2>/dev/null | grep -qi deskbuddy
 }
 
 kill_app() {
@@ -173,7 +173,7 @@ export ELECTRON_LOG_FILE="$PWD/electron-child.log"
     for d in /proc/[0-9]*; do
       cmd="$(tr '\0' ' ' <"$d/cmdline" 2>/dev/null)" || continue
       case "$cmd" in
-      *[Cc]lawd* | *relauncher*) printf '%s %s %s\n' "$t" "${d#/proc/}" "$cmd" ;;
+      *".mount_"* | *[Dd]eskbuddy* | *relauncher*) printf '%s %s %s\n' "$t" "${d#/proc/}" "$cmd" ;;
       esac
     done
     sleep 0.1

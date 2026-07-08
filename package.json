@@ -1,6 +1,6 @@
 {
   "name": "deskbuddy",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "DeskBuddy — a desktop pet that reacts to your coding agent sessions in real-time.",
   "main": "src/main.js",
   "scripts": {
