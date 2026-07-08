@@ -25,6 +25,7 @@ describe("Agent Registry", () => {
       "qoder",
       "reasonix",
       "qoderwork",
+      "mdown-manager",
     ]);
   });
 

@@ -376,6 +376,7 @@ const _settingsController = createSettingsController({
     getTelegramApprovalTokenInfo: () => getTelegramApprovalTokenInfo(),
     sendTelegramApprovalTest: () => sendTelegramApprovalTest(),
     deleteTelegramApprovalTokenFile: () => deleteTelegramApprovalTokenFile(),
+    checkMdownManagerConnection: (baseUrl, apiKey) => checkMdownManagerConnection(baseUrl, apiKey),
     // Lazy getter so settings-actions can use the controller even though it's
     // instantiated below (forward-reference).
     get telegramMigration() {
@@ -1871,6 +1872,7 @@ agentRuntime = createAgentRuntimeMain({
   updateSession: (sessionId, state, event, opts) => updateSession(sessionId, state, event, opts),
   captureGhosttyTerminalId,
   clearCodexNotifyBubbles: (...args) => clearCodexNotifyBubbles(...args),
+  getMdownManagerConfig: () => _settingsController.get("mdownManager") || {},
 });
 
 // ── HTTP server — delegated to src/server.js ──
@@ -2200,6 +2202,31 @@ function buildTelegramStatusCommandText(options = {}) {
 function handleTelegramNativeCommand({ command, args } = {}) {
   if (command !== "status") return null;
   return buildTelegramStatusCommandText({ all: true });
+}
+
+const MDOWN_MANAGER_STATUS_TIMEOUT_MS = 3000;
+
+// On-demand reachability check for the Settings UI status row. Independent of
+// whether the poller (agents/mdown-manager-poller.js) is currently running —
+// the user may be testing a token before enabling the integration.
+async function checkMdownManagerConnection(baseUrl, apiKey) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MDOWN_MANAGER_STATUS_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${String(baseUrl).replace(/\/+$/, "")}/activity`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+    if (res.status === 401) return { connected: false, reason: "unauthorized" };
+    if (res.status === 404) return { connected: true, reason: "activity-endpoint-missing" };
+    if (!res.ok) return { connected: false, reason: "http-error", httpStatus: res.status };
+    const body = await res.json().catch(() => null);
+    return { connected: true, kind: body && typeof body.kind === "string" ? body.kind : null };
+  } catch {
+    return { connected: false, reason: "unreachable" };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function writeTelegramApprovalToken(token) {
@@ -4032,6 +4059,7 @@ if (!gotTheLock) {
     // agent-gate snapshot — a user who disabled Codex at last shutdown
     // shouldn't see its file watcher spin up on the next launch.
     agentRuntime.startCodexLogMonitor();
+    agentRuntime.startMdownManagerPoller();
 
     try {
       hardwareBuddyAdapter.start();

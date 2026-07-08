@@ -431,7 +431,7 @@ function registerSettingsIpc(options = {}) {
 
   handle("settings:list-agents", () => {
     try {
-      return getAllAgents().map(mapAgentMetadata);
+      return getAllAgents().filter((agent) => !agent.hiddenFromAgentsTab).map(mapAgentMetadata);
     } catch (err) {
       console.warn("Clawd: settings:list-agents failed:", err && err.message);
       return [];

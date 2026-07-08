@@ -1145,6 +1145,54 @@ async function telegramMigrationDispatch(payload, deps = {}) {
 telegramMigrationDispatch.lockKey = "tgApproval";
 telegramApprovalDeleteTokenFile.lockKey = "tgApproval";
 
+function validateMdownManagerBaseUrl(baseUrl) {
+  if (typeof baseUrl !== "string" || !baseUrl.trim()) {
+    return { status: "error", message: "mdownManager.saveConfig: baseUrl is required" };
+  }
+  const trimmed = baseUrl.trim();
+  try {
+    // eslint-disable-next-line no-new
+    new URL(trimmed);
+  } catch {
+    return { status: "error", message: "mdownManager.saveConfig: baseUrl must be a valid URL" };
+  }
+  return { status: "ok", baseUrl: trimmed };
+}
+
+// A blank apiKey in the payload means "leave the stored key unchanged" — the
+// Settings UI never echoes the real key back, so re-saving baseUrl alone
+// (with the password field left empty) must not clobber it.
+function mdownManagerSaveConfig(payload, deps = {}) {
+  if (!payload || typeof payload !== "object") {
+    return { status: "error", message: "mdownManager.saveConfig: payload must be an object" };
+  }
+  const urlCheck = validateMdownManagerBaseUrl(payload.baseUrl);
+  if (urlCheck.status !== "ok") return urlCheck;
+  const current = (deps.snapshot && deps.snapshot.mdownManager) || {};
+  const nextApiKey = typeof payload.apiKey === "string" && payload.apiKey.trim()
+    ? payload.apiKey.trim()
+    : (typeof current.apiKey === "string" ? current.apiKey : "");
+  return {
+    status: "ok",
+    commit: { mdownManager: { baseUrl: urlCheck.baseUrl, apiKey: nextApiKey } },
+  };
+}
+
+async function mdownManagerStatus(_payload, deps = {}) {
+  const cfg = (deps.snapshot && deps.snapshot.mdownManager) || {};
+  const baseUrl = typeof cfg.baseUrl === "string" ? cfg.baseUrl.trim() : "";
+  const apiKey = typeof cfg.apiKey === "string" ? cfg.apiKey : "";
+  const configured = !!(baseUrl && apiKey);
+  if (!configured) {
+    return { status: "ok", state: { configured: false, connected: false, reason: "not-configured" } };
+  }
+  if (!deps || typeof deps.checkMdownManagerConnection !== "function") {
+    return { status: "error", message: "mdownManager.status requires checkMdownManagerConnection dep" };
+  }
+  const result = await deps.checkMdownManagerConnection(baseUrl, apiKey);
+  return { status: "ok", state: { configured: true, ...(result || { connected: false }) } };
+}
+
 async function telegramApprovalSendTest(_payload, deps = {}) {
   if (!deps || typeof deps.sendTelegramApprovalTest !== "function") {
     return { status: "error", message: "telegramApproval.test requires sendTelegramApprovalTest dep" };
@@ -1347,6 +1395,8 @@ const commandRegistry = {
   "telegramApproval.test": telegramApprovalSendTest,
   "telegramMigration.snapshot": telegramMigrationSnapshot,
   "telegramMigration.dispatch": telegramMigrationDispatch,
+  "mdownManager.saveConfig": mdownManagerSaveConfig,
+  "mdownManager.status": mdownManagerStatus,
 };
 
 module.exports = {

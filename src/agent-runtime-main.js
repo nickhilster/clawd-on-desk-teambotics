@@ -29,6 +29,8 @@ function createAgentRuntimeMain(options = {}) {
   const logWarn = typeof options.logWarn === "function" ? options.logWarn : console.warn;
   const loadCodexLogMonitor = options.loadCodexLogMonitor || (() => require("../agents/codex-log-monitor"));
   const loadCodexAgent = options.loadCodexAgent || (() => require("../agents/codex"));
+  const loadMdownManagerPoller = options.loadMdownManagerPoller || (() => require("../agents/mdown-manager-poller"));
+  const getMdownManagerConfig = options.getMdownManagerConfig || (() => ({}));
   const codexSubagentClassifier = options.codexSubagentClassifier || new DefaultCodexSubagentClassifier();
   const getServer = options.getServer || (() => null);
   const getStateRuntime = options.getStateRuntime || (() => null);
@@ -39,6 +41,7 @@ function createAgentRuntimeMain(options = {}) {
   const clearCodexNotifyBubbles = options.clearCodexNotifyBubbles || (() => {});
 
   let codexMonitor = null;
+  let mdownManagerPoller = null;
   const codexOfficialHookSessions = new Map();
 
   function markCodexOfficialHookSession(sessionId) {
@@ -110,10 +113,12 @@ function createAgentRuntimeMain(options = {}) {
 
   function startMonitorForAgent(agentId) {
     if (agentId === "codex" && codexMonitor) codexMonitor.start();
+    if (agentId === "mdown-manager") startMdownManagerPoller();
   }
 
   function stopMonitorForAgent(agentId) {
     if (agentId === "codex" && codexMonitor) codexMonitor.stop();
+    if (agentId === "mdown-manager" && mdownManagerPoller) mdownManagerPoller.stop();
   }
 
   function callServer(method, ...args) {
@@ -209,14 +214,36 @@ function createAgentRuntimeMain(options = {}) {
     return codexMonitor;
   }
 
+  function startMdownManagerPoller() {
+    if (mdownManagerPoller) {
+      if (isAgentEnabled("mdown-manager")) mdownManagerPoller.start();
+      return mdownManagerPoller;
+    }
+    try {
+      const MdownManagerPoller = loadMdownManagerPoller();
+      mdownManagerPoller = new MdownManagerPoller(
+        getMdownManagerConfig,
+        (sid, state, event, extra) => updateSession(sid, state, event, extra),
+      );
+      if (isAgentEnabled("mdown-manager")) {
+        mdownManagerPoller.start();
+      }
+    } catch (err) {
+      logWarn("Clawd: MDown Manager poller not started:", err && err.message);
+    }
+    return mdownManagerPoller;
+  }
+
   function cleanup() {
     if (codexMonitor && typeof codexMonitor.stop === "function") codexMonitor.stop();
+    if (mdownManagerPoller && typeof mdownManagerPoller.stop === "function") mdownManagerPoller.stop();
     codexOfficialHookSessions.clear();
   }
 
   return {
     getCodexSubagentClassifier: () => codexSubagentClassifier,
     startCodexLogMonitor,
+    startMdownManagerPoller,
     startMonitorForAgent,
     stopMonitorForAgent,
     syncIntegrationForAgent,
