@@ -1,5 +1,5 @@
 #!/bin/bash
-# macOS Adaptation Test Script for Clawd on Desk
+# macOS Adaptation Test Script for DeskBuddy
 # Run this AFTER launching the app: npm start
 # Usage: bash test-macos.sh
 
@@ -7,7 +7,7 @@ set -e
 
 detect_port() {
   local candidates=()
-  local runtime_file="$HOME/.clawd/runtime.json"
+  local runtime_file="$HOME/.deskbuddy/runtime.json"
   if [ -f "$runtime_file" ]; then
     local runtime_port
     runtime_port=$(node -e 'try { const fs = require("fs"); const raw = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (Number.isInteger(raw.port)) process.stdout.write(String(raw.port)); } catch {}' "$runtime_file")
@@ -30,7 +30,7 @@ detect_port() {
   done
 
   for port in "${candidates[@]}"; do
-    if curl -s -D - -o /dev/null --connect-timeout 1 "http://127.0.0.1:$port/state" 2>/dev/null | tr -d '\r' | grep -iq '^x-clawd-server: clawd-on-desk$'; then
+    if curl -s -D - -o /dev/null --connect-timeout 1 "http://127.0.0.1:$port/state" 2>/dev/null | tr -d '\r' | grep -iq '^x-deskbuddy-server: deskbuddy$'; then
       echo "$port"
       return 0
     fi
@@ -41,7 +41,7 @@ detect_port() {
 
 PORT="$(detect_port || true)"
 BASE="http://127.0.0.1:$PORT"
-HOOK="hooks/clawd-hook.js"
+HOOK="hooks/deskbuddy-hook.js"
 BOLD='\033[1m'
 DIM='\033[2m'
 GREEN='\033[32m'
@@ -59,10 +59,10 @@ header() { echo -e "\n${BOLD}${CYAN}[$1]${RESET} $2"; }
 header "0" "Pre-flight checks"
 
 if [ -z "$PORT" ]; then
-  fail "Clawd not found on ports 23333-23337. Start the app first: npm start"
+  fail "DeskBuddy not found on ports 23333-23337. Start the app first: npm start"
   exit 1
 fi
-pass "Clawd HTTP server is reachable on port $PORT"
+pass "DeskBuddy HTTP server is reachable on port $PORT"
 
 if [ "$(uname)" != "Darwin" ]; then
   fail "This script is for macOS only"
@@ -143,7 +143,7 @@ ACCESSIBILITY=$(osascript -e 'tell application "System Events" to return name of
 if echo "$ACCESSIBILITY" | grep -qi "not allowed\|assistive\|1002"; then
   fail "Accessibility permission NOT granted"
   info "Go to: System Settings → Privacy & Security → Accessibility"
-  info "Add your terminal app (or Clawd) to the allowed list"
+  info "Add your terminal app (or DeskBuddy) to the allowed list"
 else
   pass "Accessibility permission OK (frontmost app: $ACCESSIBILITY)"
 fi
@@ -157,7 +157,7 @@ curl -s -X POST "$BASE/state" \
   -d '{"state":"working","session_id":"focus-test","event":"PreToolUse","source_pid":'"$TERM_PID"',"cwd":"'"$(pwd)"'"}' > /dev/null
 
 echo ""
-echo -e "  ${YELLOW}>>> In 3 seconds, Clawd will try to focus THIS terminal <<<${RESET}"
+echo -e "  ${YELLOW}>>> In 3 seconds, DeskBuddy will try to focus THIS terminal <<<${RESET}"
 echo -e "  ${YELLOW}>>> Switch to another window NOW to verify it works    <<<${RESET}"
 sleep 3
 
@@ -276,7 +276,7 @@ pass "Test sessions cleaned up"
 echo ""
 echo -e "${BOLD}Done!${RESET} Review the results above."
 echo -e "If getStablePid or focusTerminal failed, check:"
-echo -e "  1. Accessibility permission for your terminal/Clawd"
+echo -e "  1. Accessibility permission for your terminal/DeskBuddy"
 echo -e "  2. Terminal process name in TERMINAL_NAMES_MAC"
 echo -e "  3. osascript error messages in the app console"
 echo ""

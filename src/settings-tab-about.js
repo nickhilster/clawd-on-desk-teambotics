@@ -20,7 +20,15 @@
   // cache; the dynamic ones must be re-fetched on every render so the
   // pending hint and the auto-update toggle reflect current state after
   // the user flips the toggle or the scheduler discovers a new version.
-  const STATIC_ABOUT_KEYS = ["repoUrl", "license", "copyright", "authorName", "authorUrl", "heroSvgContent"];
+  const STATIC_ABOUT_KEYS = [
+    "repoUrl",
+    "license",
+    "copyright",
+    "authorName",
+    "authorUrl",
+    "heroSvgContent",
+    "sourceRepos",
+  ];
   function fetchAboutInfo() {
     if (!window.settingsAPI || typeof window.settingsAPI.getAboutInfo !== "function") {
       return Promise.resolve(runtime.about.infoCache || null);
@@ -72,6 +80,34 @@
       helpers.openExternalSafe(url);
     });
     v.appendChild(a);
+    row.appendChild(l);
+    row.appendChild(v);
+    return row;
+  }
+
+  function buildAboutLinksRow(label, links) {
+    const row = document.createElement("div");
+    row.className = "about-info-row";
+    const l = document.createElement("div");
+    l.className = "about-info-label";
+    l.textContent = label;
+    const v = document.createElement("div");
+    v.className = "about-info-value";
+    v.style.display = "flex";
+    v.style.flexWrap = "wrap";
+    v.style.gap = "12px";
+    v.style.justifyContent = "flex-end";
+    for (const linkInfo of links) {
+      if (!linkInfo || !linkInfo.url || !linkInfo.label) continue;
+      const a = document.createElement("a");
+      a.href = "#";
+      a.textContent = linkInfo.label;
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        helpers.openExternalSafe(linkInfo.url);
+      });
+      v.appendChild(a);
+    }
     row.appendChild(l);
     row.appendChild(v);
     return row;
@@ -147,7 +183,7 @@
 
     const crabWrap = document.createElement("div");
     crabWrap.className = "about-crab-wrap";
-    crabWrap.title = "Clawd";
+    crabWrap.title = "DeskBuddy";
 
     const title = document.createElement("h2");
     title.className = "about-title";
@@ -310,6 +346,10 @@
         ));
       }
 
+      if (Array.isArray(safe.sourceRepos) && safe.sourceRepos.length > 0) {
+        infoSection.appendChild(buildAboutLinksRow(t("aboutSourceReposLabel"), safe.sourceRepos));
+      }
+
       if (safe.license) {
         const lRow = document.createElement("div");
         lRow.className = "about-info-row";
@@ -348,5 +388,5 @@
     };
   }
 
-  root.ClawdSettingsTabAbout = { init };
+  root.DeskBuddySettingsTabAbout = { init };
 })(globalThis);

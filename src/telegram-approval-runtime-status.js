@@ -7,7 +7,7 @@ const STATUS_TEXT_MAX = 3600;
 
 const STATUS_LOCALES = Object.freeze({
   en: {
-    title: "Clawd Telegram status",
+    title: "DeskBuddy Telegram status",
     labels: {
       transport: "Transport",
       health: "Health",
@@ -69,7 +69,7 @@ const STATUS_LOCALES = Object.freeze({
     truncated: "... truncated",
   },
   zh: {
-    title: "Clawd Telegram 状态",
+    title: "DeskBuddy Telegram 状态",
     labels: {
       transport: "传输",
       health: "健康状态",
@@ -131,7 +131,7 @@ const STATUS_LOCALES = Object.freeze({
     truncated: "... 已截断",
   },
   "zh-TW": {
-    title: "Clawd Telegram 狀態",
+    title: "DeskBuddy Telegram 狀態",
     labels: {
       transport: "傳輸",
       health: "健康狀態",
@@ -193,7 +193,7 @@ const STATUS_LOCALES = Object.freeze({
     truncated: "... 已截斷",
   },
   ko: {
-    title: "Clawd Telegram 상태",
+    title: "DeskBuddy Telegram 상태",
     labels: {
       transport: "전송",
       health: "상태",
@@ -255,7 +255,7 @@ const STATUS_LOCALES = Object.freeze({
     truncated: "... 잘림",
   },
   ja: {
-    title: "Clawd Telegram ステータス",
+    title: "DeskBuddy Telegram ステータス",
     labels: {
       transport: "送信方式",
       health: "状態",

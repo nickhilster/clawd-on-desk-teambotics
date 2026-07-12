@@ -28,36 +28,36 @@ const ANIMATION_OVERRIDES_EXPORT_DIALOG_STRINGS = {
   en: {
     saveTitle: "Export Animation Overrides",
     openTitle: "Import Animation Overrides",
-    defaultName: (ts) => `clawd-animation-overrides-${ts}.json`,
-    jsonFilter: "Clawd Animation Overrides",
+    defaultName: (ts) => `deskbuddy-animation-overrides-${ts}.json`,
+    jsonFilter: "DeskBuddy Animation Overrides",
     nothingToExport: "No animation overrides to export. Override something first.",
   },
   zh: {
     saveTitle: "导出动画覆盖",
     openTitle: "导入动画覆盖",
-    defaultName: (ts) => `clawd-animation-overrides-${ts}.json`,
-    jsonFilter: "Clawd 动画覆盖",
+    defaultName: (ts) => `deskbuddy-animation-overrides-${ts}.json`,
+    jsonFilter: "DeskBuddy 动画覆盖",
     nothingToExport: "没有可导出的动画覆盖。先自定义几个动画试试。",
   },
   "zh-TW": {
     saveTitle: "匯出動畫與音效自訂設定",
     openTitle: "匯入動畫與音效自訂設定",
-    defaultName: (ts) => `clawd-animation-overrides-${ts}.json`,
-    jsonFilter: "Clawd 動畫與音效自訂設定",
+    defaultName: (ts) => `deskbuddy-animation-overrides-${ts}.json`,
+    jsonFilter: "DeskBuddy 動畫與音效自訂設定",
     nothingToExport: "目前沒有可匯出的自訂設定。",
   },
   ko: {
     saveTitle: "애니메이션 덮어쓰기 내보내기",
     openTitle: "애니메이션 덮어쓰기 가져오기",
-    defaultName: (ts) => `clawd-animation-overrides-${ts}.json`,
-    jsonFilter: "Clawd 애니메이션 덮어쓰기",
+    defaultName: (ts) => `deskbuddy-animation-overrides-${ts}.json`,
+    jsonFilter: "DeskBuddy 애니메이션 덮어쓰기",
     nothingToExport: "내보낼 애니메이션 덮어쓰기가 없습니다. 먼저 무언가를 덮어써 보세요.",
   },
   ja: {
     saveTitle: "アニメーション差し替えをエクスポート",
     openTitle: "アニメーション差し替えをインポート",
-    defaultName: (ts) => `clawd-animation-overrides-${ts}.json`,
-    jsonFilter: "Clawd アニメーション差し替え",
+    defaultName: (ts) => `deskbuddy-animation-overrides-${ts}.json`,
+    jsonFilter: "DeskBuddy アニメーション差し替え",
     nothingToExport: "エクスポートするアニメーション差し替えがありません。先に何かを差し替えてください。",
   },
 };
@@ -1213,10 +1213,10 @@ function createSettingsAnimationOverridesMain(options = {}) {
         return { status: "cancel" };
       }
       const payload = {
-        clawdAnimationOverrides: ANIMATION_OVERRIDES_EXPORT_VERSION,
+        deskbuddyAnimationOverrides: ANIMATION_OVERRIDES_EXPORT_VERSION,
         version: ANIMATION_OVERRIDES_EXPORT_VERSION,
         exportedAt: new Date().toISOString(),
-        clawdVersion: app.getVersion(),
+        deskbuddyVersion: app.getVersion(),
         themes: overrides,
       };
       fs.writeFileSync(result.filePath, JSON.stringify(payload, null, 2), "utf8");
@@ -1259,11 +1259,11 @@ function createSettingsAnimationOverridesMain(options = {}) {
     }
 
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { status: "error", message: "file is not a Clawd animation overrides export" };
+      return { status: "error", message: "file is not a DeskBuddy animation overrides export" };
     }
-    const magic = parsed.clawdAnimationOverrides;
+    const magic = parsed.deskbuddyAnimationOverrides;
     if (typeof magic !== "number") {
-      return { status: "error", message: "file is not a Clawd animation overrides export" };
+      return { status: "error", message: "file is not a DeskBuddy animation overrides export" };
     }
 
     const commandResult = await settingsController.applyCommand("importAnimationOverrides", {
@@ -1278,50 +1278,4 @@ function createSettingsAnimationOverridesMain(options = {}) {
         themeCount: commandResult.importedThemeCount || 0,
       };
     }
-    return commandResult || { status: "error", message: "import failed" };
-  }
-
-  function cleanup() {
-    clearPreviewTimer();
-    pendingPostReloadTasks = [];
-    bumpPreviewPosterGeneration();
-    destroyAnimationPreviewPosterWindow();
-  }
-
-  return {
-    buildAnimationOverrideData,
-    buildAnimationOverrideSections,
-    listAnimationOverrideAssets,
-    buildAnimationAssetPreview,
-    buildAnimationAssetProbe,
-    previewAnimationOverride,
-    previewReaction,
-    openThemeAssetsDir,
-    exportAnimationOverrides,
-    importAnimationOverrides,
-    runPendingPostReloadTasks,
-    clearPreviewTimer,
-    bumpPreviewPosterGeneration,
-    maybeDestroyIdlePreviewPosterWindow,
-    destroyAnimationPreviewPosterWindow,
-    cleanup,
-  };
-}
-
-createSettingsAnimationOverridesMain.registerSettingsAnimationOverridesIpc = registerSettingsAnimationOverridesIpc;
-
-createSettingsAnimationOverridesMain.__test = {
-  ANIMATION_OVERRIDE_PREVIEW_POSTER_VERSION,
-  ANIMATION_OVERRIDE_PREVIEW_POSTER_CACHE_MAX,
-  ANIMATION_OVERRIDE_PREVIEW_POSTER_TIMEOUT_MS,
-  PREVIEW_HOLD_MIN_MS,
-  PREVIEW_HOLD_MAX_MS,
-  TRUSTED_SCRIPTED_PREVIEW_HOLD_MAX_MS,
-  isTrustedScriptedAnimationFile,
-  isObjectChannelSvgAnimationFile,
-  needsScriptedAnimationPreviewPoster,
-  getTrustedScriptedAnimationCycleMs,
-  buildAnimationPreviewPosterDescriptor,
-};
-
-module.exports = createSettingsAnimationOverridesMain;
+    return commandResult || { status: "error", message: "import failed"

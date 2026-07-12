@@ -68,7 +68,7 @@ function writeOpenClawConfigRaw(configPath, raw) {
 }
 
 function writeOpenClawConfig(config, options = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-openclaw-plugin-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-openclaw-plugin-"));
   const stateDir = options.stateDir ? path.join(root, options.stateDir) : root;
   fs.mkdirSync(stateDir, { recursive: true });
   const configPath = path.join(stateDir, "openclaw.json");
@@ -112,7 +112,7 @@ describe("openclaw plugin runtime", () => {
       },
     });
 
-    assert.strictEqual(api.default.id, "clawd-on-desk");
+    assert.strictEqual(api.default.id, "deskbuddy");
     assert.ok(registrations.some((entry) => entry.name === "before_tool_call"));
     assert.ok(registrations.some((entry) => entry.name === "model_call_ended"));
   });

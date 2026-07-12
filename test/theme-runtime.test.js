@@ -35,7 +35,7 @@ function validThemeJson(overrides = {}) {
 }
 
 function makeFixture() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-theme-runtime-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-theme-runtime-"));
   tempDirs.push(tmp);
   const appDir = path.join(tmp, "src");
   const userData = path.join(tmp, "userData");
@@ -167,10 +167,10 @@ describe("theme-runtime active ownership", () => {
     const { runtime } = createRuntime();
     themeLoader.bindActiveThemeRuntime(runtime);
 
-    const clawd = runtime.loadInitialTheme("clawd");
+    const deskbuddy = runtime.loadInitialTheme("clawd");
     const loadedCalico = themeLoader.loadTheme("calico", { strict: true });
 
-    assert.strictEqual(clawd._id, "clawd");
+    assert.strictEqual(deskbuddy._id, "clawd");
     assert.strictEqual(loadedCalico._id, "calico");
     assert.strictEqual(runtime.getActiveTheme()._id, "clawd");
     assert.strictEqual(themeLoader.getActiveTheme()._id, "clawd");

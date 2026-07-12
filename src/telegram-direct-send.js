@@ -148,14 +148,14 @@ function buildWindowsPasteShortcutScript() {
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
-public class ClawdPasteKeys {
+public class DeskBuddyPasteKeys {
     [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
-[ClawdPasteKeys]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
-[ClawdPasteKeys]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero)
-[ClawdPasteKeys]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero)
-[ClawdPasteKeys]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+[DeskBuddyPasteKeys]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
+[DeskBuddyPasteKeys]::keybd_event(0x56, 0, 0, [UIntPtr]::Zero)
+[DeskBuddyPasteKeys]::keybd_event(0x56, 0, 2, [UIntPtr]::Zero)
+[DeskBuddyPasteKeys]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
 `;
 }
 
@@ -500,7 +500,7 @@ function createTelegramDirectSend({
     if (!promptText) {
       return {
         status: "empty",
-        text: "Send text as a reply to a Clawd completion notification.",
+        text: "Send text as a reply to a DeskBuddy completion notification.",
       };
     }
 
@@ -512,7 +512,7 @@ function createTelegramDirectSend({
       return {
         status: "unmapped",
         deliveryId: deliveryEntry.id,
-        text: "Reply to a Clawd completion notification to choose the session.",
+        text: "Reply to a DeskBuddy completion notification to choose the session.",
       };
     }
 

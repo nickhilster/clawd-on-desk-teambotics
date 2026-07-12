@@ -1,6 +1,6 @@
 // Pi agent configuration
-// Perception via Pi extension: lifecycle event hook -> HTTP POST to Clawd.
-// Pi remains state-only here; Clawd must not add a permission layer on top of
+// Perception via Pi extension: lifecycle event hook -> HTTP POST to DeskBuddy.
+// Pi remains state-only here; DeskBuddy must not add a permission layer on top of
 // Pi's default YOLO execution model.
 
 module.exports = {
@@ -8,7 +8,7 @@ module.exports = {
   name: "Pi",
   processNames: { win: ["pi.exe"], mac: ["pi"], linux: ["pi"] },
   eventSource: "extension",
-  // Clawd-internal event names. hooks/pi-extension-core.js translates Pi's
+  // DeskBuddy-internal event names. hooks/pi-extension-core.js translates Pi's
   // native snake_case events to this shared PascalCase event vocabulary.
   eventMap: {
     SessionStart: "idle",

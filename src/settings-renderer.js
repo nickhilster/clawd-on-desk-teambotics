@@ -1,6 +1,6 @@
 "use strict";
 
-const core = globalThis.ClawdSettingsCore;
+const core = globalThis.DeskBuddySettingsCore;
 
 // Icons resolve via settings-icons.js at render time (keyed by tab id),
 // not as emoji/unicode glyphs \u2014 those rendered inconsistently across
@@ -19,7 +19,7 @@ const SIDEBAR_TABS = [
 ];
 
 function getTabIcon(tabId) {
-  const icons = globalThis.ClawdSettingsIcons;
+  const icons = globalThis.DeskBuddySettingsIcons;
   if (icons && typeof icons.getIcon === "function") return icons.getIcon(tabId);
   return "";
 }
@@ -29,10 +29,10 @@ function renderSidebar() {
   if (!sidebar) return;
   sidebar.innerHTML = "";
   if (
-    globalThis.ClawdSettingsDoctorModal
-    && typeof globalThis.ClawdSettingsDoctorModal.renderSidebarIndicator === "function"
+    globalThis.DeskBuddySettingsDoctorModal
+    && typeof globalThis.DeskBuddySettingsDoctorModal.renderSidebarIndicator === "function"
   ) {
-    globalThis.ClawdSettingsDoctorModal.renderSidebarIndicator(sidebar, core);
+    globalThis.DeskBuddySettingsDoctorModal.renderSidebarIndicator(sidebar, core);
   }
   for (const tab of SIDEBAR_TABS) {
     const item = document.createElement("div");
@@ -82,19 +82,19 @@ core.ops.installRenderHooks({
   content: renderContent,
 });
 
-globalThis.ClawdSettingsTabGeneral.init(core);
-globalThis.ClawdSettingsTabAgents.init(core);
-globalThis.ClawdSettingsTabTheme.init(core);
+globalThis.DeskBuddySettingsTabGeneral.init(core);
+globalThis.DeskBuddySettingsTabAgents.init(core);
+globalThis.DeskBuddySettingsTabTheme.init(core);
 // Not a top-level tab anymore — it provides the "on / off" subtab that
-// ClawdSettingsTabAnimOverrides renders. init() just wires up the core refs.
-globalThis.ClawdSettingsTabAnimMap.init(core);
-globalThis.ClawdSettingsTabAnimOverrides.init(core);
-globalThis.ClawdSettingsTabShortcuts.init(core);
-if (globalThis.ClawdSettingsTabTelegramApproval) globalThis.ClawdSettingsTabTelegramApproval.init(core);
-globalThis.ClawdSettingsTabAbout.init(core);
-if (globalThis.ClawdSettingsTabRemoteSsh) globalThis.ClawdSettingsTabRemoteSsh.init(core);
-if (globalThis.ClawdSettingsTabMobile) globalThis.ClawdSettingsTabMobile.init(core);
-if (globalThis.ClawdSettingsTabMdownManager) globalThis.ClawdSettingsTabMdownManager.init(core);
+// DeskBuddySettingsTabAnimOverrides renders. init() just wires up the core refs.
+globalThis.DeskBuddySettingsTabAnimMap.init(core);
+globalThis.DeskBuddySettingsTabAnimOverrides.init(core);
+globalThis.DeskBuddySettingsTabShortcuts.init(core);
+if (globalThis.DeskBuddySettingsTabTelegramApproval) globalThis.DeskBuddySettingsTabTelegramApproval.init(core);
+globalThis.DeskBuddySettingsTabAbout.init(core);
+if (globalThis.DeskBuddySettingsTabRemoteSsh) globalThis.DeskBuddySettingsTabRemoteSsh.init(core);
+if (globalThis.DeskBuddySettingsTabMobile) globalThis.DeskBuddySettingsTabMobile.init(core);
+if (globalThis.DeskBuddySettingsTabMdownManager) globalThis.DeskBuddySettingsTabMdownManager.init(core);
 
 if (window.settingsAPI && typeof window.settingsAPI.onChanged === "function") {
   window.settingsAPI.onChanged((payload) => core.ops.applyChanges(payload));

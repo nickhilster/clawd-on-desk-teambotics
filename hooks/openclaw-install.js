@@ -229,7 +229,7 @@ function registerOpenClawPlugin(options = {}) {
   };
 
   if (!stateDirExists && !configFileExists && !getCommandAvailable()) {
-    if (!options.silent) console.log("Clawd: OpenClaw not found - skipping OpenClaw plugin registration");
+    if (!options.silent) console.log("DeskBuddy: OpenClaw not found - skipping OpenClaw plugin registration");
     return {
       installed: false,
       skipped: true,
@@ -245,7 +245,7 @@ function registerOpenClawPlugin(options = {}) {
       return withCliStatus(installViaCli({ ...options, pluginDir }), configPath);
     }
     if (!options.silent) {
-      console.log(`Clawd: ${configPath} missing - skipping OpenClaw plugin registration`);
+      console.log(`DeskBuddy: ${configPath} missing - skipping OpenClaw plugin registration`);
     }
     return {
       installed: false,
@@ -292,7 +292,7 @@ function registerOpenClawPlugin(options = {}) {
 
   if (linked.updated) writeJsonAtomic(configPath, config);
   if (!options.silent) {
-    console.log(`Clawd OpenClaw plugin -> ${configPath}`);
+    console.log(`DeskBuddy OpenClaw plugin -> ${configPath}`);
     console.log(linked.updated ? `  Registered: ${pluginDir}` : `  Already registered: ${pluginDir}`);
   }
   return {

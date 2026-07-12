@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Merge Clawd Qwen Code hooks into ~/.qwen/settings.json.
+// Merge DeskBuddy Qwen Code hooks into ~/.qwen/settings.json.
 
 const fs = require("fs");
 const path = require("path");
@@ -41,7 +41,7 @@ function matcherForQwenCodeEvent(event) {
   return MATCHERLESS_EVENTS.has(event) ? null : "*";
 }
 
-function isClawdHookCommand(command) {
+function isDeskBuddyHookCommand(command) {
   if (typeof command !== "string") return false;
   if (command.includes(MARKER)) return true;
   const decoded = decodeWindowsEncodedCommand(command);
@@ -67,7 +67,7 @@ function buildQwenCodeHookEntry(command, event) {
   const matcher = matcherForQwenCodeEvent(event);
   const entry = {
     hooks: [{
-      name: "clawd",
+      name: "deskbuddy",
       type: "command",
       command,
       timeout: timeoutForQwenCodeEvent(event),
@@ -94,7 +94,7 @@ function isDesiredQwenCodeHookEntry(entry, desiredCommand, event) {
     Array.isArray(entry.hooks)
     && entry.hooks.length === 1
     && entry.hooks[0]
-    && entry.hooks[0].name === "clawd"
+    && entry.hooks[0].name === "deskbuddy"
     && entry.hooks[0].type === "command"
     && entry.hooks[0].command === desiredCommand
     && entry.hooks[0].timeout === timeoutForQwenCodeEvent(event)
@@ -112,7 +112,7 @@ function normalizeQwenCodeHookEntries(entries, desiredCommand, event) {
     const entry = entries[index];
     if (!entry || typeof entry !== "object") continue;
 
-    if (isClawdHookCommand(entry.command)) {
+    if (isDeskBuddyHookCommand(entry.command)) {
       matched = true;
       if (dedicatedIndex === -1) {
         replaceEntry(entry, buildQwenCodeHookEntry(desiredCommand, event));
@@ -128,12 +128,12 @@ function normalizeQwenCodeHookEntries(entries, desiredCommand, event) {
 
     if (!Array.isArray(entry.hooks)) continue;
     const otherHooks = [];
-    let clawdHookCount = 0;
+    let deskbuddyHookCount = 0;
     for (const hook of entry.hooks) {
-      if (hook && isClawdHookCommand(hook.command)) clawdHookCount++;
+      if (hook && isDeskBuddyHookCommand(hook.command)) deskbuddyHookCount++;
       else otherHooks.push(hook);
     }
-    if (clawdHookCount === 0) continue;
+    if (deskbuddyHookCount === 0) continue;
 
     matched = true;
     if (otherHooks.length > 0) {
@@ -186,14 +186,14 @@ function registerQwenCodeHooks(options = {}) {
   const qwenDir = path.dirname(settingsPath);
 
   if (!options.settingsPath && !fs.existsSync(qwenDir)) {
-    if (!options.silent) console.log("Clawd: ~/.qwen/ not found - skipping Qwen hook registration");
+    if (!options.silent) console.log("DeskBuddy: ~/.qwen/ not found - skipping Qwen hook registration");
     return { added: 0, skipped: 0, updated: 0, warnings: [] };
   }
 
   const settings = readSettings(settingsPath);
   const warnings = [];
   if (settings && settings.disableAllHooks === true) {
-    warnings.push("settings.json has disableAllHooks=true; Clawd Qwen hooks will not fire until that flag is removed.");
+    warnings.push("settings.json has disableAllHooks=true; DeskBuddy Qwen hooks will not fire until that flag is removed.");
   }
 
   const hookScript = asarUnpackedPath(path.resolve(__dirname, MARKER).replace(/\\/g, "/"));
@@ -239,7 +239,7 @@ function registerQwenCodeHooks(options = {}) {
   if (changed) writeJsonAtomic(settingsPath, settings);
 
   if (!options.silent) {
-    console.log(`Clawd Qwen hooks -> ${settingsPath}`);
+    console.log(`DeskBuddy Qwen hooks -> ${settingsPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
     for (const warning of warnings) console.warn(`  Warning: ${warning}`);
   }
@@ -268,7 +268,7 @@ function unregisterQwenCodeHooks(options = {}) {
   for (const event of QWEN_CODE_HOOK_EVENTS) {
     const entries = settings.hooks[event];
     if (!Array.isArray(entries)) continue;
-    const result = removeMatchingCommandHooks(entries, isClawdHookCommand);
+    const result = removeMatchingCommandHooks(entries, isDeskBuddyHookCommand);
     if (!result.changed) continue;
     removed += result.removed;
     changed = true;
@@ -278,7 +278,7 @@ function unregisterQwenCodeHooks(options = {}) {
 
   let backupPath = null;
   if (changed) backupPath = writeJsonAtomicWithBackup(settingsPath, settings, options);
-  if (!options.silent) console.log(`Clawd Qwen hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Qwen hooks removed: ${removed}`);
   const result = { removed, changed, settingsPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;

@@ -45,7 +45,7 @@ class FakeIpcMain {
 }
 
 function makeTempDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "clawd-settings-ipc-"));
+  return fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-settings-ipc-"));
 }
 
 function makeZip(entries) {
@@ -134,7 +134,7 @@ function createHarness(overrides = {}) {
     getSoundUrl: () => null,
     listThemesWithMetadata: () => [],
     getThemeMetadata: (themeId) => ({ name: themeId }),
-    ensureUserThemesDir: () => path.join(os.tmpdir(), "clawd-user-themes"),
+    ensureUserThemesDir: () => path.join(os.tmpdir(), "deskbuddy-user-themes"),
   };
   const codexPetMain = overrides.codexPetMain || {
     decorateThemeMetadata: (theme) => theme,
@@ -499,7 +499,7 @@ test("settings IPC opens the user themes directory", async () => {
       getSoundUrl: () => null,
       listThemesWithMetadata: () => [],
       getThemeMetadata: () => null,
-      ensureUserThemesDir: () => "C:\\Users\\Example\\AppData\\Roaming\\Clawd\\themes",
+      ensureUserThemesDir: () => "C:\\Users\\Example\\AppData\\Roaming\\DeskBuddy\\themes",
     },
     shell: {
       openPath: async (dir) => {
@@ -512,12 +512,12 @@ test("settings IPC opens the user themes directory", async () => {
 
   assert.deepStrictEqual(await ipcMain.invoke("settings:open-user-themes-dir"), {
     status: "ok",
-    path: "C:\\Users\\Example\\AppData\\Roaming\\Clawd\\themes",
+    path: "C:\\Users\\Example\\AppData\\Roaming\\DeskBuddy\\themes",
   });
-  assert.deepStrictEqual(openCalls, ["C:\\Users\\Example\\AppData\\Roaming\\Clawd\\themes"]);
+  assert.deepStrictEqual(openCalls, ["C:\\Users\\Example\\AppData\\Roaming\\DeskBuddy\\themes"]);
 });
 
-test("settings IPC imports Clawd user theme zip packages", async () => {
+test("settings IPC imports DeskBuddy user theme zip packages", async () => {
   const root = makeTempDir();
   try {
     const userThemesDir = path.join(root, "user-themes");
@@ -571,7 +571,7 @@ test("settings IPC imports Clawd user theme zip packages", async () => {
     });
     assert.deepStrictEqual(dialogParent, { id: "parent", sender: "sender-web-contents" });
     assert.deepStrictEqual(dialogOptions.properties, ["openFile"]);
-    assert.deepStrictEqual(dialogOptions.filters, [{ name: "Clawd theme zip", extensions: ["zip"] }]);
+    assert.deepStrictEqual(dialogOptions.filters, [{ name: "DeskBuddy theme zip", extensions: ["zip"] }]);
     assert.strictEqual(
       fs.readFileSync(path.join(userThemesDir, "pixel-cat", "theme.json"), "utf8"),
       JSON.stringify(themeJson)
@@ -716,6 +716,16 @@ test("settings IPC serves agent/about/update/external and remove-theme dialog he
     assert.deepStrictEqual(await ipcMain.invoke("settings:get-about-info"), {
       version: "1.2.3",
       repoUrl: "https://github.com/nickhilster/deskbuddy",
+      sourceRepos: [
+        {
+          label: "rullerzhou-afk/clawd-on-desk",
+          url: "https://github.com/rullerzhou-afk/clawd-on-desk",
+        },
+        {
+          label: "Bynlk/clawd-on-mobile",
+          url: "https://github.com/Bynlk/clawd-on-mobile",
+        },
+      ],
       license: "AGPL-3.0",
       copyright: "\u00a9 2026 Ruller_Lulu",
       authorName: "Ruller_Lulu / \u9e7f\u9e7f",

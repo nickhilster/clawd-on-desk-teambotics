@@ -949,7 +949,7 @@ describe("updateSession()", () => {
     assert.ok(!api.sessions.has("s1"));
   });
 
-  it("dismissSession removes only Clawd bookkeeping for that session", () => {
+  it("dismissSession removes only DeskBuddy bookkeeping for that session", () => {
     update(api, { id: "s1", state: "working" });
     update(api, { id: "s2", state: "thinking" });
 
@@ -2599,8 +2599,8 @@ describe("Stop completion gate (#406)", () => {
     mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
     // The product default is now 0 (opt-in); this describe exercises the
     // debounce, so turn it on explicitly.
-    savedDebounceEnv = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "1000";
+    savedDebounceEnv = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "1000";
     soundsPlayed = [];
     stateChanges = [];
     ctx = makeCtx({
@@ -2615,8 +2615,8 @@ describe("Stop completion gate (#406)", () => {
   afterEach(() => {
     api.cleanup();
     mock.timers.reset();
-    if (savedDebounceEnv === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
+    if (savedDebounceEnv === undefined) delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    else process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
   });
 
   it("background_tasks without final assistant text hold the Claude Stop as working — no celebrate, badge stays running", () => {
@@ -2763,22 +2763,22 @@ describe("Stop completion gate (#406)", () => {
     assert.ok(soundsPlayed.includes("complete"));
   });
 
-  it("CLAWD_COMPLETION_DEBOUNCE_MS=0 disables the debounce (immediate celebration)", () => {
-    const saved = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "0";
+  it("DESKBUDDY_COMPLETION_DEBOUNCE_MS=0 disables the debounce (immediate celebration)", () => {
+    const saved = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "0";
     try {
       update(api, { id: "s1", state: "attention", event: "Stop" });
       assert.strictEqual(api.getCurrentState(), "attention");
       assert.ok(soundsPlayed.includes("complete"));
     } finally {
-      if (saved === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-      else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = saved;
+      if (saved === undefined) delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+      else process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = saved;
     }
   });
 
-  it("CLAWD_COMPLETION_DEBOUNCE_MS=0 also disables the bg-only assistant-text quiet window", () => {
-    const saved = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "0";
+  it("DESKBUDDY_COMPLETION_DEBOUNCE_MS=0 also disables the bg-only assistant-text quiet window", () => {
+    const saved = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "0";
     try {
       update(api, {
         id: "s1",
@@ -2792,8 +2792,8 @@ describe("Stop completion gate (#406)", () => {
       assert.ok(soundsPlayed.includes("complete"));
       assert.strictEqual(api.deriveSessionBadge(api.sessions.get("s1")), "done");
     } finally {
-      if (saved === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-      else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = saved;
+      if (saved === undefined) delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+      else process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = saved;
     }
   });
 
@@ -2837,9 +2837,9 @@ describe("Stop completion gate (#406)", () => {
 
   it("promoteCompletion does not swallow another session's queued high-priority visual (#406 regression)", () => {
     // Short debounce so A promotes WHILE B's queued error is still pending behind
-    // the held "working" min-display (1000ms in the clawd theme).
-    const saved = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "100";
+    // the held "working" min-display (1000ms in the deskbuddy theme).
+    const saved = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "100";
     try {
       update(api, { id: "A", state: "attention", event: "Stop" }); // held working at t0 (min-display 1000)
       update(api, { id: "B", state: "error", event: "StopFailure" }); // error(8) queues behind working's min-display
@@ -2851,13 +2851,13 @@ describe("Stop completion gate (#406)", () => {
       );
       assert.strictEqual(api.deriveSessionBadge(api.sessions.get("A")), "done", "A still completes");
     } finally {
-      if (saved === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-      else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = saved;
+      if (saved === undefined) delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+      else process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = saved;
     }
   });
 
   it("Claude AskUserQuestion PostToolUse falls back to transcript completion when Stop is missed", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-claude-stop-fallback-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-claude-stop-fallback-"));
     const transcript = path.join(dir, "transcript.jsonl");
     fs.writeFileSync(transcript, [
       JSON.stringify({ type: "assistant", sessionId: "s1", message: { content: [{ type: "tool_use", name: "AskUserQuestion" }] } }),
@@ -2892,7 +2892,7 @@ describe("Stop completion gate (#406)", () => {
   });
 
   it("Claude transcript completion fallback is limited to AskUserQuestion tool results", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-claude-stop-fallback-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-claude-stop-fallback-"));
     const transcript = path.join(dir, "transcript.jsonl");
     fs.writeFileSync(transcript, [
       JSON.stringify({ type: "user", sessionId: "s1", message: { content: [{ type: "tool_result", content: "ok" }] } }),
@@ -2914,7 +2914,7 @@ describe("Stop completion gate (#406)", () => {
   });
 
   it("Claude transcript completion fallback cancels when work resumes", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-claude-stop-fallback-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-claude-stop-fallback-"));
     const transcript = path.join(dir, "transcript.jsonl");
     fs.writeFileSync(transcript, [
       JSON.stringify({ type: "assistant", sessionId: "s1", message: { content: [{ type: "tool_use", name: "AskUserQuestion" }] } }),
@@ -2946,8 +2946,8 @@ describe("Headless Stop debounce default (#449)", () => {
     mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
     // This group exercises the built-in defaults — make sure no env override
     // from the host shell leaks in.
-    savedDebounceEnv = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+    savedDebounceEnv = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
     soundsPlayed = [];
     ctx = makeCtx({
       processKill: () => true,
@@ -2958,8 +2958,8 @@ describe("Headless Stop debounce default (#449)", () => {
   afterEach(() => {
     api.cleanup();
     mock.timers.reset();
-    if (savedDebounceEnv === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
+    if (savedDebounceEnv === undefined) delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    else process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
   });
 
   it("headless Stop is held; the orchestrator's next prompt suppresses the celebration", () => {
@@ -3015,15 +3015,15 @@ describe("Headless Stop debounce default (#449)", () => {
     assert.ok(soundsPlayed.includes("complete"), "quiet window still promotes");
   });
 
-  it("CLAWD_COMPLETION_DEBOUNCE_MS=0 disables the headless default too", () => {
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "0";
+  it("DESKBUDDY_COMPLETION_DEBOUNCE_MS=0 disables the headless default too", () => {
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "0";
     update(api, { id: "h1", state: "attention", event: "Stop", headless: true });
     assert.strictEqual(api.getCurrentState(), "attention");
     assert.ok(soundsPlayed.includes("complete"), "explicit 0 keeps the old immediate behavior");
   });
 
-  it("an explicit CLAWD_COMPLETION_DEBOUNCE_MS overrides the headless default window", () => {
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "100";
+  it("an explicit DESKBUDDY_COMPLETION_DEBOUNCE_MS overrides the headless default window", () => {
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "100";
     update(api, { id: "h1", state: "attention", event: "Stop", headless: true });
     mock.timers.tick(99);
     assert.deepStrictEqual(soundsPlayed, [], "inside the overridden window");
@@ -3574,7 +3574,7 @@ describe("evictOldestSessionIfNeeded two-phase", () => {
 // UserPromptSubmit ~900-1000ms after PostToolUse to feed the tool result back
 // to the model. Without filtering this flashes "thinking" between working and
 // idle. Measured twice in dogfood (908ms non-interactive, 945ms interactive).
-// Window = 2000ms default, overridable via CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS.
+// Window = 2000ms default, overridable via DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS.
 // Two timestamps: lastToolBoundaryAt (PostToolUse / PostToolUseFailure) and
 // lastStopAt (Stop). Filter only fires while a recent tool boundary has NOT
 // yet been followed by Stop. See project_qwen_0_16_1_event_semantics canary.
@@ -3587,14 +3587,14 @@ describe("qwen-code self-submit filter", () => {
     mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
     ctx = makeCtx();
     api = require("../src/state")(ctx);
-    delete process.env.CLAWD_QWEN_SELF_SUBMIT_FILTER;
-    delete process.env.CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS;
+    delete process.env.DESKBUDDY_QWEN_SELF_SUBMIT_FILTER;
+    delete process.env.DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS;
   });
   afterEach(() => {
     api.cleanup();
     mock.timers.reset();
-    delete process.env.CLAWD_QWEN_SELF_SUBMIT_FILTER;
-    delete process.env.CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS;
+    delete process.env.DESKBUDDY_QWEN_SELF_SUBMIT_FILTER;
+    delete process.env.DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS;
   });
 
   function bootQwenAfterPostToolUse() {
@@ -3675,8 +3675,8 @@ describe("qwen-code self-submit filter", () => {
     assert.strictEqual(after.state, "thinking", "claude-code must pass through normally");
   });
 
-  it("kill switch CLAWD_QWEN_SELF_SUBMIT_FILTER=0 disables the filter", () => {
-    process.env.CLAWD_QWEN_SELF_SUBMIT_FILTER = "0";
+  it("kill switch DESKBUDDY_QWEN_SELF_SUBMIT_FILTER=0 disables the filter", () => {
+    process.env.DESKBUDDY_QWEN_SELF_SUBMIT_FILTER = "0";
     bootQwenAfterPostToolUse();
     mock.timers.tick(500);
     update(api, { id: "qsid", state: "thinking", event: "UserPromptSubmit", agentId: "qwen-code" });
@@ -3693,8 +3693,8 @@ describe("qwen-code self-submit filter", () => {
     assert.strictEqual(after.state, "thinking", "no boundary → cannot be a self-submit");
   });
 
-  it("CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS override widens the window", () => {
-    process.env.CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS = "5000";
+  it("DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS override widens the window", () => {
+    process.env.DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS = "5000";
     bootQwenAfterPostToolUse();
     mock.timers.tick(3500); // would pass with default 2000 window, but env override extends to 5000
     update(api, { id: "qsid", state: "thinking", event: "UserPromptSubmit", agentId: "qwen-code" });
@@ -3703,8 +3703,8 @@ describe("qwen-code self-submit filter", () => {
     assert.strictEqual(after.state, "working", "extended window must still drop self-submit");
   });
 
-  it("CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS invalid value falls back to default 2000ms", () => {
-    process.env.CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS = "not-a-number";
+  it("DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS invalid value falls back to default 2000ms", () => {
+    process.env.DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS = "not-a-number";
     bootQwenAfterPostToolUse();
     mock.timers.tick(1500); // within default 2000ms
     update(api, { id: "qsid", state: "thinking", event: "UserPromptSubmit", agentId: "qwen-code" });
@@ -3713,8 +3713,8 @@ describe("qwen-code self-submit filter", () => {
     assert.strictEqual(after.state, "working", "invalid env must fall back to default and still drop");
   });
 
-  it("CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS out-of-range value falls back to default", () => {
-    process.env.CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS = "999999"; // above max 10000
+  it("DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS out-of-range value falls back to default", () => {
+    process.env.DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS = "999999"; // above max 10000
     bootQwenAfterPostToolUse();
     mock.timers.tick(3000); // outside default 2000ms window
     update(api, { id: "qsid", state: "thinking", event: "UserPromptSubmit", agentId: "qwen-code" });

@@ -241,7 +241,7 @@
     const key = rememberFixAction(action);
     const busy = state.repairingKey === key;
     const disabled = state.repairingKey ? " disabled" : "";
-    const restart = action.type === "restart-clawd";
+    const restart = action.type === "restart-deskbuddy";
     const label = busy
       ? (restart ? t(core, "doctorRestarting") : t(core, "doctorFixing"))
       : (restart ? t(core, "doctorRestartButton") : t(core, "doctorFix"));
@@ -251,7 +251,7 @@
 
   function requiresFixConfirmation(action) {
     if (!action || typeof action !== "object") return false;
-    if (action.type === "restart-clawd") return true;
+    if (action.type === "restart-deskbuddy") return true;
     return !!(
       action.type === "agent-integration"
       && action.agentId === "codex"
@@ -270,7 +270,7 @@
   function renderFixConfirm(core) {
     const action = state.pendingConfirmAction;
     if (!requiresFixConfirmation(action)) return "";
-    const restart = action.type === "restart-clawd";
+    const restart = action.type === "restart-deskbuddy";
     const titleKey = restart ? "doctorRestartConfirmTitle" : "doctorFixConfirmCodexTitle";
     const detailKey = restart ? "doctorRestartConfirmDetail" : "doctorFixConfirmCodexDetail";
     const actionKey = restart ? "doctorRestartConfirmAction" : "doctorFixConfirmCodexAction";
@@ -683,8 +683,8 @@
     if (openLog) {
       openLog.addEventListener("click", async () => {
         try {
-          if (!root.doctor || typeof root.doctor.openClawdLog !== "function") throw new Error(t(core, "doctorOpenLogFailed"));
-          const result = await root.doctor.openClawdLog();
+          if (!root.doctor || typeof root.doctor.openDeskBuddyLog !== "function") throw new Error(t(core, "doctorOpenLogFailed"));
+          const result = await root.doctor.openDeskBuddyLog();
           if (!result || result.status !== "ok") throw new Error((result && (result.message || result.reason)) || t(core, "doctorOpenLogFailed"));
           showToast(core, t(core, "doctorOpenLogOpened"));
         } catch (err) {
@@ -755,7 +755,7 @@
     refreshModal(core);
     try {
       const commandAction = { ...action };
-      if (commandAction.type !== "restart-clawd") delete commandAction.confirmed;
+      if (commandAction.type !== "restart-deskbuddy") delete commandAction.confirmed;
       const result = await root.settingsAPI.command("repairDoctorIssue", commandAction);
       if (runId !== state.repairRunId) return;
       if (!result || result.status !== "ok") {
@@ -771,10 +771,10 @@
       state.repairFeedback[repairKey] = { status: "ok", message };
       state.lastRepairFeedback = { status: "ok", message };
       showToast(core, message);
-      // restart-clawd tears the main process down right after this IPC reply,
+      // restart-deskbuddy tears the main process down right after this IPC reply,
       // so re-running the checks would race the process exit and surface a
       // spurious error toast. The new process re-renders Doctor on launch.
-      if (action && action.type === "restart-clawd") return;
+      if (action && action.type === "restart-deskbuddy") return;
       await runChecks(core);
     } catch (err) {
       if (runId !== state.repairRunId) return;
@@ -880,7 +880,7 @@
     }
   }
 
-  root.ClawdSettingsDoctorModal = {
+  root.DeskBuddySettingsDoctorModal = {
     renderSidebarIndicator,
     runChecks,
     open: runAndOpen,

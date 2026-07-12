@@ -8,12 +8,12 @@ import coreModule from "./pi-extension-core.js";
 
 const core = ((coreModule as any).default || coreModule) as any;
 
-const CLAWD_SERVER_ID = "clawd-on-desk";
-const CLAWD_SERVER_HEADER = "x-clawd-server";
+const DESKBUDDY_SERVER_ID = "deskbuddy";
+const DESKBUDDY_SERVER_HEADER = "x-deskbuddy-server";
 const STATE_PATH = "/state";
 const DEFAULT_SERVER_PORT = 23333;
 const SERVER_PORTS = [23333, 23334, 23335, 23336, 23337];
-const RUNTIME_CONFIG_PATH = path.join(os.homedir(), ".clawd", "runtime.json");
+const RUNTIME_CONFIG_PATH = path.join(os.homedir(), ".deskbuddy", "runtime.json");
 const HTTP_TIMEOUT_MS = 150;
 const PROCESS_METADATA_TTL_MS = 2000;
 
@@ -129,12 +129,12 @@ function readHeader(res: http.IncomingMessage, headerName: string): string | und
   return Array.isArray(value) ? value[0] : value;
 }
 
-function isClawdResponse(res: http.IncomingMessage, body: string): boolean {
-  if (readHeader(res, CLAWD_SERVER_HEADER) === CLAWD_SERVER_ID) return true;
+function isDeskBuddyResponse(res: http.IncomingMessage, body: string): boolean {
+  if (readHeader(res, DESKBUDDY_SERVER_HEADER) === DESKBUDDY_SERVER_ID) return true;
   if (!body) return false;
   try {
     const parsed = JSON.parse(body);
-    return parsed && parsed.app === CLAWD_SERVER_ID;
+    return parsed && parsed.app === DESKBUDDY_SERVER_ID;
   } catch {
     return false;
   }
@@ -160,7 +160,7 @@ function postStateToPort(port: number, payload: string): Promise<boolean> {
         res.on("data", (chunk) => {
           if (body.length < 256) body += chunk;
         });
-        res.on("end", () => resolve(isClawdResponse(res, body)));
+        res.on("end", () => resolve(isDeskBuddyResponse(res, body)));
       }
     );
     req.on("error", () => resolve(false));
@@ -315,7 +315,7 @@ function getProcessMetadata(): ProcessMetadata {
   return value;
 }
 
-export default function clawdPiExtension(pi: ExtensionAPI): void {
+export default function deskbuddyPiExtension(pi: ExtensionAPI): void {
   core.attach(pi, {
     shouldReport: (ctx: ExtensionContext) => core.shouldReport(ctx),
     buildPayload: ({ state, event, nativeEvent, ctx }: {

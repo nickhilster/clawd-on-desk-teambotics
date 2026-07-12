@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Clawd Desktop Pet — Remote Hook Deployment
+# DeskBuddy Desktop Pet — Remote Hook Deployment
 # Deploys hook files to a remote server and registers Claude Code hooks.
 #
 # Usage:
@@ -8,7 +8,7 @@
 # Prerequisites:
 #   - SSH access to the remote server
 #   - Node.js installed on the remote server
-#   - Clawd running locally (for port detection)
+#   - DeskBuddy running locally (for port detection)
 
 set -euo pipefail
 
@@ -17,9 +17,9 @@ set -euo pipefail
 if [ $# -lt 1 ]; then
   echo "Usage: bash scripts/remote-deploy.sh user@host [--prefix NAME]"
   echo ""
-  echo "Deploys Clawd hook files to a remote server so that"
+  echo "Deploys DeskBuddy hook files to a remote server so that"
   echo "Claude Code and Codex CLI states are synced back to your"
-  echo "local Clawd via SSH reverse port forwarding."
+  echo "local DeskBuddy via SSH reverse port forwarding."
   echo ""
   echo "Options:"
   echo "  --prefix NAME   Short name for this machine (shown in Sessions menu)."
@@ -80,9 +80,9 @@ emit_node() {
   if [ ! -x "$p" ]; then return 1; fi
   v="$("$p" --version 2>/dev/null)" || return 1
   node_version_supported "$v" || return 1
-  printf 'CLAWD_REMOTE_NODE_BIN=%s\n' "$p"
-  printf 'CLAWD_REMOTE_NODE_VERSION=%s\n' "$v"
-  printf 'CLAWD_REMOTE_NODE_SOURCE=%s\n' "$src"
+  printf 'DESKBUDDY_REMOTE_NODE_BIN=%s\n' "$p"
+  printf 'DESKBUDDY_REMOTE_NODE_VERSION=%s\n' "$v"
+  printf 'DESKBUDDY_REMOTE_NODE_SOURCE=%s\n' "$src"
   exit 0
 }
 
@@ -95,8 +95,8 @@ probe_login_shells() {
       *) continue ;;
     esac
     if [ ! -x "$shell" ]; then continue; fi
-    out="$("$shell" -lic 'printf "__CLAWD_REMOTE_NODE_PROBE__\n"; command -v node 2>/dev/null; which node 2>/dev/null; true' 2>/dev/null)"
-    p="$(printf '%s\n' "$out" | awk 'found && $0 ~ /^\// { last=$0 } $0 == "__CLAWD_REMOTE_NODE_PROBE__" { found=1 } END { if (last) print last }')"
+    out="$("$shell" -lic 'printf "__DESKBUDDY_REMOTE_NODE_PROBE__\n"; command -v node 2>/dev/null; which node 2>/dev/null; true' 2>/dev/null)"
+    p="$(printf '%s\n' "$out" | awk 'found && $0 ~ /^\// { last=$0 } $0 == "__DESKBUDDY_REMOTE_NODE_PROBE__" { found=1 } END { if (last) print last }')"
     emit_node "$p" "shell:$shell"
   done
 }
@@ -138,7 +138,7 @@ FILES=(
   "$HOOKS_DIR/claude-rate-limits.js"
   "$HOOKS_DIR/quota-bucket.js"
   "$HOOKS_DIR/state-payload-size.js"
-  "$HOOKS_DIR/clawd-hook.js"
+  "$HOOKS_DIR/deskbuddy-hook.js"
   "$HOOKS_DIR/install.js"
   "$HOOKS_DIR/codex-hook.js"
   "$HOOKS_DIR/codex-assistant-output.js"
@@ -154,7 +154,7 @@ FILES=(
 # ── Local port detection ──
 
 LOCAL_PORT=23333
-RUNTIME_JSON="$HOME/.clawd/runtime.json"
+RUNTIME_JSON="$HOME/.deskbuddy/runtime.json"
 
 if [ -f "$RUNTIME_JSON" ]; then
   DETECTED_PORT=$(node -e "
@@ -167,8 +167,8 @@ if [ -f "$RUNTIME_JSON" ]; then
   LOCAL_PORT="$DETECTED_PORT"
 fi
 
-echo "Deploying Clawd hooks to $SSH_TARGET..."
-echo "  Local Clawd port: $LOCAL_PORT"
+echo "Deploying DeskBuddy hooks to $SSH_TARGET..."
+echo "  Local DeskBuddy port: $LOCAL_PORT"
 echo ""
 
 # ── Verify local files ──
@@ -192,9 +192,9 @@ ssh "$SSH_TARGET" "mkdir -p ~/.claude/hooks" || {
 
 # Check Node.js
 REMOTE_NODE=$(ssh "$SSH_TARGET" "sh -c $(quote_remote_arg "$REMOTE_NODE_PROBE")" 2>/dev/null || true)
-REMOTE_NODE_BIN=$(printf '%s\n' "$REMOTE_NODE" | sed -n 's/^CLAWD_REMOTE_NODE_BIN=//p' | head -n 1)
-REMOTE_NODE_VERSION=$(printf '%s\n' "$REMOTE_NODE" | sed -n 's/^CLAWD_REMOTE_NODE_VERSION=//p' | head -n 1)
-REMOTE_NODE_SOURCE=$(printf '%s\n' "$REMOTE_NODE" | sed -n 's/^CLAWD_REMOTE_NODE_SOURCE=//p' | head -n 1)
+REMOTE_NODE_BIN=$(printf '%s\n' "$REMOTE_NODE" | sed -n 's/^DESKBUDDY_REMOTE_NODE_BIN=//p' | head -n 1)
+REMOTE_NODE_VERSION=$(printf '%s\n' "$REMOTE_NODE" | sed -n 's/^DESKBUDDY_REMOTE_NODE_VERSION=//p' | head -n 1)
+REMOTE_NODE_SOURCE=$(printf '%s\n' "$REMOTE_NODE" | sed -n 's/^DESKBUDDY_REMOTE_NODE_SOURCE=//p' | head -n 1)
 if [ -z "$REMOTE_NODE_BIN" ] || [ -z "$REMOTE_NODE_VERSION" ]; then
   echo "ERROR: Node.js not found on remote server"
   echo "Install Node.js on the remote server first."
@@ -226,8 +226,8 @@ if [ -n "$HOST_PREFIX" ]; then
   # shell — same defense as the Node deploy path (plan v7 §3.11). bash expands
   # $HOST_PREFIX once into printf's argument; printf %s writes the literal
   # bytes; ssh forwards stdin to `cat > path` on the remote.
-  if printf '%s' "$HOST_PREFIX" | ssh "$SSH_TARGET" "cat > ~/.claude/hooks/clawd-host-prefix"; then
-    echo "  [OK] Prefix written to ~/.claude/hooks/clawd-host-prefix"
+  if printf '%s' "$HOST_PREFIX" | ssh "$SSH_TARGET" "cat > ~/.claude/hooks/deskbuddy-host-prefix"; then
+    echo "  [OK] Prefix written to ~/.claude/hooks/deskbuddy-host-prefix"
   else
     echo "ERROR: failed to write host prefix"
     exit 1
@@ -293,7 +293,7 @@ echo ""
 echo "  nohup $(remote_node_command codex-remote-monitor.js) > /dev/null 2>&1 &"
 echo ""
 echo "The fallback monitor polls Codex JSONL logs and syncs states"
-echo "back to your local Clawd through the SSH tunnel."
+echo "back to your local DeskBuddy through the SSH tunnel."
 echo "If the tunnel disconnects, it keeps running silently"
 echo "and resumes syncing when you reconnect."
 echo ""

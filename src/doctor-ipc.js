@@ -4,7 +4,7 @@ const { runDoctorChecks } = require("./doctor");
 const { getCodexHookHealth } = require("./codex-hook-health");
 const { formatDiagnosticReport, redactDoctorResult } = require("./doctor-report");
 const { createConnectionTestDeduper, runConnectionTest } = require("./doctor-hook-activity");
-const { openClawdLog } = require("./doctor-logs");
+const { openDeskBuddyLog } = require("./doctor-logs");
 
 function getDoctorRedactionOptions(app) {
   const appRoots = [path.resolve(path.join(__dirname, ".."))];
@@ -123,9 +123,9 @@ function registerDoctorIpc({
     return redactDoctorResult(result, getDoctorRedactionOptions(app));
   });
 
-  ipcMain.handle("doctor:open-clawd-log", async (_event, payload) => {
+  ipcMain.handle("doctor:open-deskbuddy-log", async (_event, payload) => {
     const safePayload = normalizeDoctorOpenLogPayload(payload);
-    return openClawdLog({
+    return openDeskBuddyLog({
       requested: safePayload.name,
       homeDir: os.homedir(),
       userDataDir: app.getPath("userData"),

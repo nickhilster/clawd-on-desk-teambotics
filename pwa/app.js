@@ -31,8 +31,8 @@
     SubagentStart: "Subagent Start", SubagentStop: "Subagent Stop",
   };
 
-  var MACHINES_KEY = "clawd-machines";
-  var LEGACY_HISTORY_KEY = "clawd-history";
+  var MACHINES_KEY = "deskbuddy-machines";
+  var LEGACY_HISTORY_KEY = "deskbuddy-history";
   var MAX_MACHINES = 12;
   var MAX_HISTORY = 5;
   var MAX_LOG_LINES = 200;
@@ -183,10 +183,10 @@
       try {
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
           navigator.serviceWorker.ready.then(function(reg) {
-            reg.showNotification(title, { body: body, tag: "clawd-" + (tag || "default"), icon: "/mobile/icons/icon-256.png" });
+            reg.showNotification(title, { body: body, tag: "deskbuddy-" + (tag || "default"), icon: "/mobile/icons/icon-256.png" });
           });
         } else {
-          new Notification(title, { body: body, tag: "clawd-" + (tag || "default") });
+          new Notification(title, { body: body, tag: "deskbuddy-" + (tag || "default") });
         }
       } catch {}
     }
@@ -824,7 +824,7 @@
       this.notifier = new NotificationManager();
       this.activeTab = "sessions";
 
-      window._clawdApp = this;
+      window._deskbuddyApp = this;
 
       this.machineManager = new MachineManager({
         onStatusChange: this._onMachineStatusChange.bind(this),

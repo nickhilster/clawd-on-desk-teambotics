@@ -68,7 +68,7 @@ describe("session alias helpers", () => {
   });
 
   it("sanitizes aliases with trim, whitespace collapse, and max length", () => {
-    assert.strictEqual(sanitizeSessionAlias("  Clawd\nmain\t repo  "), "Clawd main repo");
+    assert.strictEqual(sanitizeSessionAlias("  DeskBuddy\nmain\t repo  "), "DeskBuddy main repo");
     assert.strictEqual(sanitizeSessionAlias("   "), "");
     assert.strictEqual(sanitizeSessionAlias(null), null);
     assert.strictEqual(

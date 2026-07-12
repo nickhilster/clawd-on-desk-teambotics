@@ -166,18 +166,18 @@ async function repairLocalServer(_payload, deps) {
   }
 }
 
-function restartClawd(payload, deps) {
+function restartDeskBuddy(payload, deps) {
   if (!payload || payload.confirmed !== true) {
-    return { status: "error", message: "restartClawd requires confirmation" };
+    return { status: "error", message: "restartDeskBuddy requires confirmation" };
   }
-  if (!deps || typeof deps.restartClawd !== "function") {
-    return { status: "error", message: "restartClawd requires deps.restartClawd" };
+  if (!deps || typeof deps.restartDeskBuddy !== "function") {
+    return { status: "error", message: "restartDeskBuddy requires deps.restartDeskBuddy" };
   }
   try {
-    deps.restartClawd();
-    return { status: "ok", message: "Clawd is restarting" };
+    deps.restartDeskBuddy();
+    return { status: "ok", message: "DeskBuddy is restarting" };
   } catch (err) {
-    return { status: "error", message: `restartClawd: ${err && err.message}` };
+    return { status: "error", message: `restartDeskBuddy: ${err && err.message}` };
   }
 }
 
@@ -202,8 +202,8 @@ function createRepairDoctorIssue({ repairAgentIntegration, setBubbleCategoryEnab
     if (type === "local-server") {
       return repairLocalServer(payload, deps);
     }
-    if (type === "restart-clawd") {
-      return restartClawd(payload, deps);
+    if (type === "restart-deskbuddy") {
+      return restartDeskBuddy(payload, deps);
     }
     return {
       status: "error",
@@ -222,6 +222,6 @@ module.exports = {
   manageClaudeHooksAutomatically,
   openAtLogin,
   repairLocalServer,
-  restartClawd,
+  restartDeskBuddy,
   uninstallHooks,
 };

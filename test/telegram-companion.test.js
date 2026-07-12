@@ -229,7 +229,7 @@ test("interrupted badge uses the warning marker", async () => {
   assert.match(sent[0], /interrupted/);
 });
 
-test("completion notification follows the current Clawd language", async () => {
+test("completion notification follows the current DeskBuddy language", async () => {
   let lang = "zh";
   const { comp, sent } = makeCompanion({ getLang: () => lang, getNotifyOnComplete: () => true });
   comp.onSnapshot({ sessions: [] });

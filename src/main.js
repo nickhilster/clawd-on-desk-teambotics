@@ -21,9 +21,9 @@ const _xwaylandRelaunch = planXWaylandRelaunch({
 if (_xwaylandRelaunch) {
   console.log(
     "DeskBuddy: Linux — relaunching under XWayland (--ozone-platform=x11) " +
-    "(issue #441; override with CLAWD_OZONE_PLATFORM=wayland|x11|auto)"
+    "(issue #441; override with DESKBUDDY_OZONE_PLATFORM=wayland|x11|auto)"
   );
-  process.env.CLAWD_OZONE_RELAUNCHED = "1";
+  process.env.DESKBUDDY_OZONE_RELAUNCHED = "1";
   // Spawn the replacement ourselves instead of app.relaunch(). Electron's
   // relauncher helper is a process run from the binary INSIDE the AppImage's
   // FUSE mount, and it deliberately waits for this process to die before it
@@ -62,7 +62,7 @@ if (_xwaylandRelaunch) {
   // startup so the app still runs, just without drag (issue #441). The error
   // listener above also prevents async exec failures (ENOENT/EACCES) from
   // crashing this fallback path.
-  delete process.env.CLAWD_OZONE_RELAUNCHED;
+  delete process.env.DESKBUDDY_OZONE_RELAUNCHED;
   console.error("DeskBuddy: XWayland relaunch failed; continuing under native Wayland (issue #441).");
 }
 
@@ -170,14 +170,14 @@ const _isForegroundFullscreen = createForegroundFullscreenProbe({
 
 // ── Windows: switch the dev console to UTF-8 ──
 //
-// `npm start` attaches Clawd to a parent PowerShell/cmd console. That
+// `npm start` attaches DeskBuddy to a parent PowerShell/cmd console. That
 // console defaults to the system codepage (CP936 on zh-CN), so any
 // Chinese string we console.log lands as mojibake — the strings are
 // already UTF-8 in memory (after the GBK stderr decode fix), but the
 // console interprets the bytes as GBK on the way out.
 //
 // SetConsoleOutputCP(65001) tells the attached console to interpret
-// stdout/stderr as UTF-8 while Clawd is running. Packaged builds run under
+// stdout/stderr as UTF-8 while DeskBuddy is running. Packaged builds run under
 // the Windows GUI subsystem with no console attached, so this call is a
 // no-op there.
 let _restoreConsoleOutputCP = null;
@@ -296,10 +296,10 @@ function _deferredResizePet(sizeKey) {
 }
 
 let _restartScheduled = false;
-function _restartClawdNow() {
+function _restartDeskBuddyNow() {
   if (_restartScheduled) return;
   _restartScheduled = true;
-  // Triggered by Doctor's restart-clawd repair. relaunch() queues a fresh
+  // Triggered by Doctor's restart-deskbuddy repair. relaunch() queues a fresh
   // process; quit() then follows the normal shutdown path so before-quit
   // still flushes prefs and cleans up server/monitor resources.
   // setImmediate so the IPC reply for repairDoctorIssue lands in the
@@ -363,7 +363,7 @@ const _settingsController = createSettingsController({
     repairLocalServer: () => _server && typeof _server.repairRuntimeStatus === "function"
       ? _server.repairRuntimeStatus()
       : false,
-    restartClawd: _restartClawdNow,
+    restartDeskBuddy: _restartDeskBuddyNow,
     clearSessionsByAgent: (id) => agentRuntime ? agentRuntime.clearSessionsByAgent(id) : 0,
     dismissPermissionsByAgent: (id, options) => agentRuntime ? agentRuntime.dismissPermissionsByAgent(id, options) : 0,
     resizePet: _deferredResizePet,
@@ -2066,7 +2066,7 @@ async function persistTelegramMigrationPatch(patch) {
 
 // Canonical paths only — no env-var override. The Settings "Save token" button,
 // the sidecar's bridge TOML, and tokenStatus all share this single location so
-// a malicious or accidental CLAWD_TG_BOT_TOKEN_FILE / CLAWD_BRIDGE_CONFIG can't
+// a malicious or accidental DESKBUDDY_TG_BOT_TOKEN_FILE / DESKBUDDY_BRIDGE_CONFIG can't
 // redirect the writer to an attacker-controlled path or split the writer/reader
 // view of where the token lives.
 function getTelegramApprovalPaths() {
@@ -2349,9 +2349,9 @@ async function startTelegramApprovalSidecar() {
   }
   if (telegramApprovalSidecar) await stopTelegramApprovalSidecar();
   // The bot token only ever lives at userData/telegram-approval.env on disk.
-  // The sidecar reads it from there directly — Clawd's main process must never
+  // The sidecar reads it from there directly — DeskBuddy's main process must never
   // pipe a token value through process.env or child env, so there is no
-  // botToken option here and no CLAWD_TG_BOT_TOKEN read from process.env.
+  // botToken option here and no DESKBUDDY_TG_BOT_TOKEN read from process.env.
   telegramApprovalSidecar = createTelegramApprovalSidecar({
     baseEnv: process.env,
     env: process.env,
@@ -2440,7 +2440,7 @@ async function initTelegramMigrationController() {
     // fetch which ignores system/env proxy. Dedicated in-memory session.
     transport: createTelegramFetchTransport({
       tokenStore,
-      sessionFactory: () => require("electron").session.fromPartition("clawd-telegram", { cache: false }),
+      sessionFactory: () => require("electron").session.fromPartition("deskbuddy-telegram", { cache: false }),
       log: telegramApprovalLog,
     }),
     getDispatch: () => _telegramMigrationController && _telegramMigrationController.dispatch,
@@ -2588,7 +2588,7 @@ async function sendTelegramApprovalTest() {
   const timer = setTimeout(() => controller.abort(), 60 * 1000);
   try {
     const decision = await client.requestApproval({
-      title: "Clawd Telegram approval test",
+      title: "DeskBuddy Telegram approval test",
       detail: "This is a settings test message. It is not attached to any agent permission request.",
     }, { signal: controller.signal });
     if (decision === "allow" || decision === "deny") {
@@ -2784,7 +2784,7 @@ function sendHardwareBuddyTestApproval() {
       isCodex: true,
       isHardwareBuddyTest: true,
       cwd: __dirname,
-      codexOriginator: "clawd-settings",
+      codexOriginator: "deskbuddy-settings",
       codexSource: "hardware-buddy-test",
     };
 
@@ -3260,7 +3260,7 @@ const {
 notifyUpdaterSilentExit = () => { try { updaterOnSilentModeExit(); } catch {} };
 
 // #329: react to the autoUpdateCheck toggle in real time so users see
-// the scheduler start/stop without restarting Clawd.
+// the scheduler start/stop without restarting DeskBuddy.
 try {
   _settingsController.subscribeKey("autoUpdateCheck", (value) => {
     try {
@@ -3297,7 +3297,7 @@ const { createRemoteSshRuntime } = require("./remote-ssh-runtime");
 const { registerRemoteSshIpc } = require("./remote-ssh-ipc");
 const _remoteSshRuntime = createRemoteSshRuntime({
   getHookServerPort: () => getHookServerPort(),
-  log: (...args) => console.warn("Clawd remote-ssh:", ...args),
+  log: (...args) => console.warn("DeskBuddy remote-ssh:", ...args),
 });
 const _remoteSshIpc = registerRemoteSshIpc({
   ipcMain,
@@ -3829,7 +3829,7 @@ Object.defineProperties(this || {}, {}); // no-op placeholder
 // active theme source and the cleanup/refresh/reload protocol.
 
 // ── Auto-install VS Code / Cursor terminal-focus extension ──
-const EXT_ID = "clawd.clawd-terminal-focus";
+const EXT_ID = "deskbuddy.deskbuddy-terminal-focus";
 const EXT_VERSION = "0.1.1";
 const EXT_DIR_NAME = `${EXT_ID}-${EXT_VERSION}`;
 

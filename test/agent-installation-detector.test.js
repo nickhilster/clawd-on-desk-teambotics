@@ -14,7 +14,7 @@ const { getAgentDescriptor } = require("../src/doctor-detectors/agent-descriptor
 const tempDirs = [];
 
 function makeHome() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-agent-detect-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-agent-detect-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -56,7 +56,7 @@ describe("agent installation detector", () => {
     assert.ok(byId(report, "qwen-code"));
   });
 
-  it("detects generic parent-directory agents and reports Clawd marker presence separately", () => {
+  it("detects generic parent-directory agents and reports DeskBuddy marker presence separately", () => {
     const homeDir = makeHome();
     const qwenDir = path.join(homeDir, ".qwen");
     const codewhaleDir = path.join(homeDir, ".codewhale");
@@ -76,8 +76,8 @@ describe("agent installation detector", () => {
     assert.strictEqual(qwen.detectedInstalled, true);
     assert.strictEqual(qwen.confidence, "high");
     assert.strictEqual(qwen.reason, "parent-dir");
-    assert.strictEqual(qwen.clawdIntegration.detected, true);
-    assert.strictEqual(qwen.clawdIntegration.reason, "marker-found");
+    assert.strictEqual(qwen.deskbuddyIntegration.detected, true);
+    assert.strictEqual(qwen.deskbuddyIntegration.reason, "marker-found");
     assert.strictEqual(codewhale.detectedInstalled, true);
     assert.strictEqual(codewhale.confidence, "high");
     assert.strictEqual(codewhale.reason, "parent-dir");
@@ -86,7 +86,7 @@ describe("agent installation detector", () => {
   it("does not confuse Antigravity's ~/.gemini/config with Gemini CLI", () => {
     const homeDir = makeHome();
     writeJson(path.join(homeDir, ".gemini", "config", "hooks.json"), {
-      clawd: {
+      deskbuddy: {
         PreInvocation: [{ type: "command", command: "node /app/hooks/antigravity-hook.js PreInvocation" }],
       },
     });
@@ -106,25 +106,25 @@ describe("agent installation detector", () => {
     assert.strictEqual(antigravity.reason, "parent-dir");
   });
 
-  it("treats Gemini Clawd-only settings as integration marker, not install proof", () => {
+  it("treats Gemini DeskBuddy-only settings as integration marker, not install proof", () => {
     const homeDir = makeHome();
     const settingsPath = path.join(homeDir, ".gemini", "settings.json");
     writeJson(settingsPath, {
       hooks: {
-        SessionStart: [{ hooks: [{ name: "clawd", type: "command", command: "node /app/hooks/gemini-hook.js SessionStart" }] }],
+        SessionStart: [{ hooks: [{ name: "deskbuddy", type: "command", command: "node /app/hooks/gemini-hook.js SessionStart" }] }],
       },
     });
 
     let report = detectAgentInstallations({ homeDir, now: 1 });
     let gemini = byId(report, "gemini-cli");
     assert.strictEqual(gemini.detectedInstalled, false);
-    assert.match(gemini.detail, /only Clawd-managed/);
-    assert.strictEqual(gemini.clawdIntegration.detected, true);
+    assert.match(gemini.detail, /only DeskBuddy-managed/);
+    assert.strictEqual(gemini.deskbuddyIntegration.detected, true);
 
     writeJson(settingsPath, {
       selectedAuthType: "oauth-personal",
       hooks: {
-        SessionStart: [{ hooks: [{ name: "clawd", type: "command", command: "node /app/hooks/gemini-hook.js SessionStart" }] }],
+        SessionStart: [{ hooks: [{ name: "deskbuddy", type: "command", command: "node /app/hooks/gemini-hook.js SessionStart" }] }],
       },
     });
 
@@ -233,7 +233,7 @@ describe("agent installation detector", () => {
       assert.strictEqual(kimi.detectedInstalled, false);
     });
 
-    it("finds the Clawd marker in the kimi-code config when legacy has none", () => {
+    it("finds the DeskBuddy marker in the kimi-code config when legacy has none", () => {
       const homeDir = makeHome();
       mkdirp(path.join(homeDir, ".kimi"));
       writeText(
@@ -245,9 +245,9 @@ describe("agent installation detector", () => {
       const kimi = byId(report, "kimi-cli");
 
       assert.strictEqual(kimi.detectedInstalled, true);
-      assert.strictEqual(kimi.clawdIntegration.detected, true);
-      assert.strictEqual(kimi.clawdIntegration.reason, "marker-found");
-      assert.ok(kimi.clawdIntegration.detail.includes(".kimi-code"));
+      assert.strictEqual(kimi.deskbuddyIntegration.detected, true);
+      assert.strictEqual(kimi.deskbuddyIntegration.reason, "marker-found");
+      assert.ok(kimi.deskbuddyIntegration.detail.includes(".kimi-code"));
     });
   });
 });

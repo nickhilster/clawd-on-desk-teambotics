@@ -586,7 +586,7 @@ describe("CodexLogMonitor", () => {
     //      picked up, the appended live write below would never emit.
     //   2. Replay protection: the historical session_meta line (3 min old)
     //      must NOT emit "idle" on attach — that would be a replay of a
-    //      stale transition on Clawd restart. Backfill mode drops it.
+    //      stale transition on DeskBuddy restart. Backfill mode drops it.
     const testFile = path.join(dateDir, TEST_FILENAME);
     fs.writeFileSync(testFile, '{"type":"session_meta","payload":{"cwd":"/projects/slow"}}\n');
     const recent = new Date(Date.now() - 3 * 60 * 1000);
@@ -614,7 +614,7 @@ describe("CodexLogMonitor", () => {
   });
 
   it("backfills historical turns silently, then emits live turns normally", (_, done) => {
-    // Simulates Clawd restart discovering a completed turn that finished
+    // Simulates DeskBuddy restart discovering a completed turn that finished
     // minutes ago. The historical task_started/function_call/task_complete
     // sequence must NOT emit — those states belong to the past. Only
     // content appended after monitor start should reach the callback.

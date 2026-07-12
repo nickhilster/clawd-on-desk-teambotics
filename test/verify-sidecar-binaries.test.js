@@ -43,11 +43,11 @@ test("getRequiredSidecarsForLifecycle maps configured build targets", () => {
 test("sidecarBinaryPath uses resolver-compatible binary names", () => {
   assert.equal(
     sidecarBinaryPath("D:\\repo", "windows", "arm64"),
-    path.join("D:\\repo", "bin", "cc-connect-clawd", "windows-arm64", "cc-connect-clawd.exe")
+    path.join("D:\\repo", "bin", "deskbuddy-connect", "windows-arm64", "deskbuddy-connect.exe")
   );
   assert.equal(
     sidecarBinaryPath("/repo", "linux", "x64"),
-    path.join("/repo", "bin", "cc-connect-clawd", "linux-x64", "cc-connect-clawd")
+    path.join("/repo", "bin", "deskbuddy-connect", "linux-x64", "deskbuddy-connect")
   );
 });
 
@@ -63,7 +63,7 @@ test("verifySidecarBinaries reports missing binaries for the active build", () =
     {
       platform: "windows",
       arch: "arm64",
-      path: path.join(rootDir, "bin", "cc-connect-clawd", "windows-arm64", "cc-connect-clawd.exe"),
+      path: path.join(rootDir, "bin", "deskbuddy-connect", "windows-arm64", "deskbuddy-connect.exe"),
     },
   ]);
 });

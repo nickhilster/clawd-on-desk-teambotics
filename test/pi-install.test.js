@@ -19,14 +19,14 @@ const {
 const tempDirs = [];
 
 function makeTempDir() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-pi-install-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-pi-install-"));
   tempDirs.push(dir);
   return dir;
 }
 
 function makeSourceDir() {
   const dir = makeTempDir();
-  fs.writeFileSync(path.join(dir, "pi-extension.ts"), "export default function clawdPiExtension() {}\n", "utf8");
+  fs.writeFileSync(path.join(dir, "pi-extension.ts"), "export default function deskbuddyPiExtension() {}\n", "utf8");
   fs.writeFileSync(path.join(dir, CORE_FILE), "module.exports = { attach() {} };\n", "utf8");
   return dir;
 }
@@ -150,7 +150,7 @@ describe("pi-install", () => {
     assert.strictEqual(fs.readFileSync(path.join(extensionDir, EXTENSION_FILE), "utf8"), "user extension\n");
   });
 
-  it("uninstalls only a Clawd-managed Pi extension directory", () => {
+  it("uninstalls only a DeskBuddy-managed Pi extension directory", () => {
     const root = makeTempDir();
     const sourceDir = makeSourceDir();
     const parentDir = path.join(root, ".pi", "agent");

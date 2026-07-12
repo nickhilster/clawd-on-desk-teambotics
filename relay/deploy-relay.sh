@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# relay/deploy-relay.sh — 一键部署 Clawd 中继服务器
+# relay/deploy-relay.sh — 一键部署 DeskBuddy 中继服务器
 # 用法: ./deploy-relay.sh [docker|systemd]
 #   docker  — 使用 Docker Compose 部署（默认）
 #   systemd — 使用 systemd 服务部署
@@ -58,7 +58,7 @@ generate_config() {
   local admin_token="${3:-$(generate_token)}"
 
   cat > "$config_dir/.env" <<EOF
-# Clawd Relay Server 配置
+# DeskBuddy Relay Server 配置
 # 生成时间: $(date -Iseconds)
 PORT=${PORT}
 TOKEN=${connection_token}
@@ -98,7 +98,7 @@ deploy_docker() {
   fi
 
   log "Docker 部署完成！"
-  log "查看日志: docker compose logs -f clawd-relay"
+  log "查看日志: docker compose logs -f deskbuddy-relay"
   log "停止服务: docker compose down"
 }
 
@@ -106,8 +106,8 @@ deploy_docker() {
 deploy_systemd() {
   log "使用 systemd 部署..."
 
-  local config_dir="/etc/clawd-relay"
-  local service_file="/etc/systemd/system/clawd-relay.service"
+  local config_dir="/etc/deskbuddy-relay"
+  local service_file="/etc/systemd/system/deskbuddy-relay.service"
 
   # 创建配置目录
   sudo mkdir -p "$config_dir"
@@ -126,7 +126,7 @@ deploy_systemd() {
   # 创建 systemd 服务文件
   sudo tee "$service_file" > /dev/null <<EOF
 [Unit]
-Description=Clawd Relay Server
+Description=DeskBuddy Relay Server
 After=network.target
 
 [Service]
@@ -146,20 +146,20 @@ WantedBy=multi-user.target
 EOF
 
   sudo systemctl daemon-reload
-  sudo systemctl enable clawd-relay
-  sudo systemctl start clawd-relay
+  sudo systemctl enable deskbuddy-relay
+  sudo systemctl start deskbuddy-relay
 
   log "systemd 部署完成！"
-  log "查看日志: journalctl -u clawd-relay -f"
-  log "停止服务: sudo systemctl stop clawd-relay"
-  log "重启服务: sudo systemctl restart clawd-relay"
+  log "查看日志: journalctl -u deskbuddy-relay -f"
+  log "停止服务: sudo systemctl stop deskbuddy-relay"
+  log "重启服务: sudo systemctl restart deskbuddy-relay"
 }
 
 # 主流程
 check_deps
 
 echo ""
-log "开始部署 Clawd 中继服务器..."
+log "开始部署 DeskBuddy 中继服务器..."
 echo ""
 
 if [ "$DEPLOY_MODE" = "docker" ]; then

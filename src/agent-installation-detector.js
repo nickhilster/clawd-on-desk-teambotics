@@ -166,51 +166,51 @@ function notFound(detail = "No local installation signal found") {
   return installationResult(false, LOW_CONFIDENCE, "not-found", detail);
 }
 
-function hasClawdMarkerText(text, marker) {
+function hasDeskBuddyMarkerText(text, marker) {
   return typeof text === "string" && typeof marker === "string" && marker && text.includes(marker);
 }
 
-function hasNonClawdHookCommand(value, marker) {
+function hasNonDeskBuddyHookCommand(value, marker) {
   if (!value || typeof value !== "object") return false;
-  if (Array.isArray(value)) return value.some((entry) => hasNonClawdHookCommand(entry, marker));
+  if (Array.isArray(value)) return value.some((entry) => hasNonDeskBuddyHookCommand(entry, marker));
   for (const [key, entry] of Object.entries(value)) {
-    if (key === "command" && typeof entry === "string" && !hasClawdMarkerText(entry, marker)) return true;
-    if (hasNonClawdHookCommand(entry, marker)) return true;
+    if (key === "command" && typeof entry === "string" && !hasDeskBuddyMarkerText(entry, marker)) return true;
+    if (hasNonDeskBuddyHookCommand(entry, marker)) return true;
   }
   return false;
 }
 
 function classifyGeminiSettings(fsImpl, settingsPath, marker) {
   const raw = readText(fsImpl, settingsPath);
-  if (raw === null) return { exists: false, userContent: false, clawdOnly: false, unreadable: false };
+  if (raw === null) return { exists: false, userContent: false, deskbuddyOnly: false, unreadable: false };
   let parsed;
   try {
     parsed = JSON.parse(raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw);
   } catch {
-    return { exists: true, userContent: true, clawdOnly: false, unreadable: true };
+    return { exists: true, userContent: true, deskbuddyOnly: false, unreadable: true };
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { exists: true, userContent: true, clawdOnly: false, unreadable: false };
+    return { exists: true, userContent: true, deskbuddyOnly: false, unreadable: false };
   }
 
   const keys = Object.keys(parsed);
-  const nonClawdKeys = keys.filter((key) => key !== "hooks" && key !== "hooksConfig");
-  if (nonClawdKeys.length > 0) {
-    return { exists: true, userContent: true, clawdOnly: false, unreadable: false };
+  const nonDeskBuddyKeys = keys.filter((key) => key !== "hooks" && key !== "hooksConfig");
+  if (nonDeskBuddyKeys.length > 0) {
+    return { exists: true, userContent: true, deskbuddyOnly: false, unreadable: false };
   }
-  if (hasNonClawdHookCommand(parsed.hooks, marker)) {
-    return { exists: true, userContent: true, clawdOnly: false, unreadable: false };
+  if (hasNonDeskBuddyHookCommand(parsed.hooks, marker)) {
+    return { exists: true, userContent: true, deskbuddyOnly: false, unreadable: false };
   }
   if (parsed.hooksConfig && typeof parsed.hooksConfig === "object" && !Array.isArray(parsed.hooksConfig)) {
     const hookConfigKeys = Object.keys(parsed.hooksConfig);
     if (hookConfigKeys.some((key) => key !== "disabled")) {
-      return { exists: true, userContent: true, clawdOnly: false, unreadable: false };
+      return { exists: true, userContent: true, deskbuddyOnly: false, unreadable: false };
     }
   }
-  return { exists: true, userContent: false, clawdOnly: keys.length > 0, unreadable: false };
+  return { exists: true, userContent: false, deskbuddyOnly: keys.length > 0, unreadable: false };
 }
 
-function geminiDirHasNonClawdSignals(fsImpl, parentDir, settingsPath, marker) {
+function geminiDirHasNonDeskBuddySignals(fsImpl, parentDir, settingsPath, marker) {
   if (!dirExists(fsImpl, parentDir)) return false;
   const entries = listDir(fsImpl, parentDir);
   for (const entry of entries) {
@@ -238,14 +238,14 @@ function detectGeminiInstallation(descriptor, paths, options) {
       "config-file",
       classified.unreadable
         ? `${paths.configPath} exists but could not be classified`
-        : `${paths.configPath} contains non-Clawd Gemini settings`
+        : `${paths.configPath} contains non-DeskBuddy Gemini settings`
     );
   }
-  if (geminiDirHasNonClawdSignals(fsImpl, paths.parentDir, paths.configPath, descriptor.marker)) {
+  if (geminiDirHasNonDeskBuddySignals(fsImpl, paths.parentDir, paths.configPath, descriptor.marker)) {
     return installationResult(true, "medium", "parent-dir", `${paths.parentDir} contains Gemini CLI files`);
   }
-  if (classified.exists && classified.clawdOnly) {
-    return notFound(`${paths.configPath} contains only Clawd-managed Gemini hook signals`);
+  if (classified.exists && classified.deskbuddyOnly) {
+    return notFound(`${paths.configPath} contains only DeskBuddy-managed Gemini hook signals`);
   }
   return notFound();
 }
@@ -322,25 +322,25 @@ function markerInDirectoryFiles(fsImpl, dirPath, marker, options = {}) {
     if (checked >= maxFiles) break;
     checked++;
     const text = readText(fsImpl, path.join(dirPath, entry.name));
-    if (hasClawdMarkerText(text, marker)) return true;
+    if (hasDeskBuddyMarkerText(text, marker)) return true;
   }
   return false;
 }
 
-function detectClawdIntegration(descriptor, paths, options) {
+function detectDeskBuddyIntegration(descriptor, paths, options) {
   const fsImpl = options.fs;
   if (descriptor.agentId === "pi") {
-    const markerPath = path.join(paths.configPath, descriptor.markerFile || ".clawd-managed.json");
+    const markerPath = path.join(paths.configPath, descriptor.markerFile || ".deskbuddy-managed.json");
     return fileExists(fsImpl, markerPath)
       ? { detected: true, reason: "marker-file", detail: `${markerPath} exists`, paths: { markerPath } }
-      : { detected: false, reason: "not-found", detail: "No Clawd-managed Pi extension marker found" };
+      : { detected: false, reason: "not-found", detail: "No DeskBuddy-managed Pi extension marker found" };
   }
   if (descriptor.agentId === "hermes") {
     const files = Array.isArray(descriptor.managedFiles) ? descriptor.managedFiles : [];
     const found = files.some((file) => fileExists(fsImpl, path.join(paths.configPath, file)));
     return found
-      ? { detected: true, reason: "managed-files", detail: `${paths.configPath} contains Clawd plugin files`, paths: { pluginDir: paths.configPath } }
-      : { detected: false, reason: "not-found", detail: "No Clawd-managed Hermes plugin files found" };
+      ? { detected: true, reason: "managed-files", detail: `${paths.configPath} contains DeskBuddy plugin files`, paths: { pluginDir: paths.configPath } }
+      : { detected: false, reason: "not-found", detail: "No DeskBuddy-managed Hermes plugin files found" };
   }
   if (descriptor.configMode === "dir") {
     return markerInDirectoryFiles(fsImpl, paths.configPath, descriptor.marker)
@@ -352,7 +352,7 @@ function detectClawdIntegration(descriptor, paths, options) {
   if (Array.isArray(paths.configTargets)) {
     for (const target of paths.configTargets) {
       const targetText = readText(fsImpl, target.configPath);
-      if (hasClawdMarkerText(targetText, descriptor.marker)) {
+      if (hasDeskBuddyMarkerText(targetText, descriptor.marker)) {
         return {
           detected: true,
           reason: "marker-found",
@@ -363,7 +363,7 @@ function detectClawdIntegration(descriptor, paths, options) {
     }
   }
   const text = readText(fsImpl, paths.configPath);
-  if (hasClawdMarkerText(text, descriptor.marker)) {
+  if (hasDeskBuddyMarkerText(text, descriptor.marker)) {
     return {
       detected: true,
       reason: "marker-found",
@@ -374,7 +374,7 @@ function detectClawdIntegration(descriptor, paths, options) {
   return {
     detected: false,
     reason: "not-found",
-    detail: `No ${descriptor.marker || "Clawd"} marker found`,
+    detail: `No ${descriptor.marker || "DeskBuddy"} marker found`,
   };
 }
 
@@ -397,7 +397,7 @@ function detectAgentInstallation(descriptor, options = {}) {
     reason: installation.reason,
     detail: installation.detail,
     paths,
-    clawdIntegration: detectClawdIntegration(descriptor, paths, normalizedOptions),
+    deskbuddyIntegration: detectDeskBuddyIntegration(descriptor, paths, normalizedOptions),
   };
 }
 

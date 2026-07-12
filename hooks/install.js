@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Clawd Desktop Pet — Hook Installer
+// DeskBuddy Desktop Pet — Hook Installer
 // Safely merges hook commands into ~/.claude/settings.json
 // Does NOT overwrite existing hooks — appends to arrays
 
@@ -453,7 +453,7 @@ async function getClaudeVersionAsync(options = {}) {
   return cachedClaudeVersionPromise;
 }
 
-const MARKER = "clawd-hook.js";
+const MARKER = "deskbuddy-hook.js";
 const AUTO_START_MARKER = "auto-start.js";
 const LEGACY_AUTO_START_MARKER = "auto-start.sh";
 const HTTP_MARKER = PERMISSION_PATH;
@@ -476,12 +476,12 @@ function buildCommandHookSpec(nodeBin, scriptPath, args = "", options = {}) {
   };
 
   // Remote hook deployment targets POSIX shells over SSH and relies on bash-style
-  // env-prefix syntax (`CLAWD_REMOTE=1 cmd`). Keep that legacy form even if tests
+  // env-prefix syntax (`DESKBUDDY_REMOTE=1 cmd`). Keep that legacy form even if tests
   // force win32 here; Windows + remote is not a supported deployment target.
   if (options.remote) {
     return withHookOptions({
       type: "command",
-      command: `CLAWD_REMOTE=1 ${quotedCommand}`,
+      command: `DESKBUDDY_REMOTE=1 ${quotedCommand}`,
     });
   }
 
@@ -547,7 +547,7 @@ function syncCommandHook(entries, marker, expectedHook) {
   return { found, changed };
 }
 
-function isClawdPermissionUrl(url) {
+function isDeskBuddyPermissionUrl(url) {
   if (typeof url !== "string" || !url) return false;
   try {
     const parsed = new URL(url);
@@ -566,12 +566,12 @@ function isClawdPermissionUrl(url) {
   }
 }
 
-function isClawdPermissionHook(entry) {
+function isDeskBuddyPermissionHook(entry) {
   return !!entry
     && typeof entry === "object"
     && entry.type === "http"
     && typeof entry.url === "string"
-    && isClawdPermissionUrl(entry.url);
+    && isDeskBuddyPermissionUrl(entry.url);
 }
 
 function removeMatchingCommandHooks(entries, predicate) {
@@ -634,7 +634,7 @@ function removeMatchingHttpHooks(entries, predicate) {
       continue;
     }
 
-    if (isClawdPermissionHook(entry) && predicate(entry)) {
+    if (isDeskBuddyPermissionHook(entry) && predicate(entry)) {
       removed++;
       changed = true;
       continue;
@@ -646,7 +646,7 @@ function removeMatchingHttpHooks(entries, predicate) {
     }
 
     const nextHooks = entry.hooks.filter((hook) => {
-      if (!isClawdPermissionHook(hook)) return true;
+      if (!isDeskBuddyPermissionHook(hook)) return true;
       if (!predicate(hook)) return true;
       removed++;
       changed = true;
@@ -674,7 +674,7 @@ function syncHttpHook(entries, expectedUrl) {
   if (!Array.isArray(entries)) return { found, changed };
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") continue;
-    if (isClawdPermissionHook(entry)) {
+    if (isDeskBuddyPermissionHook(entry)) {
       found = true;
       if (entry.url !== expectedUrl) {
         entry.url = expectedUrl;
@@ -683,7 +683,7 @@ function syncHttpHook(entries, expectedUrl) {
     }
     if (!Array.isArray(entry.hooks)) continue;
     for (const hook of entry.hooks) {
-      if (!isClawdPermissionHook(hook)) continue;
+      if (!isDeskBuddyPermissionHook(hook)) continue;
       found = true;
       if (hook.url !== expectedUrl) {
         hook.url = expectedUrl;
@@ -765,7 +765,7 @@ function reconcileVersionedHooks(settings, supportedEvents, versionInfo) {
 }
 
 /**
- * Register Clawd hooks into ~/.claude/settings.json.
+ * Register DeskBuddy hooks into ~/.claude/settings.json.
  * Safe to call multiple times — skips already-registered hooks.
  * @param {object} [options]
  * @param {boolean} [options.silent] - suppress console output (for auto-registration)
@@ -777,7 +777,7 @@ function reconcileVersionedHooks(settings, supportedEvents, versionInfo) {
 function registerHooks(options = {}) {
   const settingsPath = options.settingsPath || path.join(os.homedir(), ".claude", "settings.json");
   const hookPort = getHookServerPort(options.port);
-  const hookScript = asarUnpackedPath(path.resolve(__dirname, "clawd-hook.js").replace(/\\/g, "/"));
+  const hookScript = asarUnpackedPath(path.resolve(__dirname, "deskbuddy-hook.js").replace(/\\/g, "/"));
   const platform = options.platform || process.platform;
 
   // Read existing settings
@@ -987,7 +987,7 @@ function registerHooks(options = {}) {
   if (!options.silent) {
     const versionLabel = versionInfo.status === "known" ? versionInfo.version : "unknown";
     const versionSource = versionInfo.source || "unavailable";
-    console.log(`Clawd hooks installed to ${settingsPath}`);
+    console.log(`DeskBuddy hooks installed to ${settingsPath}`);
     console.log(`  Claude Code version: ${versionLabel}`);
     console.log(`  Detection source: ${versionSource}`);
     if (versionInfo.status === "unknown") {
@@ -1024,7 +1024,7 @@ function registerHooks(options = {}) {
 async function registerHooksAsync(options = {}) {
   const settingsPath = options.settingsPath || path.join(os.homedir(), ".claude", "settings.json");
   const hookPort = getHookServerPort(options.port);
-  const hookScript = asarUnpackedPath(path.resolve(__dirname, "clawd-hook.js").replace(/\\/g, "/"));
+  const hookScript = asarUnpackedPath(path.resolve(__dirname, "deskbuddy-hook.js").replace(/\\/g, "/"));
   const platform = options.platform || process.platform;
 
   let settings = {};
@@ -1211,7 +1211,7 @@ async function registerHooksAsync(options = {}) {
   if (!options.silent) {
     const versionLabel = versionInfo.status === "known" ? versionInfo.version : "unknown";
     const versionSource = versionInfo.source || "unavailable";
-    console.log(`Clawd hooks installed to ${settingsPath}`);
+    console.log(`DeskBuddy hooks installed to ${settingsPath}`);
     console.log(`  Claude Code version: ${versionLabel}`);
     console.log(`  Detection source: ${versionSource}`);
     if (versionInfo.status === "unknown") {
@@ -1272,7 +1272,7 @@ function unregisterHooks(options = {}) {
     );
     const httpResult = removeMatchingHttpHooks(
       commandResult.entries,
-      (hook) => isClawdPermissionHook(hook)
+      (hook) => isDeskBuddyPermissionHook(hook)
     );
 
     if (!commandResult.changed && !httpResult.changed) continue;
@@ -1320,7 +1320,7 @@ async function unregisterHooksAsync(options = {}) {
     );
     const httpResult = removeMatchingHttpHooks(
       commandResult.entries,
-      (hook) => isClawdPermissionHook(hook)
+      (hook) => isDeskBuddyPermissionHook(hook)
     );
 
     if (!commandResult.changed && !httpResult.changed) continue;
@@ -1421,7 +1421,7 @@ function registerClaudeStatusline(options = {}) {
   const settingsPath = options.settingsPath || path.join(homeDir, ".claude", "settings.json");
 
   if (!options.settingsPath && !hasClaudeSettingsDir(homeDir)) {
-    if (!options.silent) console.log("Clawd: Claude Code settings not found - skipping statusline registration");
+    if (!options.silent) console.log("DeskBuddy: Claude Code settings not found - skipping statusline registration");
     return { installed: false, changed: false, skippedExisting: false, settingsPath };
   }
 
@@ -1437,7 +1437,7 @@ function registerClaudeStatusline(options = {}) {
   const existingIsOurs = !!(existing && typeof existing.command === "string" && existing.command.includes(STATUSLINE_MARKER));
 
   if (existing && !existingIsOurs) {
-    if (!options.silent) console.log(`Clawd: existing Claude Code statusline detected at ${settingsPath} - leaving it in place`);
+    if (!options.silent) console.log(`DeskBuddy: existing Claude Code statusline detected at ${settingsPath} - leaving it in place`);
     return { installed: true, changed: false, skippedExisting: true, settingsPath };
   }
 
@@ -1458,7 +1458,7 @@ function registerClaudeStatusline(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Claude Code statusline -> ${settingsPath}${changed ? " (updated)" : " (already up to date)"}`);
+    console.log(`DeskBuddy Claude Code statusline -> ${settingsPath}${changed ? " (updated)" : " (already up to date)"}`);
   }
 
   return { installed: true, changed, skippedExisting: false, settingsPath };
@@ -1484,7 +1484,7 @@ function unregisterClaudeStatusline(options = {}) {
 
   delete settings.statusLine;
   const backupPath = writeJsonAtomicWithBackup(settingsPath, settings, options);
-  if (!options.silent) console.log(`Clawd Claude Code statusline removed -> ${settingsPath}`);
+  if (!options.silent) console.log(`DeskBuddy Claude Code statusline removed -> ${settingsPath}`);
   const result = { installed: true, removed: 1, changed: true, settingsPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;
@@ -1516,8 +1516,8 @@ module.exports = {
     readClaudeVersionFallbackAsync,
     getClaudeVersion,
     getClaudeVersionAsync,
-    isClawdPermissionHook,
-    isClawdPermissionUrl,
+    isDeskBuddyPermissionHook,
+    isDeskBuddyPermissionUrl,
     removeMatchingHttpHooks,
     versionLessThan,
     removeMatchingCommandHooks,

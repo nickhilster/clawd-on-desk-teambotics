@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 function makeTempDir() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codex-pet-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codex-pet-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -355,7 +355,7 @@ describe("codex-pet-adapter wrapper generation and materialization", () => {
     assert.match(idleStatic, /transform: translate\(0px, 0px\)/);
   });
 
-  it("materializes a managed Clawd theme that strict-loads through theme-loader", () => {
+  it("materializes a managed DeskBuddy theme that strict-loads through theme-loader", () => {
     const root = makeTempDir();
     const packageDir = copyFixturePackage(path.join(root, "pets"));
     const validation = adapter.validateCodexPetPackage(packageDir);

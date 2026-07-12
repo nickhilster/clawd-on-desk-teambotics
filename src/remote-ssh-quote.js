@@ -3,7 +3,7 @@
 // ── Remote SSH platform quoting helpers ──
 //
 // Pure functions for safely embedding ssh/scp arguments into terminal
-// command strings on three platforms. Used when Clawd spawns a system
+// command strings on three platforms. Used when DeskBuddy spawns a system
 // terminal (Authenticate / Open Terminal) instead of running ssh as a
 // child process — those code paths must hand a single string to the OS
 // terminal, which re-interprets it.

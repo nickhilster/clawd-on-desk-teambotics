@@ -117,7 +117,7 @@ describe("Mobile Preview Server", () => {
   }
 
   before(async () => {
-    tmpTokenDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-test-"));
+    tmpTokenDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-test-"));
     server = initMobilePreviewServer({
       sessions,
       getPendingPermissions: () => pendingPermissions,
@@ -146,7 +146,7 @@ describe("Mobile Preview Server", () => {
   it("serves PWA static files", async () => {
     const res = await httpGet(port, "/mobile/");
     assert.strictEqual(res.status, 200);
-    assert.ok(res.body.includes("Clawd on Mobile"));
+    assert.ok(res.body.includes("DeskBuddy Mobile"));
     assert.ok(res.headers["content-type"].includes("text/html"));
   });
 
@@ -286,7 +286,7 @@ describe("Token Rotation", () => {
   const sessions = new Map();
 
   before(async () => {
-    tmpTokenDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-rotate-"));
+    tmpTokenDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-rotate-"));
     tokenFile = path.join(tmpTokenDir, "token.json");
     server = initMobilePreviewServer({
       sessions,
@@ -686,7 +686,7 @@ describe("Rotate-on-use", () => {
   const sessions = new Map();
 
   before(() => {
-    tmpTokenDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-rou-"));
+    tmpTokenDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-rou-"));
     tokenFile = path.join(tmpTokenDir, "token.json");
   });
 

@@ -40,7 +40,7 @@ function validThemeJson(overrides = {}) {
 }
 
 function makeFixture({ builtinThemes = [], userThemes = [], centralAssets = REQUIRED_FILES } = {}) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-theme-shape-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-theme-shape-"));
   tempDirs.push(tmp);
   const appDir = path.join(tmp, "src");
   const userData = path.join(tmp, "userData");
@@ -83,7 +83,7 @@ afterEach(() => {
 });
 
 describe("validateThemeShape", () => {
-  it("validates a built-in theme using central clawd assets without activating a theme", () => {
+  it("validates a built-in theme using central deskbuddy assets without activating a theme", () => {
     makeFixture({
       builtinThemes: [
         { id: "clawd", json: validThemeJson({ name: "Clawd" }) },

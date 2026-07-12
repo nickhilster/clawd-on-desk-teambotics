@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 
-// Install Clawd's Hermes Agent plugin without mutating Hermes config.yaml.
+// Install DeskBuddy's Hermes Agent plugin without mutating Hermes config.yaml.
 //
 // Hermes config is YAML and user-owned. The only supported activation path in
 // this installer is `hermes plugins enable deskbuddy`; if the CLI is not
@@ -400,7 +400,7 @@ function unregisterHermesPlugin(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Hermes plugin removed -> ${pluginDir}`);
+    console.log(`DeskBuddy Hermes plugin removed -> ${pluginDir}`);
     for (const warning of warnings) console.warn(`  Warning: ${warning}`);
   }
 

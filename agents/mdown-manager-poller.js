@@ -4,7 +4,7 @@
 //
 // MDown Manager isn't a coding agent — it's a separate local app with its
 // own local HTTP API (bearer-token auth, http://127.0.0.1:7734 by default).
-// This polls that API and drives Clawd's own state machine the same way
+// This polls that API and drives DeskBuddy's own state machine the same way
 // agents/codex-log-monitor.js drives it from JSONL tailing, except over HTTP
 // instead of a file tail. MDown Manager has no session concept, so it's
 // represented as a single persistent pseudo-session.
@@ -13,7 +13,7 @@ const DEFAULT_POLL_INTERVAL_MS = 2000;
 const REQUEST_TIMEOUT_MS = 3000;
 const SESSION_ID = "mdown-manager";
 
-// MDown Manager `kind` -> Clawd state. Chosen to reuse the MDM theme's
+// MDown Manager `kind` -> DeskBuddy state. Chosen to reuse the MDM theme's
 // existing states/files (themes/mdown-manager/theme.json) — no new SVGs.
 const KIND_TO_STATE = {
   idle: "idle",

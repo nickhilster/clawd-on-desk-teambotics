@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Clawd Desktop Pet — Copilot CLI Hook Script
+// DeskBuddy Desktop Pet — Copilot CLI Hook Script
 // Usage: node copilot-hook.js <event_name>
 // Reads stdin JSON from Copilot CLI for sessionId (camelCase)
 //
 // Two dispatch paths:
 //   - state events (sessionStart, preToolUse, ...) → POST /state, fire-and-forget
 //   - permissionRequest                            → POST /permission, blocks
-//                                                    until Clawd resolves and
+//                                                    until DeskBuddy resolves and
 //                                                    emits Copilot stdout JSON
 //
 // The hook MUST always exit 0 with empty stdout on any failure path.
@@ -26,7 +26,7 @@ const {
 } = require("./server-config");
 const { createPidResolver, readStdinJson, getPlatformConfig } = require("./shared-process");
 
-// PERMISSION_HTTP_TIMEOUT_MS is the internal Clawd /permission HTTP timeout.
+// PERMISSION_HTTP_TIMEOUT_MS is the internal DeskBuddy /permission HTTP timeout.
 // It MUST stay strictly below `permissionRequest` hook `timeoutSec * 1000` so
 // the hook always returns and exits cleanly *before* Copilot kills it on
 // `timeoutSec` expiry — Phase 0 §4.2 capture confirmed Copilot 1.0.54
@@ -195,7 +195,7 @@ function capToolInput(value, depth) {
 // After per-field caps, do a final serialized-byte check. If we're still
 // over the route limit (would only happen if the structure itself is
 // pathological, since per-string is already capped), replace tool_input
-// with a stub so Clawd at least gets the routing fields and can fall back
+// with a stub so DeskBuddy at least gets the routing fields and can fall back
 // to no-decision rather than the route-level 413.
 function enforceBodySizeCap(body) {
   const serialized = JSON.stringify(body);
@@ -214,7 +214,7 @@ function enforceBodySizeCap(body) {
 
 function normalizePermissionSuggestions(value) {
   // Copilot 1.0.54 emits `permissionSuggestions: []` (camelCase) on the
-  // wire, but Clawd's existing /permission route consumes the snake_case
+  // wire, but DeskBuddy's existing /permission route consumes the snake_case
   // `permission_suggestions` field (matches Codex/Qwen). Forward either
   // shape if present; the field is kept for forward-compat — empirical
   // capture showed it is always [] in current Copilot CLI.
@@ -222,7 +222,7 @@ function normalizePermissionSuggestions(value) {
   return capToolInput(raw, 0) || [];
 }
 
-// Build the Clawd /permission POST body from a Copilot permissionRequest
+// Build the DeskBuddy /permission POST body from a Copilot permissionRequest
 // stdin payload. Field reference: docs/investigations/copilot-permission-payload-2026-05.md §5.
 //
 // Throws when the payload is missing required fields (sessionId, toolName,
@@ -249,7 +249,7 @@ function buildPermissionBody(payload, resolve, options = {}) {
   }
 
   // Copilot toolName is lowercase on the wire (e.g. `edit`, `powershell`).
-  // Display-layer casing/normalization happens in Clawd's bubble formatter,
+  // Display-layer casing/normalization happens in DeskBuddy's bubble formatter,
   // not here — keep the wire shape unchanged.
   const toolName = (typeof safe.toolName === "string" && safe.toolName)
     || (typeof safe.tool_name === "string" && safe.tool_name)
@@ -282,7 +282,7 @@ function buildPermissionBody(payload, resolve, options = {}) {
   };
   if (cwd) body.cwd = cwd;
 
-  if (process.env.CLAWD_REMOTE) {
+  if (process.env.DESKBUDDY_REMOTE) {
     const readHost = options.readHostPrefix || readHostPrefix;
     body.host = readHost();
   } else if (typeof resolve === "function") {
@@ -297,10 +297,10 @@ function buildPermissionBody(payload, resolve, options = {}) {
   return body;
 }
 
-// Map a Clawd /permission response to a Copilot decision, or null for
+// Map a DeskBuddy /permission response to a Copilot decision, or null for
 // no-decision (empty stdout fallback). Phase 0 §3 locked empty stdout
 // as the no-decision wire format.
-function parseClawdPermissionResponse(ok, responseBody, statusCode) {
+function parseDeskBuddyPermissionResponse(ok, responseBody, statusCode) {
   if (!ok) return null;
   if (statusCode === 204) return null;
   if (typeof statusCode !== "number" || statusCode < 200 || statusCode >= 300) return null;
@@ -313,7 +313,7 @@ function parseClawdPermissionResponse(ok, responseBody, statusCode) {
   if (behavior === "deny") {
     const message = typeof parsed.message === "string" && parsed.message
       ? parsed.message
-      : "Denied by Clawd";
+      : "Denied by DeskBuddy";
     return { behavior: "deny", message };
   }
   return null;
@@ -361,14 +361,14 @@ function buildStateBody(event, payload, resolve, options = {}) {
 
   // Session title: prefer payload field if present, otherwise read the
   // renamed name from ~/.copilot/session-state/<sid>/workspace.yaml so
-  // /rename in Copilot CLI propagates to Clawd on the next hook event.
+  // /rename in Copilot CLI propagates to DeskBuddy on the next hook event.
   const sessionTitle =
     normalizeTitle(payload.session_title) ||
     normalizeTitle(payload.sessionTitle) ||
     readCopilotSessionTitle(sessionId);
   if (sessionTitle) body.session_title = sessionTitle;
 
-  if (process.env.CLAWD_REMOTE) {
+  if (process.env.DESKBUDDY_REMOTE) {
     const readHost = options.readHostPrefix || readHostPrefix;
     body.host = readHost();
   } else {
@@ -399,7 +399,7 @@ function buildStateBody(event, payload, resolve, options = {}) {
 // inside their repo tree, we must fall open from anywhere inside that tree.
 // So this helper walks cwd's ancestor chain and checks every level for any
 // of the 5 sources. As soon as ONE level + ONE source declares
-// permissionRequest, we return true so the Clawd hook fails open.
+// permissionRequest, we return true so the DeskBuddy hook fails open.
 //
 // Cost: per cwd, ~depth × (one readdir + 4 statSync + at most a handful of
 // small reads). Path depths are short in practice (< 20) and the directories
@@ -488,7 +488,7 @@ function buildResolver() {
 function runStatePath(event, resolve, safeExit) {
   // Pre-resolve on sessionStart. Remote mode skips PID collection because
   // remote PIDs are meaningless on the local machine.
-  if (event === "sessionStart" && !process.env.CLAWD_REMOTE) resolve();
+  if (event === "sessionStart" && !process.env.DESKBUDDY_REMOTE) resolve();
 
   readStdinJson().then((payload) => {
     let body = null;
@@ -535,7 +535,7 @@ function runPermissionPath(resolve, safeExit) {
         { timeoutMs: PERMISSION_HTTP_TIMEOUT_MS },
         (ok, _confirmedPort, responseBody, statusCode) => {
           try {
-            const decision = parseClawdPermissionResponse(ok, responseBody, statusCode);
+            const decision = parseDeskBuddyPermissionResponse(ok, responseBody, statusCode);
             writeCopilotDecision(decision);
           } catch {}
           safeExit(0);
@@ -590,7 +590,7 @@ module.exports = {
   capToolInput,
   enforceBodySizeCap,
   normalizePermissionSuggestions,
-  parseClawdPermissionResponse,
+  parseDeskBuddyPermissionResponse,
   writeCopilotDecision,
   hasUserPermissionHookInRepoHooks,
   normalizeTitle,

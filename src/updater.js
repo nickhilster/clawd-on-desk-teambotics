@@ -146,7 +146,7 @@ function initUpdater(ctx, deps = {}) {
   // ── #329 pending-update state (Phase 2) ──────────────────────────────
   // Prefs IO is delegated to ctx.getUpdatePref / setUpdatePref. main.js
   // wires these to settingsController so reads/writes go through the
-  // single-writer architecture and persist to clawd-prefs.json.
+  // single-writer architecture and persist to deskbuddy-prefs.json.
   function readPref(key, fallback) {
     if (typeof ctx.getUpdatePref !== "function") return fallback;
     try {

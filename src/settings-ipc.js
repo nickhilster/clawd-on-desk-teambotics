@@ -378,7 +378,7 @@ function registerSettingsIpc(options = {}) {
     try {
       result = await dialog.showOpenDialog(getDialogParent(event), {
         properties: ["openFile"],
-        filters: [{ name: "Clawd theme zip", extensions: ["zip"] }],
+        filters: [{ name: "DeskBuddy theme zip", extensions: ["zip"] }],
       });
     } catch (err) {
       return { status: "error", message: `theme zip picker failed: ${err && err.message}` };
@@ -468,6 +468,16 @@ function registerSettingsIpc(options = {}) {
     return {
       version: app.getVersion(),
       repoUrl: "https://github.com/nickhilster/deskbuddy",
+      sourceRepos: [
+        {
+          label: "rullerzhou-afk/clawd-on-desk",
+          url: "https://github.com/rullerzhou-afk/clawd-on-desk",
+        },
+        {
+          label: "Bynlk/clawd-on-mobile",
+          url: "https://github.com/Bynlk/clawd-on-mobile",
+        },
+      ],
       license: "AGPL-3.0",
       copyright: "\u00a9 2026 Ruller_Lulu",
       authorName: "Ruller_Lulu / \u9e7f\u9e7f",
@@ -548,8 +558,8 @@ function registerSettingsIpc(options = {}) {
       }
       const nameParam = machineName ? `&name=${encodeURIComponent(machineName)}` : "";
       const pwaUrl = `http://${lanIp}:${port}/mobile/?host=${lanIp}&port=${port}&token=${tok}${nameParam}`;
-      // deskbuddy://host:port/token — must match Clawd Mobile's URL parser exactly once that
-      // app adopts the new scheme (was clawd://, ^clawd://([^:]+):(\d+)/([a-fA-F0-9]{16,})$).
+      // deskbuddy://host:port/token — must match DeskBuddy Mobile's URL parser exactly once that
+      // app adopts the new scheme (was deskbuddy://, ^deskbuddy://([^:]+):(\d+)/([a-fA-F0-9]{16,})$).
       // No browser fallback: if the native app isn't installed, scanning this link dead-ends
       // instead of opening the PWA.
       const nativeUrl = `deskbuddy://${lanIp}:${port}/${tok}`;

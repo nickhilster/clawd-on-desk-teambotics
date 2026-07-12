@@ -56,7 +56,7 @@ describe("Hermes plugin", () => {
     assert.ok(!hooks.includes("post_approval_response"));
   });
 
-  it("maps verified Hermes session boundary hooks to Clawd lifecycle events", () => {
+  it("maps verified Hermes session boundary hooks to DeskBuddy lifecycle events", () => {
     const source = readPluginSource();
     assert.match(source, /"on_session_finalize": \("sleeping", "SessionEnd"\)/);
     assert.match(source, /"on_session_reset": \("idle", "SessionStart"\)/);
@@ -527,10 +527,10 @@ class FakeResponse:
 def fake_urlopen(req, timeout=None):
     calls.append({"url": req.full_url, "method": req.get_method(), "timeout": timeout})
     if req.full_url.endswith("/state"):
-        return FakeResponse(headers={mod.CLAWD_SERVER_HEADER: mod.CLAWD_SERVER_ID})
+        return FakeResponse(headers={mod.DESKBUDDY_SERVER_HEADER: mod.DESKBUDDY_SERVER_ID})
     if req.full_url.endswith("/permission"):
         return FakeResponse(
-            headers={mod.CLAWD_SERVER_HEADER: mod.CLAWD_SERVER_ID},
+            headers={mod.DESKBUDDY_SERVER_HEADER: mod.DESKBUDDY_SERVER_ID},
             body=json.dumps({"decision": "allow"}).encode("utf-8"),
         )
     raise AssertionError(req.full_url)
@@ -586,11 +586,11 @@ class FakeResponse:
 
 def fake_urlopen(req, timeout=None):
     if req.full_url.endswith("/state"):
-        return FakeResponse(headers={mod.CLAWD_SERVER_HEADER: mod.CLAWD_SERVER_ID})
+        return FakeResponse(headers={mod.DESKBUDDY_SERVER_HEADER: mod.DESKBUDDY_SERVER_ID})
     if req.full_url.endswith("/permission"):
         permission_payloads.append(json.loads(req.data.decode("utf-8")))
         return FakeResponse(
-            headers={mod.CLAWD_SERVER_HEADER: mod.CLAWD_SERVER_ID},
+            headers={mod.DESKBUDDY_SERVER_HEADER: mod.DESKBUDDY_SERVER_ID},
             body=json.dumps({"decision": "allow"}).encode("utf-8"),
         )
     raise AssertionError(req.full_url)
@@ -654,7 +654,7 @@ print(json.dumps({"result": result, "calls": calls, "logs": logs}, sort_keys=Tru
     assert.strictEqual(result.logs[0].event, "post_permission_skipped_no_server");
   });
 
-  it("does not issue the long permission POST when the short probe is not Clawd", () => {
+  it("does not issue the long permission POST when the short probe is not DeskBuddy", () => {
     const output = runPluginPython(String.raw`
 import importlib.util
 import json

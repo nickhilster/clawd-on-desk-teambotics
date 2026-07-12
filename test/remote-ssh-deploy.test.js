@@ -138,9 +138,9 @@ async function stubPosixShellProbe() {
 
 function nodeProbeStdout(nodeBin = "/usr/bin/node", version = "v20.10.0", source = "path") {
   return [
-    `CLAWD_REMOTE_NODE_BIN=${nodeBin}`,
-    `CLAWD_REMOTE_NODE_VERSION=${version}`,
-    `CLAWD_REMOTE_NODE_SOURCE=${source}`,
+    `DESKBUDDY_REMOTE_NODE_BIN=${nodeBin}`,
+    `DESKBUDDY_REMOTE_NODE_VERSION=${version}`,
+    `DESKBUDDY_REMOTE_NODE_SOURCE=${source}`,
   ].join("\n");
 }
 
@@ -270,11 +270,11 @@ test("deploy: with hostPrefix triggers host-prefix step via ssh stdin", async ()
   const result = await deploy({ profile, runtime, deps: { spawn, hooksDir, detectRemoteShell: stubPosixShellProbe } });
   assert.equal(result.ok, true);
   assert.equal(capturedStdin, "raspberry");
-  // The 4th call (index 3) must be the host-prefix ssh: cat > ~/.claude/hooks/clawd-host-prefix
+  // The 4th call (index 3) must be the host-prefix ssh: cat > ~/.claude/hooks/deskbuddy-host-prefix
   const hpCall = calls[3];
   assert.equal(hpCall.command, "ssh");
   const remoteCmd = hpCall.args[hpCall.args.length - 1];
-  assert.equal(remoteCmd, "cat > ~/.claude/hooks/clawd-host-prefix");
+  assert.equal(remoteCmd, "cat > ~/.claude/hooks/deskbuddy-host-prefix");
   // Must NOT contain printf / echo of the hostPrefix value (no shell interp).
   for (const arg of hpCall.args) {
     assert.equal(arg.includes("raspberry"), false, "hostPrefix value must NOT appear in ssh args");
@@ -407,14 +407,14 @@ test("startCodexMonitor pre-cleans then launches new monitor", async () => {
   assert.equal(calls.length, 2);
   // First call: pre-clean (kill old PID + rm)
   const cleanCmd = calls[0].args[calls[0].args.length - 1];
-  assert.match(cleanCmd, /\.clawd-codex-monitor\.pid/);
+  assert.match(cleanCmd, /\.deskbuddy-codex-monitor\.pid/);
   assert.match(cleanCmd, /kill \$\(cat .*\.pid\) 2>\/dev\/null/);
   assert.match(cleanCmd, /rm -f .*\.pid/);
   assert.match(cleanCmd, /;\s*true\s*$/, "must terminate with `; true` so exit code is 0 even on missing pid");
   // Second call: launch with port + writes new PID file
   const startCmd = calls[1].args[calls[1].args.length - 1];
   assert.match(startCmd, /nohup '\/usr\/bin\/node' "\$HOME\/\.claude\/hooks\/codex-remote-monitor\.js" '--port' '23335'/);
-  assert.match(startCmd, /echo \$! > ~\/\.clawd-codex-monitor\.pid/);
+  assert.match(startCmd, /echo \$! > ~\/\.deskbuddy-codex-monitor\.pid/);
 });
 
 test("startCodexMonitor verifies stale persisted Node metadata before launch", async () => {

@@ -51,7 +51,7 @@ describe("scripts/remote-deploy.sh FILES manifest", () => {
     const script = fs.readFileSync(SCRIPT_PATH, "utf8");
 
     assert.match(script, /REMOTE_NODE_PROBE=/);
-    assert.match(script, /CLAWD_REMOTE_NODE_BIN/);
+    assert.match(script, /DESKBUDDY_REMOTE_NODE_BIN/);
     assert.match(script, /REMOTE_NODE_BIN=/);
     assert.doesNotMatch(script, /ssh "\$SSH_TARGET" "node ~\/\.claude\/hooks\/install\.js --remote"/);
   });

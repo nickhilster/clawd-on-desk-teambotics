@@ -17,7 +17,7 @@ const { decodeWindowsEncodedCommand } = require("../hooks/json-utils");
 const tempDirs = [];
 
 function makeTempSettingsFile(initial = {}) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-qwen-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-qwen-"));
   const settingsPath = path.join(tmpDir, "settings.json");
   fs.writeFileSync(settingsPath, JSON.stringify(initial, null, 2), "utf8");
   tempDirs.push(tmpDir);
@@ -31,7 +31,7 @@ function readJson(filePath) {
 function listCleanupBackups(filePath) {
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
-  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.clawd-cleanup-`));
+  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.deskbuddy-cleanup-`));
 }
 
 // On win32 the installer wraps commands in PowerShell -EncodedCommand
@@ -75,7 +75,7 @@ describe("Qwen Code hook installer", () => {
         assert.strictEqual(entry.matcher, matcher, event);
       }
       assert.strictEqual(entry.hooks.length, 1);
-      assert.strictEqual(entry.hooks[0].name, "clawd");
+      assert.strictEqual(entry.hooks[0].name, "deskbuddy");
       assert.strictEqual(entry.hooks[0].type, "command");
       assert.strictEqual(entry.hooks[0].timeout, timeoutForQwenCodeEvent(event));
       const payload = commandPayload(entry.hooks[0].command);
@@ -113,14 +113,14 @@ describe("Qwen Code hook installer", () => {
     assert.match(result.warnings[0], /disableAllHooks=true/);
   });
 
-  it("splits Clawd out of shared matcher entries", () => {
+  it("splits DeskBuddy out of shared matcher entries", () => {
     const settingsPath = makeTempSettingsFile({
       hooks: {
         PreToolUse: [{
           matcher: "Bash",
           hooks: [
             { type: "command", command: "other-tool", name: "other" },
-            { type: "command", command: '"/old/node" "/old/path/qwen-code-hook.js" "PreToolUse"', name: "clawd" },
+            { type: "command", command: '"/old/node" "/old/path/qwen-code-hook.js" "PreToolUse"', name: "deskbuddy" },
           ],
         }],
       },
@@ -145,7 +145,7 @@ describe("Qwen Code hook installer", () => {
           hooks: [{
             type: "command",
             command: '"/home/user/.nvm/versions/node/v22/bin/node" "/old/path/qwen-code-hook.js" "Stop"',
-            name: "clawd",
+            name: "deskbuddy",
           }],
         }],
       },
@@ -158,7 +158,7 @@ describe("Qwen Code hook installer", () => {
   });
 
   it("skips startup auto-sync when ~/.qwen does not exist", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-qwen-home-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-qwen-home-"));
     tempDirs.push(tmpDir);
 
     const result = registerQwenCodeHooks({ silent: true, homeDir: tmpDir, nodeBin: "/usr/local/bin/node" });
@@ -175,7 +175,7 @@ describe("Qwen Code hook installer", () => {
     const nodeBin = "C:\\Program Files\\nodejs\\node.exe";
     const command = buildQwenCodeHookCommand(
       nodeBin,
-      "D:/clawd/hooks/qwen-code-hook.js",
+      "D:/deskbuddy/hooks/qwen-code-hook.js",
       "PermissionRequest",
       {
         platform: "win32",
@@ -189,7 +189,7 @@ describe("Qwen Code hook installer", () => {
     );
     assert.strictEqual(
       decodeWindowsEncodedCommand(command),
-      `& '${nodeBin}' 'D:/clawd/hooks/qwen-code-hook.js' 'PermissionRequest'`
+      `& '${nodeBin}' 'D:/deskbuddy/hooks/qwen-code-hook.js' 'PermissionRequest'`
     );
   });
 
@@ -201,7 +201,7 @@ describe("Qwen Code hook installer", () => {
         PermissionRequest: [{
           matcher: "*",
           hooks: [{
-            name: "clawd",
+            name: "deskbuddy",
             type: "command",
             command: '"C:\\Program Files\\nodejs\\node.exe" "D:/animation/hooks/qwen-code-hook.js" "PermissionRequest"',
             timeout: 600000,
@@ -257,18 +257,18 @@ describe("Qwen Code hook installer", () => {
     assert.match(decodeWindowsEncodedCommand(after.hooks.Stop[0].hooks[0].command), /'C:\\Tools\\node\.exe'/);
   });
 
-  it("unregister removes encoded Clawd commands while preserving user hooks", () => {
+  it("unregister removes encoded DeskBuddy commands while preserving user hooks", () => {
     const settingsPath = makeTempSettingsFile({
       hooks: {
         PreToolUse: [{
           matcher: "*",
           hooks: [
             {
-              name: "clawd",
+              name: "deskbuddy",
               type: "command",
               command: buildQwenCodeHookCommand(
                 "C:\\Tools\\node.exe",
-                "D:/clawd/hooks/qwen-code-hook.js",
+                "D:/deskbuddy/hooks/qwen-code-hook.js",
                 "PreToolUse",
                 { platform: "win32" }
               ),

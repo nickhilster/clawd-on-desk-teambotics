@@ -252,8 +252,8 @@ describe("buildStateBody (Copilot)", () => {
   });
 
   it("remote mode includes host prefix and skips local PID fields", () => {
-    const oldRemote = process.env.CLAWD_REMOTE;
-    process.env.CLAWD_REMOTE = "1";
+    const oldRemote = process.env.DESKBUDDY_REMOTE;
+    process.env.DESKBUDDY_REMOTE = "1";
     let resolveCalled = false;
     try {
       const body = buildStateBody(
@@ -274,8 +274,8 @@ describe("buildStateBody (Copilot)", () => {
       assert.strictEqual("pid_chain" in body, false);
       assert.strictEqual(resolveCalled, false);
     } finally {
-      if (oldRemote === undefined) delete process.env.CLAWD_REMOTE;
-      else process.env.CLAWD_REMOTE = oldRemote;
+      if (oldRemote === undefined) delete process.env.DESKBUDDY_REMOTE;
+      else process.env.DESKBUDDY_REMOTE = oldRemote;
     }
   });
 });
@@ -389,7 +389,7 @@ const {
   capToolInput,
   enforceBodySizeCap,
   normalizePermissionSuggestions,
-  parseClawdPermissionResponse,
+  parseDeskBuddyPermissionResponse,
   writeCopilotDecision,
   hasUserPermissionHookInRepoHooks,
   HOOK_TOOL_INPUT_STRING_MAX,
@@ -476,8 +476,8 @@ describe("buildPermissionBody", () => {
   });
 
   it("remote mode: skips local PID fields and emits host", () => {
-    const originalRemote = process.env.CLAWD_REMOTE;
-    process.env.CLAWD_REMOTE = "1";
+    const originalRemote = process.env.DESKBUDDY_REMOTE;
+    process.env.DESKBUDDY_REMOTE = "1";
     try {
       const body = buildPermissionBody(SAMPLE_EDIT_PAYLOAD, mockResolve, {
         readHostPrefix: () => "test-host",
@@ -487,12 +487,12 @@ describe("buildPermissionBody", () => {
       assert.strictEqual(body.agent_pid, undefined);
       assert.strictEqual(body.pid_chain, undefined);
     } finally {
-      if (originalRemote === undefined) delete process.env.CLAWD_REMOTE;
-      else process.env.CLAWD_REMOTE = originalRemote;
+      if (originalRemote === undefined) delete process.env.DESKBUDDY_REMOTE;
+      else process.env.DESKBUDDY_REMOTE = originalRemote;
     }
   });
 
-  it("does NOT forward Copilot envelope fields (hookName, timestamp) into Clawd body", () => {
+  it("does NOT forward Copilot envelope fields (hookName, timestamp) into DeskBuddy body", () => {
     const body = buildPermissionBody(SAMPLE_EDIT_PAYLOAD, mockResolve);
     assert.strictEqual(body.hookName, undefined);
     assert.strictEqual(body.timestamp, undefined);
@@ -621,44 +621,44 @@ describe("normalizePermissionSuggestions", () => {
   });
 });
 
-describe("parseClawdPermissionResponse", () => {
+describe("parseDeskBuddyPermissionResponse", () => {
   it("HTTP 200 + behavior:allow → allow decision", () => {
-    const d = parseClawdPermissionResponse(true, '{"behavior":"allow"}', 200);
+    const d = parseDeskBuddyPermissionResponse(true, '{"behavior":"allow"}', 200);
     assert.deepStrictEqual(d, { behavior: "allow" });
   });
 
   it("HTTP 200 + behavior:deny → deny decision with message", () => {
-    const d = parseClawdPermissionResponse(true, '{"behavior":"deny","message":"nope"}', 200);
+    const d = parseDeskBuddyPermissionResponse(true, '{"behavior":"deny","message":"nope"}', 200);
     assert.deepStrictEqual(d, { behavior: "deny", message: "nope" });
   });
 
-  it("deny without message falls back to 'Denied by Clawd'", () => {
-    const d = parseClawdPermissionResponse(true, '{"behavior":"deny"}', 200);
-    assert.deepStrictEqual(d, { behavior: "deny", message: "Denied by Clawd" });
+  it("deny without message falls back to 'Denied by DeskBuddy'", () => {
+    const d = parseDeskBuddyPermissionResponse(true, '{"behavior":"deny"}', 200);
+    assert.deepStrictEqual(d, { behavior: "deny", message: "Denied by DeskBuddy" });
   });
 
   it("HTTP 204 → null (no-decision)", () => {
-    assert.strictEqual(parseClawdPermissionResponse(true, "", 204), null);
+    assert.strictEqual(parseDeskBuddyPermissionResponse(true, "", 204), null);
   });
 
-  it("ok=false → null (no-decision, e.g. Clawd not running)", () => {
-    assert.strictEqual(parseClawdPermissionResponse(false, "", 0), null);
+  it("ok=false → null (no-decision, e.g. DeskBuddy not running)", () => {
+    assert.strictEqual(parseDeskBuddyPermissionResponse(false, "", 0), null);
   });
 
   it("malformed JSON body → null", () => {
-    assert.strictEqual(parseClawdPermissionResponse(true, "not json", 200), null);
+    assert.strictEqual(parseDeskBuddyPermissionResponse(true, "not json", 200), null);
   });
 
   it("unknown behavior → null (no-decision, do not pass through)", () => {
-    assert.strictEqual(parseClawdPermissionResponse(true, '{"behavior":"maybe"}', 200), null);
+    assert.strictEqual(parseDeskBuddyPermissionResponse(true, '{"behavior":"maybe"}', 200), null);
   });
 
   it("HTTP 5xx → null", () => {
-    assert.strictEqual(parseClawdPermissionResponse(true, '{"behavior":"allow"}', 500), null);
+    assert.strictEqual(parseDeskBuddyPermissionResponse(true, '{"behavior":"allow"}', 500), null);
   });
 
   it("empty response body → null", () => {
-    assert.strictEqual(parseClawdPermissionResponse(true, "", 200), null);
+    assert.strictEqual(parseDeskBuddyPermissionResponse(true, "", 200), null);
   });
 });
 
@@ -717,11 +717,11 @@ describe("writeCopilotDecision", () => {
 describe("hasUserPermissionHookInRepoHooks — repo-level safe-v1 (codex review 3)", () => {
   // Copilot CLI merges <cwd>/.github/hooks/*.json into the user-level hook
   // chain. Installer doesn't know cwd; hook itself does. If the repo ships
-  // its own permissionRequest hook, the Clawd hook MUST fall open (empty
+  // its own permissionRequest hook, the DeskBuddy hook MUST fall open (empty
   // stdout, exit 0) so the project audit/deny rule isn't silently overridden.
 
   function makeTmpRepo() {
-    const root = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "clawd-copilot-repo-"));
+    const root = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "deskbuddy-copilot-repo-"));
     const hooksDir = pathTest.join(root, ".github", "hooks");
     fsTest.mkdirSync(hooksDir, { recursive: true });
     return { root, hooksDir };
@@ -781,7 +781,7 @@ describe("hasUserPermissionHookInRepoHooks — repo-level safe-v1 (codex review 
     } finally { fsTest.rmSync(root, { recursive: true, force: true }); }
   });
 
-  it("returns false on malformed JSON (transient FS hiccup must not block Clawd)", () => {
+  it("returns false on malformed JSON (transient FS hiccup must not block DeskBuddy)", () => {
     const { root, hooksDir } = makeTmpRepo();
     try {
       fsTest.writeFileSync(pathTest.join(hooksDir, "broken.json"), "{ not valid");
@@ -815,7 +815,7 @@ describe("hasUserPermissionHookInRepoHooks — repo-level safe-v1 (codex review 
   it("returns false when no ancestor up to fs root declares a permissionRequest", () => {
     // Walking up the chain must not produce false positives on directories
     // that don't carry any of the 5 known sources.
-    const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "clawd-copilot-noancestor-"));
+    const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "deskbuddy-copilot-noancestor-"));
     try {
       const deepDir = pathTest.join(tmpRoot, "a", "b", "c");
       fsTest.mkdirSync(deepDir, { recursive: true });
@@ -832,7 +832,7 @@ describe("hasUserPermissionHookInRepoHooks — repo-level safe-v1 (codex review 
     it(`detects an inline permissionRequest in ${inline.join("/")} at an ancestor`, () => {
       // All four inline-settings sources are merged into Copilot's hook
       // chain per the official docs (including cross-tool .claude/*).
-      const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "clawd-copilot-inline-"));
+      const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "deskbuddy-copilot-inline-"));
       try {
         const targetDir = pathTest.join(tmpRoot, ...inline.slice(0, -1));
         fsTest.mkdirSync(targetDir, { recursive: true });
@@ -848,7 +848,7 @@ describe("hasUserPermissionHookInRepoHooks — repo-level safe-v1 (codex review 
   }
 
   it("parses inline settings written with a UTF-8 BOM", () => {
-    const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "clawd-copilot-bom-inline-"));
+    const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "deskbuddy-copilot-bom-inline-"));
     try {
       const claudeDir = pathTest.join(tmpRoot, ".claude");
       fsTest.mkdirSync(claudeDir, { recursive: true });
@@ -861,8 +861,8 @@ describe("hasUserPermissionHookInRepoHooks — repo-level safe-v1 (codex review 
     } finally { fsTest.rmSync(tmpRoot, { recursive: true, force: true }); }
   });
 
-  it("returns false for malformed inline settings (transient FS hiccup must not block Clawd)", () => {
-    const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "clawd-copilot-bad-inline-"));
+  it("returns false for malformed inline settings (transient FS hiccup must not block DeskBuddy)", () => {
+    const tmpRoot = fsTest.mkdtempSync(pathTest.join(osTest.tmpdir(), "deskbuddy-copilot-bad-inline-"));
     try {
       const claudeDir = pathTest.join(tmpRoot, ".claude");
       fsTest.mkdirSync(claudeDir, { recursive: true });

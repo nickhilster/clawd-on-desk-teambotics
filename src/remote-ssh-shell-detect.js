@@ -90,7 +90,7 @@ async function detectRemoteShell({ profile, spawn, buildSshArgs, runtime, deps =
   const spawnFn = spawn || (deps.spawn || childProcess.spawn);
 
   // POSIX probe — `uname -s` is the canonical "what kernel are you" check
-  // and exists on every POSIX system Clawd targets. cmd.exe responds with
+  // and exists on every POSIX system DeskBuddy targets. cmd.exe responds with
   // "'uname' is not recognized…" and non-zero exit, so a 0/Linux response
   // is a strong POSIX signal.
   const posixArgs = buildSshArgs(profile).concat(["uname -s"]);

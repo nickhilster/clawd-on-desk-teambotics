@@ -645,5 +645,5 @@
     core.tabs["remote-ssh"] = { render };
   }
 
-  root.ClawdSettingsTabRemoteSsh = { init };
+  root.DeskBuddySettingsTabRemoteSsh = { init };
 })(globalThis);

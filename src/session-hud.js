@@ -273,11 +273,11 @@ function getHudWidth(showElapsed = true, showStateLabels = true, showContextUsag
 function deferMacFloatingVisibility(ctx, win) {
   if (!isMac || !win || win.isDestroyed()) return;
   const deferUntil = Date.now() + MAC_FLOATING_TOPMOST_DELAY_MS;
-  win.__clawdMacDeferredVisibilityUntil = deferUntil;
+  win.__deskbuddyMacDeferredVisibilityUntil = deferUntil;
   setTimeout(() => {
     if (!win || win.isDestroyed()) return;
-    if (win.__clawdMacDeferredVisibilityUntil === deferUntil) {
-      delete win.__clawdMacDeferredVisibilityUntil;
+    if (win.__deskbuddyMacDeferredVisibilityUntil === deferUntil) {
+      delete win.__deskbuddyMacDeferredVisibilityUntil;
     }
     if (typeof ctx.reapplyMacVisibility === "function") ctx.reapplyMacVisibility();
   }, MAC_FLOATING_TOPMOST_DELAY_MS);

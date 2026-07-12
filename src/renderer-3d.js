@@ -16,7 +16,7 @@ import * as THREE from "../node_modules/three/build/three.module.js";
 import { GLTFLoader } from "./vendor/three-addons/loaders/GLTFLoader.js";
 
 const petContainer = document.getElementById("pet-container");
-const canvas = document.getElementById("clawd3d-canvas");
+const canvas = document.getElementById("deskbuddy3d-canvas");
 
 let renderer = null;
 let scene = null;
@@ -115,7 +115,7 @@ function setupModel(gltf, clipsConfig) {
 
   lastFrameTime = 0;
   petContainer.classList.add("render-3d-active");
-  applyState(window.__clawdCurrentState || "idle");
+  applyState(window.__deskbuddyCurrentState || "idle");
   animate(performance.now());
 }
 
@@ -140,7 +140,7 @@ function configure(render3dConfig) {
 }
 
 window.electronAPI.onStateChange((state) => {
-  window.__clawdCurrentState = state;
+  window.__deskbuddyCurrentState = state;
   applyState(state);
 });
 

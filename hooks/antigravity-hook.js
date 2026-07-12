@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Clawd - Antigravity CLI hook adapter
+// DeskBuddy - Antigravity CLI hook adapter
 // Registered in Antigravity's global hooks file by hooks/antigravity-install.js
 
 const fs = require("fs");
@@ -45,7 +45,7 @@ const resolve = createPidResolver({
 });
 
 function getAntigravityPermissionTimeoutMs(env = process.env) {
-  const raw = Number(env.CLAWD_ANTIGRAVITY_PERMISSION_TIMEOUT_MS);
+  const raw = Number(env.DESKBUDDY_ANTIGRAVITY_PERMISSION_TIMEOUT_MS);
   if (Number.isFinite(raw) && raw > 0) return Math.min(raw, ANTIGRAVITY_PERMISSION_TIMEOUT_MS);
   return ANTIGRAVITY_PERMISSION_TIMEOUT_MS;
 }
@@ -55,14 +55,14 @@ function isTruthyDebugValue(value) {
 }
 
 function isAntigravityHookDebugEnabled(env = process.env) {
-  return isTruthyDebugValue(String(env.CLAWD_ANTIGRAVITY_HOOK_DEBUG || "").toLowerCase());
+  return isTruthyDebugValue(String(env.DESKBUDDY_ANTIGRAVITY_HOOK_DEBUG || "").toLowerCase());
 }
 
 function getAntigravityHookDebugLogPath(env = process.env) {
-  if (typeof env.CLAWD_ANTIGRAVITY_HOOK_DEBUG_FILE === "string" && env.CLAWD_ANTIGRAVITY_HOOK_DEBUG_FILE.trim()) {
-    return env.CLAWD_ANTIGRAVITY_HOOK_DEBUG_FILE.trim();
+  if (typeof env.DESKBUDDY_ANTIGRAVITY_HOOK_DEBUG_FILE === "string" && env.DESKBUDDY_ANTIGRAVITY_HOOK_DEBUG_FILE.trim()) {
+    return env.DESKBUDDY_ANTIGRAVITY_HOOK_DEBUG_FILE.trim();
   }
-  return path.join(os.homedir(), ".gemini", "antigravity-cli", "clawd-hook-debug.log");
+  return path.join(os.homedir(), ".gemini", "antigravity-cli", "deskbuddy-hook-debug.log");
 }
 
 function truncateDebugString(value, max = DEBUG_STRING_MAX) {
@@ -109,9 +109,9 @@ function writeAntigravityHookDebug(env, event, fields = {}) {
     });
   }
 
-  if (isTruthyDebugValue(String(env.CLAWD_ANTIGRAVITY_HOOK_DEBUG_STDERR || "").toLowerCase())) {
+  if (isTruthyDebugValue(String(env.DESKBUDDY_ANTIGRAVITY_HOOK_DEBUG_STDERR || "").toLowerCase())) {
     try {
-      process.stderr.write(`[clawd-antigravity] ${line}\n`);
+      process.stderr.write(`[deskbuddy-antigravity] ${line}\n`);
     } catch {}
   }
 
@@ -140,7 +140,7 @@ function resolveHookName(payload, argvEvent) {
 }
 
 function shouldResolvePid(hookName, env = process.env) {
-  return !!HOOK_MAP[hookName] && !env.CLAWD_REMOTE;
+  return !!HOOK_MAP[hookName] && !env.DESKBUDDY_REMOTE;
 }
 
 function normalizeSessionId(value, payload) {
@@ -397,7 +397,7 @@ async function sendHookEvent(payload, argvEvent, deps = {}) {
   const env = deps.env || process.env;
   const hookName = resolveHookName(payload, argvEvent);
   const outLine = stdoutForEvent(hookName);
-  const remote = !!env.CLAWD_REMOTE;
+  const remote = !!env.DESKBUDDY_REMOTE;
   const pidMeta = shouldResolvePid(hookName, env)
     ? (deps.resolvePid ? deps.resolvePid() : undefined)
     : undefined;

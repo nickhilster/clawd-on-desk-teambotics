@@ -1,5 +1,5 @@
 // Kiro CLI agent configuration
-// Hooks via ~/.kiro/agents/clawd.json, stdin JSON + exit code gating
+// Hooks via ~/.kiro/agents/deskbuddy.json, stdin JSON + exit code gating
 // Docs: https://kiro.dev/docs/cli/hooks/
 
 module.exports = {

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Clawd — Qoder hook (Phase 1: state-only).
+// DeskBuddy — Qoder hook (Phase 1: state-only).
 //
 // Registered in ~/.qoder/settings.json by hooks/qoder-install.js. Reads the
 // hook payload from stdin (JSON with hook_event_name), POSTs a state event to
-// the running Clawd server, and ALWAYS writes `{}` to stdout. Clawd never
+// the running DeskBuddy server, and ALWAYS writes `{}` to stdout. DeskBuddy never
 // answers a Qoder permission decision in Phase 1, so PermissionRequest /
 // PermissionDenied are observed as passive `notification` state only and
 // Qoder's native permission flow stays in control.
@@ -17,7 +17,7 @@ const TOOL_MATCH_ARRAY_MAX = 16;
 const TOOL_MATCH_OBJECT_KEYS_MAX = 32;
 const TOOL_MATCH_DEPTH_MAX = 6;
 
-// Qoder hook event → { state, event } for the Clawd state machine. Every
+// Qoder hook event → { state, event } for the DeskBuddy state machine. Every
 // event returns `{}` (no gating) in Phase 1.
 const HOOK_MAP = {
   SessionStart:       { state: "idle",         event: "SessionStart" },
@@ -27,11 +27,11 @@ const HOOK_MAP = {
   PostToolUseFailure: { state: "error",        event: "PostToolUseFailure" },
   Stop:               { state: "attention",    event: "Stop" },
   Notification:       { state: "notification", event: "Notification" },
-  // State-only: Qoder's permission events are surfaced as a passive Clawd
-  // Notification (event: "Notification"), NOT as a Clawd PermissionRequest.
+  // State-only: Qoder's permission events are surfaced as a passive DeskBuddy
+  // Notification (event: "Notification"), NOT as a DeskBuddy PermissionRequest.
   // That keeps them on the normal notification path so they (a) honor the
   // per-agent notification-hook mute toggle in state.js and (b) write session
-  // bookkeeping consistently — Clawd never answers the decision and the hook
+  // bookkeeping consistently — DeskBuddy never answers the decision and the hook
   // still returns `{}`. Phase 1 does not distinguish the originating Qoder
   // event, so both collapse to a single Notification cue.
   PermissionRequest:  { state: "notification", event: "Notification" },
@@ -116,7 +116,7 @@ function resolveHookName(payload, argvEvent) {
 }
 
 function shouldResolvePid(hookName, env = process.env) {
-  return !!HOOK_MAP[hookName] && !env.CLAWD_REMOTE;
+  return !!HOOK_MAP[hookName] && !env.DESKBUDDY_REMOTE;
 }
 
 function applyLocalProcessFields(body, pidMeta) {
@@ -182,7 +182,7 @@ function buildStateBody(hookName, payload, options = {}) {
 function sendHookEvent(payload, argvEvent, deps = {}) {
   const env = deps.env || process.env;
   const hookName = resolveHookName(payload, argvEvent);
-  const remote = !!env.CLAWD_REMOTE;
+  const remote = !!env.DESKBUDDY_REMOTE;
   const body = buildStateBody(hookName, payload, {
     remote,
     host: remote && deps.readHostPrefix ? deps.readHostPrefix() : undefined,

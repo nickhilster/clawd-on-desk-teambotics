@@ -63,7 +63,7 @@ function windowsPathToWslPath(value) {
 // `command` is only executed by POSIX shells — for a Windows-authored
 // hooks.json that means WSL. Run the WINDOWS node.exe via WSL interop rather
 // than a Linux node: the hook then lives in a Windows process whose
-// 127.0.0.1 is the Windows loopback, so events reach Clawd's server (which
+// 127.0.0.1 is the Windows loopback, so events reach DeskBuddy's server (which
 // binds 127.0.0.1 only) even in WSL's default NAT mode, where a Linux-side
 // process gets connection-refused. Requires WSL interop (on by default).
 // Env-var prefixes (`KEY=value node.exe ...`) do NOT cross the interop
@@ -333,7 +333,7 @@ function ensureCodexHooksFeature(configPath, options = {}) {
 
 // includeWindowsVariant widens the match to commandWindows. Registration
 // passes it only on win32 hosts: a POSIX host must never claim (and rewrite
-// the command of) an entry whose only Clawd trace is a leftover
+// the command of) an entry whose only DeskBuddy trace is a leftover
 // commandWindows — that command could be a third-party hook. Uninstall, by
 // contrast, always matches both fields: removal must be complete on every
 // platform.
@@ -454,7 +454,7 @@ function registerCodexCommandHooks(options = {}) {
 
   const { codexDir, hooksPath, configPath } = getCodexPaths(options);
   if (!options.hooksPath && !options.codexDir && !fs.existsSync(codexDir)) {
-    if (!options.silent) console.log("Clawd: ~/.codex/ not found - skipping Codex hook registration");
+    if (!options.silent) console.log("DeskBuddy: ~/.codex/ not found - skipping Codex hook registration");
     return { added: 0, skipped: 0, updated: 0, configChanged: false, warnings: [] };
   }
 
@@ -476,7 +476,7 @@ function registerCodexCommandHooks(options = {}) {
     || "node";
   const commandEnv = {
     ...(options.env || {}),
-    ...(options.remote ? { CLAWD_REMOTE: "1" } : {}),
+    ...(options.remote ? { DESKBUDDY_REMOTE: "1" } : {}),
   };
   // On a Windows host, a WSL session may consume this hooks.json through a
   // shared CODEX_HOME (#544). Codex resolves `commandWindows` on Windows and
@@ -573,7 +573,7 @@ function registerCodexCommandHooks(options = {}) {
 
   if (!options.silent) {
     const label = options.label || "Codex hooks";
-    console.log(`Clawd ${label} -> ${hooksPath}`);
+    console.log(`DeskBuddy ${label} -> ${hooksPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
     if (feature.changed) console.log(`  Updated [features].hooks in ${configPath}`);
     for (const warning of warnings) console.warn(`  Warning: ${warning}`);
@@ -627,7 +627,7 @@ function unregisterCodexCommandHooks(options = {}) {
 
   let backupPath = null;
   if (changed) backupPath = writeJsonAtomicWithBackup(hooksPath, settings, options);
-  if (!options.silent) console.log(`Clawd Codex hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Codex hooks removed: ${removed}`);
   const result = { removed, changed };
   if (options.backup === true) result.backupPath = backupPath;
   return result;

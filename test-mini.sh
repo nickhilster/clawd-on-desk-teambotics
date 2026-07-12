@@ -6,12 +6,12 @@
 DELAY=${1:-6}
 
 SVGS=(
-  "clawd-mini-idle.svg"
-  "clawd-mini-enter.svg"
-  "clawd-mini-peek.svg"
-  "clawd-mini-alert.svg"
-  "clawd-mini-happy.svg"
-  "clawd-mini-crabwalk.svg"
+  "deskbuddy-mini-idle.svg"
+  "deskbuddy-mini-enter.svg"
+  "deskbuddy-mini-peek.svg"
+  "deskbuddy-mini-alert.svg"
+  "deskbuddy-mini-happy.svg"
+  "deskbuddy-mini-crabwalk.svg"
 )
 
 STATES=(
@@ -38,6 +38,6 @@ echo ""
 echo "Returning to idle..."
 curl -s -X POST http://127.0.0.1:23333/state \
   -H "Content-Type: application/json" \
-  -d '{"state":"idle","svg":"clawd-idle-follow.svg"}'
+  -d '{"state":"idle","svg":"deskbuddy-idle-follow.svg"}'
 echo ""
 echo "=== DONE ==="

@@ -72,13 +72,13 @@ describe("getCodexHookHealth", () => {
       agentId: "codex",
       agentName: "Codex CLI",
       eventSource: "hook",
-      parentDir: "/clawd-nonexistent-codex-dir-xyz",
-      configPath: "/clawd-nonexistent-codex-dir-xyz/hooks.json",
+      parentDir: "/deskbuddy-nonexistent-codex-dir-xyz",
+      configPath: "/deskbuddy-nonexistent-codex-dir-xyz/hooks.json",
       configMode: "file",
       autoInstall: true,
       marker: "codex-hook.js",
       nested: true,
-      supplementary: { key: "hooks", configPath: "/clawd-nonexistent-codex-dir-xyz/config.toml" },
+      supplementary: { key: "hooks", configPath: "/deskbuddy-nonexistent-codex-dir-xyz/config.toml" },
     };
     const v = getCodexHookHealth({ descriptors: [fakeDescriptor] });
     assert.strictEqual(v.available, true);
@@ -139,7 +139,7 @@ describe("decideCodexHookNotification (edge-triggered dedup)", () => {
     assert.strictEqual(d2.shouldNotify, true);
   });
 
-  it("never notifies when Codex is disabled in Clawd", () => {
+  it("never notifies when Codex is disabled in DeskBuddy", () => {
     const d = decideCodexHookNotification(broken("needs-review"), "", { codexEnabled: false });
     assert.strictEqual(d.shouldNotify, false);
   });

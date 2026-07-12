@@ -12,7 +12,7 @@ const ROLLOUT_NAME =
   "rollout-2026-03-25T15-10-51-019d23d4-f1a9-7633-b9c7-758327137228.jsonl";
 
 function tempRollout(lines) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codex-remote-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codex-remote-"));
   const filePath = path.join(dir, ROLLOUT_NAME);
   fs.writeFileSync(filePath, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
   return { dir, filePath };

@@ -21,10 +21,10 @@ const path = require("path");
 
 const AUTOSTART_DIR = path.join(os.homedir(), ".config", "autostart");
 const AUTOSTART_FILE = path.join(AUTOSTART_DIR, "deskbuddy.desktop");
-// Renamed from clawd-on-desk.desktop during the DeskBuddy rebrand. Cleaned up
+// Renamed from deskbuddy.desktop during the DeskBuddy rebrand. Cleaned up
 // opportunistically in linuxSetOpenAtLogin() so existing installs don't end
 // up with both a stale and a current autostart entry.
-const LEGACY_AUTOSTART_FILE = path.join(AUTOSTART_DIR, "clawd-on-desk.desktop");
+const LEGACY_AUTOSTART_FILE = path.join(AUTOSTART_DIR, "deskbuddy.desktop");
 
 function getLoginItemSettings({ isPackaged, openAtLogin, execPath, appPath }) {
   if (isPackaged) return { openAtLogin };

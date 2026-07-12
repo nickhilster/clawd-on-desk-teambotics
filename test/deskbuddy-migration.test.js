@@ -14,12 +14,12 @@ function makeTempDir(prefix) {
 test("deskbuddy-migration", async (t) => {
   await t.test("copies legacy prefs into the new location and renames the file", () => {
     const appDataDir = makeTempDir("deskbuddy-migration-appdata-");
-    const legacyDir = path.join(appDataDir, "clawd-on-desk");
+    const legacyDir = path.join(appDataDir, "deskbuddy");
     const newDir = path.join(appDataDir, "deskbuddy");
     fs.mkdirSync(legacyDir, { recursive: true });
     fs.mkdirSync(newDir, { recursive: true });
     fs.writeFileSync(
-      path.join(legacyDir, "clawd-prefs.json"),
+      path.join(legacyDir, "deskbuddy-prefs.json"),
       JSON.stringify({ theme: "calico", x: 100 }),
     );
 
@@ -35,15 +35,15 @@ test("deskbuddy-migration", async (t) => {
 
   await t.test("leaves the legacy folder in place (copy, not move)", () => {
     const appDataDir = makeTempDir("deskbuddy-migration-appdata-");
-    const legacyDir = path.join(appDataDir, "clawd-on-desk");
+    const legacyDir = path.join(appDataDir, "deskbuddy");
     const newDir = path.join(appDataDir, "deskbuddy");
     fs.mkdirSync(legacyDir, { recursive: true });
     fs.mkdirSync(newDir, { recursive: true });
-    fs.writeFileSync(path.join(legacyDir, "clawd-prefs.json"), JSON.stringify({ theme: "clawd" }));
+    fs.writeFileSync(path.join(legacyDir, "deskbuddy-prefs.json"), JSON.stringify({ theme: "deskbuddy" }));
 
     migrateLegacyUserData({ appDataDir, newUserDataDir: newDir });
 
-    assert.equal(fs.existsSync(path.join(legacyDir, "clawd-prefs.json")), true);
+    assert.equal(fs.existsSync(path.join(legacyDir, "deskbuddy-prefs.json")), true);
   });
 
   await t.test("is a no-op when there is no legacy folder", () => {
@@ -59,11 +59,11 @@ test("deskbuddy-migration", async (t) => {
 
   await t.test("is a no-op when the new location already has a prefs file (already migrated)", () => {
     const appDataDir = makeTempDir("deskbuddy-migration-appdata-");
-    const legacyDir = path.join(appDataDir, "clawd-on-desk");
+    const legacyDir = path.join(appDataDir, "deskbuddy");
     const newDir = path.join(appDataDir, "deskbuddy");
     fs.mkdirSync(legacyDir, { recursive: true });
     fs.mkdirSync(newDir, { recursive: true });
-    fs.writeFileSync(path.join(legacyDir, "clawd-prefs.json"), JSON.stringify({ theme: "clawd" }));
+    fs.writeFileSync(path.join(legacyDir, "deskbuddy-prefs.json"), JSON.stringify({ theme: "deskbuddy" }));
     fs.writeFileSync(path.join(newDir, "deskbuddy-prefs.json"), JSON.stringify({ theme: "calico" }));
 
     const result = migrateLegacyUserData({ appDataDir, newUserDataDir: newDir });
@@ -75,15 +75,15 @@ test("deskbuddy-migration", async (t) => {
 
   await t.test("copies non-prefs files (e.g. theme overrides cache) alongside the prefs file", () => {
     const appDataDir = makeTempDir("deskbuddy-migration-appdata-");
-    const legacyDir = path.join(appDataDir, "clawd-on-desk");
+    const legacyDir = path.join(appDataDir, "deskbuddy");
     const newDir = path.join(appDataDir, "deskbuddy");
     fs.mkdirSync(legacyDir, { recursive: true });
     fs.mkdirSync(newDir, { recursive: true });
-    fs.writeFileSync(path.join(legacyDir, "clawd-prefs.json"), JSON.stringify({ theme: "clawd" }));
-    fs.writeFileSync(path.join(legacyDir, "clawd-main.log"), "some log line\n");
+    fs.writeFileSync(path.join(legacyDir, "deskbuddy-prefs.json"), JSON.stringify({ theme: "deskbuddy" }));
+    fs.writeFileSync(path.join(legacyDir, "deskbuddy-main.log"), "some log line\n");
 
     migrateLegacyUserData({ appDataDir, newUserDataDir: newDir });
 
-    assert.equal(fs.existsSync(path.join(newDir, "clawd-main.log")), true);
+    assert.equal(fs.existsSync(path.join(newDir, "deskbuddy-main.log")), true);
   });
 });

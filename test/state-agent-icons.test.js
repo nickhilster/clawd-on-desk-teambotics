@@ -142,7 +142,7 @@ describe("state agent icons", () => {
       "<svg>\n  <path />\n</svg>\n"
     );
 
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-svg-hash-"));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-svg-hash-"));
     try {
       const lfPath = path.join(tempDir, "lf.svg");
       const crlfPath = path.join(tempDir, "crlf.svg");

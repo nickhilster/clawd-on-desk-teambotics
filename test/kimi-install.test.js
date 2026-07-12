@@ -19,7 +19,7 @@ const {
 const tempDirs = [];
 
 function makeTempKimiHome() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-kimi-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-kimi-"));
   const kimiDir = path.join(root, ".kimi");
   fs.mkdirSync(kimiDir, { recursive: true });
   tempDirs.push(root);
@@ -29,7 +29,7 @@ function makeTempKimiHome() {
 function listCleanupBackups(filePath) {
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
-  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.clawd-cleanup-`));
+  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.deskbuddy-cleanup-`));
 }
 
 afterEach(() => {
@@ -132,7 +132,7 @@ describe("Kimi hook installer", () => {
     assert.ok(result.updated >= 1);
   });
 
-  it("deduplicates repeated Clawd Kimi hook blocks", () => {
+  it("deduplicates repeated DeskBuddy Kimi hook blocks", () => {
     const { settingsPath } = makeTempKimiHome();
     const repeatedBlocks = KIMI_HOOK_EVENTS.map((event) => `[[hooks]]
 event = "${event}"
@@ -155,21 +155,21 @@ timeout = 30
 
     const content = fs.readFileSync(settingsPath, "utf8");
     const blocks = [...content.matchAll(/\[\[hooks\]\][\s\S]*?(?=\n\[\[hooks\]\]|\s*$)/g)].map((m) => m[0]);
-    const clawdBlocks = blocks.filter((block) => (
+    const deskbuddyBlocks = blocks.filter((block) => (
       /command\s*=\s*(?:"[^"]*kimi-hook\.js[^"]*"|'[^']*kimi-hook\.js[^']*')/.test(block)
     ));
-    assert.strictEqual(clawdBlocks.length, KIMI_HOOK_EVENTS.length);
+    assert.strictEqual(deskbuddyBlocks.length, KIMI_HOOK_EVENTS.length);
     for (const event of KIMI_HOOK_EVENTS) {
-      const count = clawdBlocks.filter((block) => block.includes(`event = "${event}"`)).length;
+      const count = deskbuddyBlocks.filter((block) => block.includes(`event = "${event}"`)).length;
       assert.strictEqual(count, 1, `event ${event} should appear exactly once`);
     }
-    assert.ok(content.includes("CLAWD_KIMI_PERMISSION_MODE=suspect"));
+    assert.ok(content.includes("DESKBUDDY_KIMI_PERMISSION_MODE=suspect"));
     assert.ok(result.updated >= 1);
   });
 
   it("matches and normalizes double-quoted command strings with escaped quotes", () => {
     const { settingsPath } = makeTempKimiHome();
-    const escapedCommand = 'command = "CLAWD_KIMI_PERMISSION_MODE=suspect \\"/usr/local/bin/node\\" \\"/old/path/kimi-hook.js\\""';
+    const escapedCommand = 'command = "DESKBUDDY_KIMI_PERMISSION_MODE=suspect \\"/usr/local/bin/node\\" \\"/old/path/kimi-hook.js\\""';
     fs.writeFileSync(
       settingsPath,
       `default_model = "kimi-for-coding"\n\n[[hooks]]\nevent = "PreToolUse"\n${escapedCommand}\nmatcher = ""\ntimeout = 30\n`,
@@ -188,9 +188,9 @@ timeout = 30
     assert.ok(result.updated >= 1);
   });
 
-  it("preserves user-authored sections that follow Clawd hook blocks", () => {
+  it("preserves user-authored sections that follow DeskBuddy hook blocks", () => {
     // Regression: the old lookahead-based strip greedily swallowed anything
-    // between the first Clawd [[hooks]] and EOF, wiping user-added tables
+    // between the first DeskBuddy [[hooks]] and EOF, wiping user-added tables
     // like [server] / [[tools]] / [mcp] on every startup auto-sync.
     const { settingsPath } = makeTempKimiHome();
     const legacy = [
@@ -198,7 +198,7 @@ timeout = 30
       "",
       "[[hooks]]",
       'event = "PreToolUse"',
-      "command = '\"node\" \"/opt/clawd/hooks/kimi-hook.js\"'",
+      "command = '\"node\" \"/opt/deskbuddy/hooks/kimi-hook.js\"'",
       'matcher = ""',
       "timeout = 30",
       "",
@@ -227,14 +227,14 @@ timeout = 30
     assert.strictEqual(markerLines.length, KIMI_HOOK_EVENTS.length);
   });
 
-  it("unregister removes only Clawd blocks and preserves following TOML sections", () => {
+  it("unregister removes only DeskBuddy blocks and preserves following TOML sections", () => {
     const { settingsPath } = makeTempKimiHome();
     const content = [
       'default_model = "kimi-for-coding"',
       "",
       "[[hooks]]",
       'event = "SessionStart"',
-      'command = \'"node" "/opt/clawd/hooks/kimi-hook.js"\'',
+      'command = \'"node" "/opt/deskbuddy/hooks/kimi-hook.js"\'',
       'matcher = ""',
       "timeout = 30",
       "",
@@ -290,7 +290,7 @@ timeout = 30
       "",
       "[[hooks]]",
       'event = "PreToolUse"',
-      `command = '"${existingWinPath}" "/opt/clawd/hooks/kimi-hook.js"'`,
+      `command = '"${existingWinPath}" "/opt/deskbuddy/hooks/kimi-hook.js"'`,
       'matcher = ""',
       "timeout = 30",
       "",
@@ -319,7 +319,7 @@ timeout = 30
     assert.ok(!fs.existsSync(settingsPath));
   });
 
-  it("writes CLAWD_KIMI_PERMISSION_MODE into hook command when provided", () => {
+  it("writes DESKBUDDY_KIMI_PERMISSION_MODE into hook command when provided", () => {
     const { settingsPath } = makeTempKimiHome();
     registerKimiHooks({
       silent: true,
@@ -328,7 +328,7 @@ timeout = 30
       permissionMode: MODE_SUSPECT,
     });
     const content = fs.readFileSync(settingsPath, "utf8");
-    assert.ok(content.includes("CLAWD_KIMI_PERMISSION_MODE=suspect"));
+    assert.ok(content.includes("DESKBUDDY_KIMI_PERMISSION_MODE=suspect"));
   });
 
   it("normalizes permission mode values", () => {
@@ -343,14 +343,14 @@ timeout = 30
     const content = `
 [[hooks]]
 event = "PreToolUse"
-command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-hook.js"'
+command = 'DESKBUDDY_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-hook.js"'
 `;
     assert.strictEqual(extractExistingPermissionMode(content), MODE_SUSPECT);
     assert.strictEqual(extractExistingPermissionMode(""), null);
     assert.strictEqual(extractExistingPermissionMode("command = \"echo hello\""), null);
   });
 
-  it("preserves existing CLAWD_KIMI_PERMISSION_MODE across env-less re-syncs", () => {
+  it("preserves existing DESKBUDDY_KIMI_PERMISSION_MODE across env-less re-syncs", () => {
     const { settingsPath } = makeTempKimiHome();
 
     // First install: user explicitly opts into suspect mode.
@@ -361,12 +361,12 @@ command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-h
       permissionMode: MODE_SUSPECT,
     });
     const afterFirst = fs.readFileSync(settingsPath, "utf8");
-    assert.ok(afterFirst.includes("CLAWD_KIMI_PERMISSION_MODE=suspect"));
+    assert.ok(afterFirst.includes("DESKBUDDY_KIMI_PERMISSION_MODE=suspect"));
 
-    // Second install emulates Clawd's startup auto-sync when the env var
+    // Second install emulates DeskBuddy's startup auto-sync when the env var
     // is NOT set. Before the fix this path silently stripped the prefix.
-    const prevEnv = process.env.CLAWD_KIMI_PERMISSION_MODE;
-    delete process.env.CLAWD_KIMI_PERMISSION_MODE;
+    const prevEnv = process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
+    delete process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
     try {
       registerKimiHooks({
         silent: true,
@@ -374,13 +374,13 @@ command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-h
         nodeBin: "/usr/local/bin/node",
       });
     } finally {
-      if (prevEnv === undefined) delete process.env.CLAWD_KIMI_PERMISSION_MODE;
-      else process.env.CLAWD_KIMI_PERMISSION_MODE = prevEnv;
+      if (prevEnv === undefined) delete process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_MODE = prevEnv;
     }
 
     const afterSecond = fs.readFileSync(settingsPath, "utf8");
     assert.ok(
-      afterSecond.includes("CLAWD_KIMI_PERMISSION_MODE=suspect"),
+      afterSecond.includes("DESKBUDDY_KIMI_PERMISSION_MODE=suspect"),
       "env-less re-sync should preserve the previously written mode prefix"
     );
   });
@@ -392,7 +392,7 @@ command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-h
     const toml = [
       "[[hooks]]",
       'event = "PreToolUse"',
-      'command = "CLAWD_KIMI_PERMISSION_MODE=suspect \\"/usr/local/bin/node\\" \\"/opt/clawd/hooks/kimi-hook.js\\""',
+      'command = "DESKBUDDY_KIMI_PERMISSION_MODE=suspect \\"/usr/local/bin/node\\" \\"/opt/deskbuddy/hooks/kimi-hook.js\\""',
       'matcher = ""',
       "timeout = 30",
       "",
@@ -408,7 +408,7 @@ command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-h
     const legacyBlocks = KIMI_HOOK_EVENTS.map((event) => [
       "[[hooks]]",
       `event = "${event}"`,
-      'command = "CLAWD_KIMI_PERMISSION_MODE=suspect \\"/usr/local/bin/node\\" \\"/opt/clawd/hooks/kimi-hook.js\\""',
+      'command = "DESKBUDDY_KIMI_PERMISSION_MODE=suspect \\"/usr/local/bin/node\\" \\"/opt/deskbuddy/hooks/kimi-hook.js\\""',
       'matcher = ""',
       "timeout = 30",
       "",
@@ -416,8 +416,8 @@ command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-h
     const legacy = `default_model = "kimi-for-coding"\n\n${legacyBlocks}`;
     fs.writeFileSync(settingsPath, legacy, "utf8");
 
-    const prevEnv = process.env.CLAWD_KIMI_PERMISSION_MODE;
-    delete process.env.CLAWD_KIMI_PERMISSION_MODE;
+    const prevEnv = process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
+    delete process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
     try {
       registerKimiHooks({
         silent: true,
@@ -425,13 +425,13 @@ command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-h
         nodeBin: "/usr/local/bin/node",
       });
     } finally {
-      if (prevEnv === undefined) delete process.env.CLAWD_KIMI_PERMISSION_MODE;
-      else process.env.CLAWD_KIMI_PERMISSION_MODE = prevEnv;
+      if (prevEnv === undefined) delete process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_MODE = prevEnv;
     }
 
     const after = fs.readFileSync(settingsPath, "utf8");
     assert.ok(
-      after.includes("CLAWD_KIMI_PERMISSION_MODE=suspect"),
+      after.includes("DESKBUDDY_KIMI_PERMISSION_MODE=suspect"),
       "legacy escaped-quote install should keep suspect mode after env-less re-sync"
     );
   });
@@ -455,13 +455,13 @@ command = 'CLAWD_KIMI_PERMISSION_MODE=suspect "/usr/bin/node" "/some/path/kimi-h
     });
 
     const content = fs.readFileSync(settingsPath, "utf8");
-    assert.ok(content.includes("CLAWD_KIMI_PERMISSION_MODE=explicit"));
-    assert.ok(!content.includes("CLAWD_KIMI_PERMISSION_MODE=suspect"));
+    assert.ok(content.includes("DESKBUDDY_KIMI_PERMISSION_MODE=explicit"));
+    assert.ok(!content.includes("DESKBUDDY_KIMI_PERMISSION_MODE=suspect"));
   });
 });
 
 function makeTempKimiCodeHome() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-kimi-code-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-kimi-code-"));
   const kimiCodeDir = path.join(root, ".kimi-code");
   fs.mkdirSync(kimiCodeDir, { recursive: true });
   tempDirs.push(root);
@@ -488,7 +488,7 @@ describe("Kimi Code hook installer (kimi-code flavor, #563)", () => {
     // POSIX env prefixes never execute under cmd.exe (kimi-code hook runner
     // is spawn(shell:true) → %COMSPEC%); the kimi-code target must never
     // carry one even when a permission mode is explicitly requested.
-    assert.ok(!content.includes("CLAWD_KIMI_PERMISSION_MODE"));
+    assert.ok(!content.includes("DESKBUDDY_KIMI_PERMISSION_MODE"));
   });
 
   it("creates a hooks-only config.toml without default_model", () => {
@@ -517,13 +517,13 @@ describe("Kimi Code hook installer (kimi-code flavor, #563)", () => {
     const migrated = [
       "[[hooks]]",
       'event = "SessionStart"',
-      "command = 'CLAWD_KIMI_PERMISSION_MODE=suspect \"node\" \"/opt/clawd/hooks/kimi-hook.js\"'",
+      "command = 'DESKBUDDY_KIMI_PERMISSION_MODE=suspect \"node\" \"/opt/deskbuddy/hooks/kimi-hook.js\"'",
       'matcher = ""',
       "timeout = 30",
       "",
       "[[hooks]]",
       'event = "PreToolUse"',
-      "command = 'CLAWD_KIMI_PERMISSION_MODE=suspect \"node\" \"/opt/clawd/hooks/kimi-hook.js\"'",
+      "command = 'DESKBUDDY_KIMI_PERMISSION_MODE=suspect \"node\" \"/opt/deskbuddy/hooks/kimi-hook.js\"'",
       'matcher = ""',
       "timeout = 30",
       "",
@@ -539,12 +539,12 @@ describe("Kimi Code hook installer (kimi-code flavor, #563)", () => {
 
     assert.strictEqual(result.updated, 1);
     const content = fs.readFileSync(settingsPath, "utf8");
-    assert.ok(!content.includes("CLAWD_KIMI_PERMISSION_MODE"));
+    assert.ok(!content.includes("DESKBUDDY_KIMI_PERMISSION_MODE"));
     const blockCount = (content.match(/\[\[hooks\]\]/g) || []).length;
     assert.strictEqual(blockCount, KIMI_CODE_HOOK_EVENTS.length);
   });
 
-  it("preserves user hooks and other sections while rewriting Clawd blocks", () => {
+  it("preserves user hooks and other sections while rewriting DeskBuddy blocks", () => {
     const { settingsPath } = makeTempKimiCodeHome();
     const content = [
       'default_model = "kimi-k2.5"',
@@ -561,7 +561,7 @@ describe("Kimi Code hook installer (kimi-code flavor, #563)", () => {
       "",
       "[[hooks]]",
       'event = "SessionStart"',
-      "command = '\"node\" \"/opt/clawd/hooks/kimi-hook.js\"'",
+      "command = '\"node\" \"/opt/deskbuddy/hooks/kimi-hook.js\"'",
       'matcher = ""',
       "timeout = 30",
       "",

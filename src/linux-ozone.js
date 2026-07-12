@@ -26,7 +26,7 @@
 // this resolver, so it always passes userOzonePlatform=null):
 //   • An explicit --ozone-platform you pass yourself → always honored as-is
 //     (Chromium reads it directly; we never relaunch over it).
-//   • Else CLAWD_OZONE_PLATFORM governs the automatic relaunch:
+//   • Else DESKBUDDY_OZONE_PLATFORM governs the automatic relaunch:
 //        x11            → relaunch into XWayland
 //        wayland / auto → stay on the native-Wayland default
 //   • Else auto-detect: x11 when on a Wayland session AND an X server (DISPLAY)
@@ -38,7 +38,7 @@
 // happens before app.whenReady. DISPLAY only proves the variable is set, not
 // that the server is reachable, but it is the cheap signal that keeps us from
 // turning "pet can't drag" into "app won't launch" on a Wayland-only box; the
-// CLAWD_OZONE_PLATFORM escape hatch covers the rest.
+// DESKBUDDY_OZONE_PLATFORM escape hatch covers the rest.
 //
 // `userOzonePlatform` is the value the user put on argv for --ozone-platform
 // (or null/empty), passed in by the caller so this stays a pure, testable
@@ -52,7 +52,7 @@ function resolveLinuxOzonePlatform(options = {}) {
 
   // 1. Explicit env override wins over everything (including a user argv
   //    switch — the caller removes/replaces the command-line switch to match).
-  const override = String(env.CLAWD_OZONE_PLATFORM || "").trim().toLowerCase();
+  const override = String(env.DESKBUDDY_OZONE_PLATFORM || "").trim().toLowerCase();
   if (override === "x11") return "x11";
   if (override === "wayland") return "wayland";
   if (override === "auto") return null;
@@ -122,7 +122,7 @@ function parseOzonePlatformFromArgv(argv) {
 // its code pages and dies before launching anything. Three loop guards:
 // (a) an --ozone-platform already on argv — the PRIMARY guard, since the
 // relaunched process always carries the flag, and it is checked before resolve()
-// so even CLAWD_OZONE_PLATFORM=x11 can't spin; (b) the CLAWD_OZONE_RELAUNCHED
+// so even DESKBUDDY_OZONE_PLATFORM=x11 can't spin; (b) the DESKBUDDY_OZONE_RELAUNCHED
 // sentinel — a backstop for the rare case where the spawn args fail to
 // round-trip; (c) the resolved target (only x11 relaunches; Wayland is default).
 function planXWaylandRelaunch(options = {}) {
@@ -131,7 +131,7 @@ function planXWaylandRelaunch(options = {}) {
   const argv = Array.isArray(options.argv) ? options.argv : [];
 
   // Guard 1: already relaunched once → never loop.
-  if (String(env.CLAWD_OZONE_RELAUNCHED || "").trim() === "1") return null;
+  if (String(env.DESKBUDDY_OZONE_RELAUNCHED || "").trim() === "1") return null;
 
   // Guard 2: an explicit --ozone-platform already on the real argv (the
   // relaunched process, or a deliberate user/packager choice) → honor it.

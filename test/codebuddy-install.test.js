@@ -14,7 +14,7 @@ const MARKER = "codebuddy-hook.js";
 const tempDirs = [];
 
 function makeTempSettingsFile(initial = {}) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codebuddy-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codebuddy-"));
   const settingsPath = path.join(tmpDir, "settings.json");
   fs.writeFileSync(settingsPath, JSON.stringify(initial, null, 2), "utf8");
   tempDirs.push(tmpDir);
@@ -28,7 +28,7 @@ function readJson(filePath) {
 function listCleanupBackups(filePath) {
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
-  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.clawd-cleanup-`));
+  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.deskbuddy-cleanup-`));
 }
 
 afterEach(() => {
@@ -191,7 +191,7 @@ describe("CodeBuddy hook installer", () => {
         Stop: [{
           matcher: "",
           hooks: [
-            { type: "command", command: '"/node" "/clawd/codebuddy-hook.js"' },
+            { type: "command", command: '"/node" "/deskbuddy/codebuddy-hook.js"' },
             { type: "command", command: "echo keep" },
           ],
         }],

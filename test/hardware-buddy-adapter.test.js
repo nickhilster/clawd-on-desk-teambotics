@@ -267,12 +267,12 @@ function createFakeTimers() {
 describe("hardware buddy adapter", () => {
   it("is disabled unless explicitly requested by env", () => {
     assert.strictEqual(isEnabledFromEnv({}), false);
-    assert.strictEqual(isEnabledFromEnv({ CLAWD_HARDWARE_BUDDY: "1" }), true);
-    assert.strictEqual(isEnabledFromEnv({ CLAWD_HARDWARE_BUDDY_BACKEND: "bleak" }), true);
-    assert.strictEqual(isEnabledFromEnv({ CLAWD_HARDWARE_BUDDY_ADDRESS: "AA:BB" }), true);
+    assert.strictEqual(isEnabledFromEnv({ DESKBUDDY_HARDWARE_BUDDY: "1" }), true);
+    assert.strictEqual(isEnabledFromEnv({ DESKBUDDY_HARDWARE_BUDDY_BACKEND: "bleak" }), true);
+    assert.strictEqual(isEnabledFromEnv({ DESKBUDDY_HARDWARE_BUDDY_ADDRESS: "AA:BB" }), true);
     assert.strictEqual(isEnabledFromEnv({
-      CLAWD_HARDWARE_BUDDY: "1",
-      CLAWD_HARDWARE_BUDDY_DISABLED: "true",
+      DESKBUDDY_HARDWARE_BUDDY: "1",
+      DESKBUDDY_HARDWARE_BUDDY_DISABLED: "true",
     }), false);
   });
 
@@ -346,7 +346,7 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const perm = { toolName: "Bash" };
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1", CLAWD_HARDWARE_BUDDY_BACKEND: "fake" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1", DESKBUDDY_HARDWARE_BUDDY_BACKEND: "fake" },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
         SidecarClient: FakeSidecarClient,
@@ -379,7 +379,7 @@ describe("hardware buddy adapter", () => {
     const resolvePermissionEntry = () => {};
     const statePriority = { working: 3 };
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       permissionsEnabled: true,
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -402,7 +402,7 @@ describe("hardware buddy adapter", () => {
     const perm = { toolName: "Bash" };
     const resolved = [];
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       permissionsEnabled: true,
       coreModules: {
         HardwareBuddyController: PromptingHardwareBuddyController,
@@ -426,7 +426,7 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const perm = { toolName: "Bash" };
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       permissionsEnabled: true,
       coreModules: {
         HardwareBuddyController: PromptingHardwareBuddyController,
@@ -456,7 +456,7 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const perm = { toolName: "Bash \udcae" };
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       permissionsEnabled: true,
       coreModules: {
         HardwareBuddyController: PromptingHardwareBuddyController,
@@ -481,7 +481,7 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const logs = [];
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       permissionsEnabled: true,
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -499,7 +499,7 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const fakeTimers = createFakeTimers();
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
         SidecarClient: FakeSidecarClient,
@@ -525,7 +525,7 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const fakeTimers = createFakeTimers();
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
         SidecarClient: FakeSidecarClient,
@@ -545,7 +545,7 @@ describe("hardware buddy adapter", () => {
   it("keeps start idempotent", () => {
     resetFakes();
     const adapter = createHardwareBuddyAdapter({
-      env: { CLAWD_HARDWARE_BUDDY: "1" },
+      env: { DESKBUDDY_HARDWARE_BUDDY: "1" },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
         SidecarClient: FakeSidecarClient,
@@ -563,8 +563,8 @@ describe("hardware buddy adapter", () => {
     const fakeTimers = createFakeTimers();
     const adapter = createHardwareBuddyAdapter({
       env: {
-        CLAWD_HARDWARE_BUDDY: "1",
-        CLAWD_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
+        DESKBUDDY_HARDWARE_BUDDY: "1",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -588,10 +588,10 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const adapter = createHardwareBuddyAdapter({
       env: {
-        CLAWD_HARDWARE_BUDDY: "1",
-        CLAWD_HARDWARE_BUDDY_BACKEND: "fake",
-        CLAWD_HARDWARE_BUDDY_ADDRESS: "FAKE:CLAWSTICK",
-        CLAWD_HARDWARE_BUDDY_CONNECT_DELAY_MS: "0",
+        DESKBUDDY_HARDWARE_BUDDY: "1",
+        DESKBUDDY_HARDWARE_BUDDY_BACKEND: "fake",
+        DESKBUDDY_HARDWARE_BUDDY_ADDRESS: "FAKE:CLAWSTICK",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_DELAY_MS: "0",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -766,11 +766,11 @@ describe("hardware buddy adapter", () => {
     const fakeTimers = createFakeTimers();
     const adapter = createHardwareBuddyAdapter({
       env: {
-        CLAWD_HARDWARE_BUDDY: "1",
-        CLAWD_HARDWARE_BUDDY_BACKEND: "fake",
-        CLAWD_HARDWARE_BUDDY_ADDRESS: "FAKE:CLAWSTICK",
-        CLAWD_HARDWARE_BUDDY_CONNECT_DELAY_MS: "10",
-        CLAWD_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
+        DESKBUDDY_HARDWARE_BUDDY: "1",
+        DESKBUDDY_HARDWARE_BUDDY_BACKEND: "fake",
+        DESKBUDDY_HARDWARE_BUDDY_ADDRESS: "FAKE:CLAWSTICK",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_DELAY_MS: "10",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -814,8 +814,8 @@ describe("hardware buddy adapter", () => {
         permissionsEnabled: false,
       },
       env: {
-        CLAWD_HARDWARE_BUDDY_CONNECT_DELAY_MS: "10",
-        CLAWD_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_DELAY_MS: "10",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -856,10 +856,10 @@ describe("hardware buddy adapter", () => {
     const fakeTimers = createFakeTimers();
     const adapter = createHardwareBuddyAdapter({
       env: {
-        CLAWD_HARDWARE_BUDDY: "1",
-        CLAWD_HARDWARE_BUDDY_BACKEND: "fake",
-        CLAWD_HARDWARE_BUDDY_ADDRESS: "FAKE:CLAWSTICK",
-        CLAWD_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
+        DESKBUDDY_HARDWARE_BUDDY: "1",
+        DESKBUDDY_HARDWARE_BUDDY_BACKEND: "fake",
+        DESKBUDDY_HARDWARE_BUDDY_ADDRESS: "FAKE:CLAWSTICK",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -889,8 +889,8 @@ describe("hardware buddy adapter", () => {
     const fakeTimers = createFakeTimers();
     const adapter = createHardwareBuddyAdapter({
       env: {
-        CLAWD_HARDWARE_BUDDY: "1",
-        CLAWD_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
+        DESKBUDDY_HARDWARE_BUDDY: "1",
+        DESKBUDDY_HARDWARE_BUDDY_CONNECT_RETRY_MS: "25",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -960,9 +960,9 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const adapter = createHardwareBuddyAdapter({
       env: {
-        CLAWD_HARDWARE_BUDDY: "1",
-        CLAWD_HARDWARE_BUDDY_BACKEND: "fake",
-        CLAWD_HARDWARE_BUDDY_FAKE_SECURE: "false",
+        DESKBUDDY_HARDWARE_BUDDY: "1",
+        DESKBUDDY_HARDWARE_BUDDY_BACKEND: "fake",
+        DESKBUDDY_HARDWARE_BUDDY_FAKE_SECURE: "false",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,
@@ -981,9 +981,9 @@ describe("hardware buddy adapter", () => {
     resetFakes();
     const adapter = createHardwareBuddyAdapter({
       env: {
-        CLAWD_HARDWARE_BUDDY: "1",
-        CLAWD_HARDWARE_BUDDY_BACKEND: "bleak",
-        CLAWD_HARDWARE_BUDDY_FAKE_SECURE: "false",
+        DESKBUDDY_HARDWARE_BUDDY: "1",
+        DESKBUDDY_HARDWARE_BUDDY_BACKEND: "bleak",
+        DESKBUDDY_HARDWARE_BUDDY_FAKE_SECURE: "false",
       },
       coreModules: {
         HardwareBuddyController: FakeHardwareBuddyController,

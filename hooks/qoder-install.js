@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Merge Clawd Qoder hooks into ~/.qoder/settings.json (append-only, idempotent).
+// Merge DeskBuddy Qoder hooks into ~/.qoder/settings.json (append-only, idempotent).
 //
-// Phase 1 is state-only: the registered hook script posts state to Clawd and
+// Phase 1 is state-only: the registered hook script posts state to DeskBuddy and
 // always returns `{}`, so Qoder's native permission flow stays in control.
 
 const fs = require("fs");
@@ -35,7 +35,7 @@ const QODER_HOOK_EVENTS = [
   "SessionEnd",
 ];
 
-function isClawdHookCommand(command) {
+function isDeskBuddyHookCommand(command) {
   if (typeof command !== "string") return false;
   if (command.includes(MARKER)) return true;
   // Windows commands are wrapped as PowerShell -EncodedCommand, so the marker
@@ -47,7 +47,7 @@ function isClawdHookCommand(command) {
 function buildQoderHookEntry(command) {
   return {
     matcher: "*",
-    hooks: [{ name: "clawd", type: "command", command }],
+    hooks: [{ name: "deskbuddy", type: "command", command }],
   };
 }
 
@@ -76,7 +76,7 @@ function isDesiredQoderHookEntry(entry, desiredCommand) {
     && Array.isArray(entry.hooks)
     && entry.hooks.length === 1
     && entry.hooks[0]
-    && entry.hooks[0].name === "clawd"
+    && entry.hooks[0].name === "deskbuddy"
     && entry.hooks[0].type === "command"
     && entry.hooks[0].command === desiredCommand
   );
@@ -93,8 +93,8 @@ function normalizeQoderHookEntries(entries, desiredCommand) {
     const entry = entries[index];
     if (!entry || typeof entry !== "object") continue;
 
-    // Legacy flat Clawd entry ({ command }) — normalize into the nested shape.
-    if (isClawdHookCommand(entry.command)) {
+    // Legacy flat DeskBuddy entry ({ command }) — normalize into the nested shape.
+    if (isDeskBuddyHookCommand(entry.command)) {
       matched = true;
       if (dedicatedIndex === -1) {
         replaceEntry(entry, buildQoderHookEntry(desiredCommand));
@@ -110,18 +110,18 @@ function normalizeQoderHookEntries(entries, desiredCommand) {
 
     if (!Array.isArray(entry.hooks)) continue;
     const otherHooks = [];
-    let clawdHookCount = 0;
+    let deskbuddyHookCount = 0;
     for (const hook of entry.hooks) {
-      if (hook && isClawdHookCommand(hook.command)) {
-        clawdHookCount++;
+      if (hook && isDeskBuddyHookCommand(hook.command)) {
+        deskbuddyHookCount++;
       } else {
         otherHooks.push(hook);
       }
     }
-    if (clawdHookCount === 0) continue;
+    if (deskbuddyHookCount === 0) continue;
 
     matched = true;
-    // The entry mixes a Clawd hook with user hooks — strip ours, keep theirs.
+    // The entry mixes a DeskBuddy hook with user hooks — strip ours, keep theirs.
     if (otherHooks.length > 0) {
       entry.hooks = otherHooks;
       changed = true;
@@ -157,32 +157,32 @@ function normalizeQoderHookEntries(entries, desiredCommand) {
   return { matched: true, changed };
 }
 
-// Qoder's `hooksConfig.disabled` list can name a hook group by id ("clawd") or
-// by raw command. Collapse Clawd command references into the "clawd" id and
+// Qoder's `hooksConfig.disabled` list can name a hook group by id ("deskbuddy") or
+// by raw command. Collapse DeskBuddy command references into the "deskbuddy" id and
 // de-duplicate so Doctor can reliably see whether our group is disabled.
 function normalizeQoderDisabledHooks(settings) {
   const hooksConfig = settings && typeof settings === "object" ? settings.hooksConfig : null;
   if (!hooksConfig || typeof hooksConfig !== "object" || !Array.isArray(hooksConfig.disabled)) return false;
 
   let changed = false;
-  let sawClawd = false;
+  let sawDeskBuddy = false;
   const nextDisabled = [];
 
   for (const entry of hooksConfig.disabled) {
-    if (entry === "clawd") {
-      if (sawClawd) {
+    if (entry === "deskbuddy") {
+      if (sawDeskBuddy) {
         changed = true;
         continue;
       }
-      sawClawd = true;
+      sawDeskBuddy = true;
       nextDisabled.push(entry);
       continue;
     }
 
-    if (isClawdHookCommand(entry)) {
-      if (!sawClawd) {
-        nextDisabled.push("clawd");
-        sawClawd = true;
+    if (isDeskBuddyHookCommand(entry)) {
+      if (!sawDeskBuddy) {
+        nextDisabled.push("deskbuddy");
+        sawDeskBuddy = true;
       }
       changed = true;
       continue;
@@ -205,7 +205,7 @@ function readSettings(settingsPath) {
 }
 
 /**
- * Register Clawd hooks into ~/.qoder/settings.json
+ * Register DeskBuddy hooks into ~/.qoder/settings.json
  * @param {object} [options]
  * @param {boolean} [options.silent]
  * @param {string} [options.settingsPath]
@@ -221,7 +221,7 @@ function registerQoderHooks(options = {}) {
   // Skip if ~/.qoder/ doesn't exist (Qoder not installed / not initialized).
   const qoderDir = path.dirname(settingsPath);
   if (!options.settingsPath && !fs.existsSync(qoderDir)) {
-    if (!options.silent) console.log("Clawd: ~/.qoder/ not found — skipping Qoder hook registration");
+    if (!options.silent) console.log("DeskBuddy: ~/.qoder/ not found — skipping Qoder hook registration");
     return { added: 0, skipped: 0, updated: 0 };
   }
 
@@ -268,7 +268,7 @@ function registerQoderHooks(options = {}) {
   if (changed) writeJsonAtomic(settingsPath, settings);
 
   if (!options.silent) {
-    console.log(`Clawd Qoder hooks → ${settingsPath}`);
+    console.log(`DeskBuddy Qoder hooks → ${settingsPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
   }
 
@@ -276,7 +276,7 @@ function registerQoderHooks(options = {}) {
 }
 
 /**
- * Remove Clawd hook entries from ~/.qoder/settings.json
+ * Remove DeskBuddy hook entries from ~/.qoder/settings.json
  * @param {object} [options]
  * @param {boolean} [options.silent]
  * @param {string} [options.settingsPath]
@@ -311,7 +311,7 @@ function unregisterQoderHooks(options = {}) {
         continue;
       }
       // Flat command format.
-      if (isClawdHookCommand(entry.command)) {
+      if (isDeskBuddyHookCommand(entry.command)) {
         removed++;
         changed = true;
         continue;
@@ -319,7 +319,7 @@ function unregisterQoderHooks(options = {}) {
       // Nested hooks format.
       if (Array.isArray(entry.hooks)) {
         const otherHooks = entry.hooks.filter(
-          (hook) => !(hook && typeof hook === "object" && isClawdHookCommand(hook.command))
+          (hook) => !(hook && typeof hook === "object" && isDeskBuddyHookCommand(hook.command))
         );
         removed += entry.hooks.length - otherHooks.length;
         if (otherHooks.length !== entry.hooks.length) {
@@ -338,7 +338,7 @@ function unregisterQoderHooks(options = {}) {
   }
 
   if (changed) writeJsonAtomic(settingsPath, settings);
-  if (!options.silent) console.log(`Clawd Qoder hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Qoder hooks removed: ${removed}`);
   return { removed };
 }
 

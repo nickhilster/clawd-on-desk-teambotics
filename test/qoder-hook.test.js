@@ -23,7 +23,7 @@ describe("Qoder hook runtime (Phase 1 state-only)", () => {
     assert.strictEqual(HOOK_MAP.PermissionRequest.state, "notification");
     assert.strictEqual(HOOK_MAP.PermissionDenied.state, "notification");
     assert.strictEqual(HOOK_MAP.Notification.state, "notification");
-    // P1-b: permission events ride the Clawd Notification event so state.js's
+    // P1-b: permission events ride the DeskBuddy Notification event so state.js's
     // per-agent notification mute gate applies and bookkeeping is consistent.
     assert.strictEqual(HOOK_MAP.PermissionRequest.event, "Notification");
     assert.strictEqual(HOOK_MAP.PermissionDenied.event, "Notification");
@@ -121,7 +121,7 @@ describe("Qoder hook runtime (Phase 1 state-only)", () => {
       assert.strictEqual(result.stdout, "{}");
     }
     assert.deepStrictEqual(posted.map((b) => b.state), ["notification", "notification"]);
-    // P1-b: posted as Clawd Notification events (not PermissionRequest/Denied)
+    // P1-b: posted as DeskBuddy Notification events (not PermissionRequest/Denied)
     // so the wait-for-input mute toggle and notification gate take effect.
     assert.deepStrictEqual(posted.map((b) => b.event), ["Notification", "Notification"]);
   });

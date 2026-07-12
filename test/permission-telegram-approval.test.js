@@ -361,7 +361,7 @@ describe("permission telegram remote approval", () => {
     };
     const perm = initPermission(makeCtx({ getTelegramApprovalClient: () => client }));
     // Bare Bash payload — only `command`. Local bubble shows the full command
-    // but Telegram would only get "Tool input hidden by Clawd.", so the guard
+    // but Telegram would only get "Tool input hidden by DeskBuddy.", so the guard
     // must refuse to send.
     const entry = makePermEntry({
       toolInput: { command: "rm -rf /tmp/scratch" },

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Clawd on Desk — CodeWhale Hook Script
+// DeskBuddy — CodeWhale Hook Script
 //
 // Invoked by CodeWhale lifecycle hooks ([[hooks.hooks]] in config.toml).
 // CodeWhale passes context via environment variables:
@@ -30,7 +30,7 @@ const HOOK_SOURCE = "codewhale-hook";
 // ── Stable Session ID Cache ───────────────────────────────────────────────────
 // Some events (e.g. mode_change) may fire without DEEPSEEK_SESSION_ID set.
 // We cache the last known session id so all events for the same codewhale
-// instance map to the same Clawd session, preventing duplicate HUD labels.
+// instance map to the same DeskBuddy session, preventing duplicate HUD labels.
 const SESSION_CACHE = path.join(os.tmpdir(), "codewhale-hook-session");
 
 function readCachedSessionId(cachePath = SESSION_CACHE) {
@@ -50,7 +50,7 @@ function clearCachedSessionId(cachePath = SESSION_CACHE) {
 }
 
 // ── Event Translation ────────────────────────────────────────────────────────
-// CodeWhale snake_case lifecycle events → Clawd PascalCase + state.
+// CodeWhale snake_case lifecycle events → DeskBuddy PascalCase + state.
 
 const EVENT_MAP = {
   session_start: { event: "SessionStart", state: "idle" },
@@ -93,7 +93,7 @@ function buildPayload(codewhaleEventName, env, options = {}) {
 
   // Stable session id: use DEEPSEEK_SESSION_ID when available, fall back to
   // cached value so events like mode_change (which may lack the env var) still
-  // map to the same Clawd session instead of creating duplicate labels.
+  // map to the same DeskBuddy session instead of creating duplicate labels.
   let sessionId = safeString(env.DEEPSEEK_SESSION_ID, null) || readSession();
   if (!sessionId) {
     sessionId = `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -108,7 +108,7 @@ function buildPayload(codewhaleEventName, env, options = {}) {
     session_id: `${AGENT_ID}:${sessionId}`,
   };
 
-  // Workspace → cwd (for session menu label in Clawd)
+  // Workspace → cwd (for session menu label in DeskBuddy)
   const workspace = safeString(env.DEEPSEEK_WORKSPACE, "");
   if (workspace) {
     payload.cwd = workspace;

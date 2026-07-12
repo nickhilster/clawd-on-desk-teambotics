@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Merge Clawd Cursor Agent hooks into ~/.cursor/hooks.json (append-only, idempotent)
+// Merge DeskBuddy Cursor Agent hooks into ~/.cursor/hooks.json (append-only, idempotent)
 
 const fs = require("fs");
 const path = require("path");
@@ -43,7 +43,7 @@ function buildCursorHookCommand(nodeBin, hookScript, platform = process.platform
 }
 
 /**
- * Register Clawd hooks into ~/.cursor/hooks.json
+ * Register DeskBuddy hooks into ~/.cursor/hooks.json
  * @param {object} [options]
  * @param {boolean} [options.silent]
  * @param {string} [options.hooksPath]
@@ -134,7 +134,7 @@ function registerCursorHooks(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Cursor hooks → ${hooksPath}`);
+    console.log(`DeskBuddy Cursor hooks → ${hooksPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
   }
 
@@ -172,7 +172,7 @@ function unregisterCursorHooks(options = {}) {
 
   let backupPath = null;
   if (changed) backupPath = writeJsonAtomicWithBackup(hooksPath, settings, options);
-  if (!options.silent) console.log(`Clawd Cursor hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Cursor hooks removed: ${removed}`);
   const result = { removed, changed, hooksPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;

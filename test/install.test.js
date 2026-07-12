@@ -26,13 +26,13 @@ const {
   readClaudeVersionFallback,
   readClaudeVersionFallbackAsync,
   getClaudeVersionAsync,
-  isClawdPermissionUrl,
+  isDeskBuddyPermissionUrl,
 } = __test;
 
 const tempDirs = [];
 
 function makeTempSettings(initialSettings = {}) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-install-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-install-"));
   const settingsPath = path.join(tmpDir, "settings.json");
   fs.writeFileSync(settingsPath, JSON.stringify(initialSettings, null, 2), "utf8");
   tempDirs.push(tmpDir);
@@ -62,8 +62,8 @@ function getCommandHookEntries(settings, event, marker) {
   return hooks;
 }
 
-function getClawdCommands(settings, event) {
-  return getCommandHookEntries(settings, event, "clawd-hook.js").map((hook) => hook.command);
+function getDeskBuddyCommands(settings, event) {
+  return getCommandHookEntries(settings, event, "deskbuddy-hook.js").map((hook) => hook.command);
 }
 
 function getHttpUrls(settings, event) {
@@ -571,7 +571,7 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const stopHooks = getCommandHookEntries(settings, "Stop", "clawd-hook.js");
+    const stopHooks = getCommandHookEntries(settings, "Stop", "deskbuddy-hook.js");
     assert.strictEqual(stopHooks.length, 1);
     assert.strictEqual(stopHooks[0].shell, "powershell");
     assert.strictEqual(stopHooks[0].async, true);
@@ -581,14 +581,14 @@ describe("Hook installer version compatibility", () => {
   });
 
   it("keeps remote hooks on the legacy bash-compatible format", () => {
-    const hook = __test.buildCommandHookSpec("node", "/tmp/clawd-hook.js", "Stop", {
+    const hook = __test.buildCommandHookSpec("node", "/tmp/deskbuddy-hook.js", "Stop", {
       platform: "win32",
       remote: true,
     });
 
     assert.deepStrictEqual(hook, {
       type: "command",
-      command: 'CLAWD_REMOTE=1 "node" "/tmp/clawd-hook.js" Stop',
+      command: 'DESKBUDDY_REMOTE=1 "node" "/tmp/deskbuddy-hook.js" Stop',
     });
   });
 
@@ -603,9 +603,9 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const stopHooks = getCommandHookEntries(settings, "Stop", "clawd-hook.js");
+    const stopHooks = getCommandHookEntries(settings, "Stop", "deskbuddy-hook.js");
     assert.strictEqual(stopHooks.length, 1);
-    assert.ok(stopHooks[0].command.startsWith('CLAWD_REMOTE=1 "/usr/bin/node" "'), stopHooks[0].command);
+    assert.ok(stopHooks[0].command.startsWith('DESKBUDDY_REMOTE=1 "/usr/bin/node" "'), stopHooks[0].command);
     assert.strictEqual(stopHooks[0].async, true);
     assert.strictEqual(stopHooks[0].timeout, 10);
     assert.ok(!Object.prototype.hasOwnProperty.call(stopHooks[0], "shell"));
@@ -622,7 +622,7 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const stopHooks = getCommandHookEntries(settings, "Stop", "clawd-hook.js");
+    const stopHooks = getCommandHookEntries(settings, "Stop", "deskbuddy-hook.js");
     assert.strictEqual(stopHooks.length, 1);
     assert.ok(!Object.prototype.hasOwnProperty.call(stopHooks[0], "shell"));
     assert.strictEqual(stopHooks[0].async, true);
@@ -640,7 +640,7 @@ describe("Hook installer version compatibility", () => {
 
     const settings = readSettings(settingsPath);
     assert.ok(Array.isArray(settings.hooks.StopFailure));
-    assert.deepStrictEqual(getClawdCommands(settings, "StopFailure").length, 1);
+    assert.deepStrictEqual(getDeskBuddyCommands(settings, "StopFailure").length, 1);
     assert.strictEqual(result.versionStatus, "known");
     assert.strictEqual(result.version, "2.1.78");
   });
@@ -674,13 +674,13 @@ describe("Hook installer version compatibility", () => {
     assert.strictEqual(result.versionStatus, "unknown");
   });
 
-  it("removes stale Clawd StopFailure hooks while preserving third-party entries when version is known too old", () => {
+  it("removes stale DeskBuddy StopFailure hooks while preserving third-party entries when version is known too old", () => {
     const settingsPath = makeTempSettings({
       hooks: {
         StopFailure: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" StopFailure' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" StopFailure' }],
           },
         ],
         PostCompact: [],
@@ -713,7 +713,7 @@ describe("Hook installer version compatibility", () => {
         StopFailure: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" StopFailure' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" StopFailure' }],
           },
         ],
       },
@@ -727,7 +727,7 @@ describe("Hook installer version compatibility", () => {
 
     const settings = readSettings(settingsPath);
     assert.ok(Array.isArray(settings.hooks.StopFailure));
-    assert.strictEqual(getClawdCommands(settings, "StopFailure").length, 1);
+    assert.strictEqual(getDeskBuddyCommands(settings, "StopFailure").length, 1);
     assert.strictEqual(result.removed, 0);
   });
 
@@ -737,7 +737,7 @@ describe("Hook installer version compatibility", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/old/path/clawd-hook.js" Stop' }],
+            hooks: [{ type: "command", command: 'node "/old/path/deskbuddy-hook.js" Stop' }],
           },
         ],
       },
@@ -750,10 +750,10 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const commands = getClawdCommands(settings, "Stop");
+    const commands = getDeskBuddyCommands(settings, "Stop");
     assert.strictEqual(result.updated, 1);
     assert.strictEqual(commands.length, 1);
-    assert.ok(commands[0].includes('hooks/clawd-hook.js'));
+    assert.ok(commands[0].includes('hooks/deskbuddy-hook.js'));
     assert.ok(!commands[0].includes('/old/path/'));
   });
 
@@ -763,7 +763,7 @@ describe("Hook installer version compatibility", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: '"node" "/old/path/clawd-hook.js" Stop' }],
+            hooks: [{ type: "command", command: '"node" "/old/path/deskbuddy-hook.js" Stop' }],
           },
         ],
       },
@@ -778,7 +778,7 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const stopHooks = getCommandHookEntries(settings, "Stop", "clawd-hook.js");
+    const stopHooks = getCommandHookEntries(settings, "Stop", "deskbuddy-hook.js");
     assert.strictEqual(result.updated, 1);
     assert.strictEqual(stopHooks.length, 1);
     assert.strictEqual(stopHooks[0].shell, "powershell");
@@ -795,7 +795,7 @@ describe("Hook installer version compatibility", () => {
             hooks: [{
               type: "command",
               shell: "powershell",
-              command: '& "node" "/old/path/clawd-hook.js" Stop',
+              command: '& "node" "/old/path/deskbuddy-hook.js" Stop',
             }],
           },
         ],
@@ -811,7 +811,7 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const stopHooks = getCommandHookEntries(settings, "Stop", "clawd-hook.js");
+    const stopHooks = getCommandHookEntries(settings, "Stop", "deskbuddy-hook.js");
     assert.strictEqual(result.updated, 1);
     assert.strictEqual(stopHooks.length, 1);
     assert.ok(!Object.prototype.hasOwnProperty.call(stopHooks[0], "shell"));
@@ -858,7 +858,7 @@ describe("Hook installer version compatibility", () => {
     assert.strictEqual(second.updated, 0);
 
     const settings = readSettings(settingsPath);
-    const stopHooks = getCommandHookEntries(settings, "Stop", "clawd-hook.js");
+    const stopHooks = getCommandHookEntries(settings, "Stop", "deskbuddy-hook.js");
     assert.strictEqual(stopHooks.length, 1);
     assert.strictEqual(stopHooks[0].shell, "powershell");
     assert.ok(stopHooks[0].command.startsWith("& "), stopHooks[0].command);
@@ -871,7 +871,7 @@ describe("Hook installer version compatibility", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: `"${existingAbsPath}" "/app/hooks/clawd-hook.js" Stop` }],
+            hooks: [{ type: "command", command: `"${existingAbsPath}" "/app/hooks/deskbuddy-hook.js" Stop` }],
           },
         ],
       },
@@ -886,7 +886,7 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const commands = getClawdCommands(settings, "Stop");
+    const commands = getDeskBuddyCommands(settings, "Stop");
     assert.strictEqual(commands.length, 1);
     // Must still contain the original absolute nvm path, NOT bare "node"
     assert.ok(commands[0].includes(existingAbsPath), `expected ${existingAbsPath} in: ${commands[0]}`);
@@ -907,7 +907,7 @@ describe("Hook installer version compatibility", () => {
             hooks: [{
               type: "command",
               shell: "powershell",
-              command: `& "${existingWinPath}" "C:/app/hooks/clawd-hook.js" Stop`,
+              command: `& "${existingWinPath}" "C:/app/hooks/deskbuddy-hook.js" Stop`,
             }],
           },
         ],
@@ -923,7 +923,7 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const commands = getClawdCommands(settings, "Stop");
+    const commands = getDeskBuddyCommands(settings, "Stop");
     assert.strictEqual(commands.length, 1);
     assert.ok(commands[0].includes(existingWinPath), `expected ${existingWinPath} in: ${commands[0]}`);
     assert.ok(!commands[0].includes('& "node"'), "should not downgrade to bare node");
@@ -1008,7 +1008,7 @@ describe("Hook installer version compatibility", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ command: `"${existingAbsPath}" "/app/hooks/clawd-hook.js" Stop` }],
+            hooks: [{ command: `"${existingAbsPath}" "/app/hooks/deskbuddy-hook.js" Stop` }],
           },
         ],
       },
@@ -1022,7 +1022,7 @@ describe("Hook installer version compatibility", () => {
     });
 
     const settings = readSettings(settingsPath);
-    const stopHooks = getCommandHookEntries(settings, "Stop", "clawd-hook.js");
+    const stopHooks = getCommandHookEntries(settings, "Stop", "deskbuddy-hook.js");
     assert.ok(result.updated >= 1);
     assert.strictEqual(stopHooks.length, 1);
     assert.strictEqual(stopHooks[0].type, "command");
@@ -1154,26 +1154,26 @@ describe("Hook installer version compatibility", () => {
 });
 
 describe("Claude permission hook ownership", () => {
-  it("recognizes only exact Clawd PermissionRequest URLs on managed ports", () => {
+  it("recognizes only exact DeskBuddy PermissionRequest URLs on managed ports", () => {
     for (const port of SERVER_PORTS) {
       assert.strictEqual(
-        isClawdPermissionUrl(`http://127.0.0.1:${port}/permission`),
+        isDeskBuddyPermissionUrl(`http://127.0.0.1:${port}/permission`),
         true,
-        `expected managed port ${port} to be Clawd-owned`
+        `expected managed port ${port} to be DeskBuddy-owned`
       );
     }
 
-    assert.strictEqual(isClawdPermissionUrl("http://127.0.0.1:8080/permission"), false);
-    assert.strictEqual(isClawdPermissionUrl("http://localhost:23333/permission"), false);
-    assert.strictEqual(isClawdPermissionUrl("https://127.0.0.1:23333/permission"), false);
-    assert.strictEqual(isClawdPermissionUrl("http://127.0.0.1:23333/permission?x=1"), false);
-    assert.strictEqual(isClawdPermissionUrl("http://127.0.0.1:23333/permission#frag"), false);
-    assert.strictEqual(isClawdPermissionUrl("http://user@127.0.0.1:23333/permission"), false);
-    assert.strictEqual(isClawdPermissionUrl("http://127.0.0.1/permission"), false);
+    assert.strictEqual(isDeskBuddyPermissionUrl("http://127.0.0.1:8080/permission"), false);
+    assert.strictEqual(isDeskBuddyPermissionUrl("http://localhost:23333/permission"), false);
+    assert.strictEqual(isDeskBuddyPermissionUrl("https://127.0.0.1:23333/permission"), false);
+    assert.strictEqual(isDeskBuddyPermissionUrl("http://127.0.0.1:23333/permission?x=1"), false);
+    assert.strictEqual(isDeskBuddyPermissionUrl("http://127.0.0.1:23333/permission#frag"), false);
+    assert.strictEqual(isDeskBuddyPermissionUrl("http://user@127.0.0.1:23333/permission"), false);
+    assert.strictEqual(isDeskBuddyPermissionUrl("http://127.0.0.1/permission"), false);
   });
 
-  it("preserves third-party local PermissionRequest URLs while adding Clawd HTTP hook", () => {
-    const clawdUrl = buildPermissionUrl(SERVER_PORTS[0]);
+  it("preserves third-party local PermissionRequest URLs while adding DeskBuddy HTTP hook", () => {
+    const deskbuddyUrl = buildPermissionUrl(SERVER_PORTS[0]);
     const settingsPath = makeTempSettings({
       hooks: {
         PermissionRequest: [
@@ -1200,11 +1200,11 @@ describe("Claude permission hook ownership", () => {
     assert.deepStrictEqual(getHttpUrls(settings, "PermissionRequest"), [
       "http://127.0.0.1:8080/permission",
       "http://localhost:8080/permission",
-      clawdUrl,
+      deskbuddyUrl,
     ]);
   });
 
-  it("updates stale Clawd PermissionRequest URLs on managed fallback ports", () => {
+  it("updates stale DeskBuddy PermissionRequest URLs on managed fallback ports", () => {
     const expectedUrl = buildPermissionUrl(SERVER_PORTS[0]);
     const staleUrl = buildPermissionUrl(SERVER_PORTS[SERVER_PORTS.length - 1]);
     const settingsPath = makeTempSettings({
@@ -1250,13 +1250,13 @@ describe("Hook installer deprecated hook cleanup", () => {
     );
   });
 
-  it("removes stale Clawd WorktreeCreate hook while preserving user-authored entries", () => {
+  it("removes stale DeskBuddy WorktreeCreate hook while preserving user-authored entries", () => {
     const settingsPath = makeTempSettings({
       hooks: {
         WorktreeCreate: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" WorktreeCreate' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" WorktreeCreate' }],
           },
           {
             matcher: "",
@@ -1279,17 +1279,17 @@ describe("Hook installer deprecated hook cleanup", () => {
       settings.hooks.WorktreeCreate[0].hooks[0].command,
       'node "/tmp/user-worktree.js" WorktreeCreate'
     );
-    assert.strictEqual(getClawdCommands(settings, "WorktreeCreate").length, 0);
+    assert.strictEqual(getDeskBuddyCommands(settings, "WorktreeCreate").length, 0);
     assert.ok(result.removed >= 1);
   });
 
-  it("deletes WorktreeCreate key when the only entry was the Clawd hook", () => {
+  it("deletes WorktreeCreate key when the only entry was the DeskBuddy hook", () => {
     const settingsPath = makeTempSettings({
       hooks: {
         WorktreeCreate: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" WorktreeCreate' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" WorktreeCreate' }],
           },
         ],
       },
@@ -1307,7 +1307,7 @@ describe("Hook installer deprecated hook cleanup", () => {
 });
 
 describe("Hook installer unregisterHooks", () => {
-  it("removes Clawd command hooks, HTTP hook, and auto-start while preserving third-party hooks", () => {
+  it("removes DeskBuddy command hooks, HTTP hook, and auto-start while preserving third-party hooks", () => {
     const settingsPath = makeTempSettings({
       hooks: {
         SessionStart: [
@@ -1317,7 +1317,7 @@ describe("Hook installer unregisterHooks", () => {
           },
           {
             matcher: "",
-            hooks: [{ type: "command", shell: "powershell", command: '& "node" "/tmp/clawd-hook.js" SessionStart' }],
+            hooks: [{ type: "command", shell: "powershell", command: '& "node" "/tmp/deskbuddy-hook.js" SessionStart' }],
           },
           {
             matcher: "",
@@ -1327,7 +1327,7 @@ describe("Hook installer unregisterHooks", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", shell: "powershell", command: '& "node" "/tmp/clawd-hook.js" Stop' }],
+            hooks: [{ type: "command", shell: "powershell", command: '& "node" "/tmp/deskbuddy-hook.js" Stop' }],
           },
         ],
         PermissionRequest: [
@@ -1351,8 +1351,8 @@ describe("Hook installer unregisterHooks", () => {
     const settings = readSettings(settingsPath);
 
     assert.deepStrictEqual(result, { removed: 4, changed: true });
-    assert.deepStrictEqual(getClawdCommands(settings, "SessionStart"), []);
-    assert.deepStrictEqual(getClawdCommands(settings, "Stop"), []);
+    assert.deepStrictEqual(getDeskBuddyCommands(settings, "SessionStart"), []);
+    assert.deepStrictEqual(getDeskBuddyCommands(settings, "Stop"), []);
     assert.deepStrictEqual(
       settings.hooks.SessionStart[0].hooks[0].command,
       'node "/tmp/third-party.js" SessionStart'
@@ -1364,7 +1364,7 @@ describe("Hook installer unregisterHooks", () => {
     assert.ok(!Object.prototype.hasOwnProperty.call(settings.hooks, "Stop"));
   });
 
-  it("keeps third-party PermissionRequest hooks when no Clawd HTTP hook is present", () => {
+  it("keeps third-party PermissionRequest hooks when no DeskBuddy HTTP hook is present", () => {
     const settingsPath = makeTempSettings({
       hooks: {
         PermissionRequest: [
@@ -1390,7 +1390,7 @@ describe("Hook installer unregisterHooks", () => {
     ]);
   });
 
-  it("recognizes stale Clawd PermissionRequest URLs on any managed port", () => {
+  it("recognizes stale DeskBuddy PermissionRequest URLs on any managed port", () => {
     const settingsPath = makeTempSettings({
       hooks: {
         PermissionRequest: [
@@ -1415,7 +1415,7 @@ describe("Hook installer unregisterHooks", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" Stop' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' }],
           },
         ],
       },
@@ -1428,13 +1428,13 @@ describe("Hook installer unregisterHooks", () => {
     assert.deepStrictEqual(second, { removed: 0, changed: false });
   });
 
-  it("keeps empty hooks object when every Clawd entry is removed", () => {
+  it("keeps empty hooks object when every DeskBuddy entry is removed", () => {
     const settingsPath = makeTempSettings({
       hooks: {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" Stop' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' }],
           },
         ],
       },
@@ -1455,7 +1455,7 @@ describe("async hook installer parity", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: `"${existingAbsPath}" "/app/hooks/clawd-hook.js" Stop` }],
+            hooks: [{ type: "command", command: `"${existingAbsPath}" "/app/hooks/deskbuddy-hook.js" Stop` }],
           },
         ],
       },
@@ -1482,7 +1482,7 @@ describe("async hook installer parity", () => {
       },
     });
 
-    const commands = getClawdCommands(readSettings(settingsPath), "Stop");
+    const commands = getDeskBuddyCommands(readSettings(settingsPath), "Stop");
     assert.ok(commands.some((command) => command.includes(existingAbsPath)), commands.join("\n"));
   });
 
@@ -1512,7 +1512,7 @@ describe("async hook installer parity", () => {
       },
     });
 
-    const commands = getClawdCommands(readSettings(settingsPath), "Stop");
+    const commands = getDeskBuddyCommands(readSettings(settingsPath), "Stop");
     assert.ok(commands.some((command) => command.startsWith(`"${nodeBin}" "`)), commands.join("\n"));
   });
 
@@ -1545,7 +1545,7 @@ describe("async hook installer parity", () => {
   it("unregisterHooksAsync removes the same entries as unregisterHooks", async () => {
     const initial = {
       hooks: {
-        Stop: [{ matcher: "", hooks: [{ type: "command", command: '"/usr/bin/node" "/tmp/clawd-hook.js"' }] }],
+        Stop: [{ matcher: "", hooks: [{ type: "command", command: '"/usr/bin/node" "/tmp/deskbuddy-hook.js"' }] }],
         PermissionRequest: [{ matcher: "", hooks: [{ type: "http", url: "http://127.0.0.1:23333/permission" }] }],
       },
     };
@@ -1576,14 +1576,14 @@ describe("Hook installer settings backup", () => {
 
     assert.ok(result.backupPath, "should return a backupPath");
     assert.ok(fs.existsSync(result.backupPath), "backup file should exist on disk");
-    // Backup holds the ORIGINAL pre-install content (the user's own hook, no Clawd hooks).
+    // Backup holds the ORIGINAL pre-install content (the user's own hook, no DeskBuddy hooks).
     assert.deepStrictEqual(readSettings(result.backupPath), original);
-    // Live file was mutated (Clawd hooks added) and the user's hook is preserved.
-    assert.ok(getClawdCommands(readSettings(settingsPath), "Stop").length > 0, "Clawd hooks should be installed");
+    // Live file was mutated (DeskBuddy hooks added) and the user's hook is preserved.
+    assert.ok(getDeskBuddyCommands(readSettings(settingsPath), "Stop").length > 0, "DeskBuddy hooks should be installed");
   });
 
   it("does not back up when settings.json does not pre-exist", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-install-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-install-"));
     tempDirs.push(tmpDir);
     const settingsPath = path.join(tmpDir, "settings.json"); // intentionally absent
 
@@ -1613,7 +1613,7 @@ describe("Hook installer settings backup", () => {
 
   it("caps backups under repeated re-register instead of piling up unbounded", () => {
     // Simulates a CC-Switch style write war: an external tool keeps stripping
-    // Clawd's hooks from settings.json, the watcher keeps re-registering them.
+    // DeskBuddy's hooks from settings.json, the watcher keeps re-registering them.
     // Each real write snapshots the prior file, but the total must stay bounded.
     const thirdParty = { hooks: { Stop: [{ matcher: "", hooks: [{ type: "command", command: "user-own-hook" }] }] } };
     const settingsPath = makeTempSettings(thirdParty);
@@ -1621,7 +1621,7 @@ describe("Hook installer settings backup", () => {
     const countBaks = () => fs.readdirSync(dir).filter((n) => n.endsWith(".bak")).length;
 
     for (let i = 0; i < 8; i++) {
-      // External tool overwrites settings.json back to third-party-only (drops Clawd hooks).
+      // External tool overwrites settings.json back to third-party-only (drops DeskBuddy hooks).
       fs.writeFileSync(settingsPath, JSON.stringify(thirdParty, null, 2), "utf-8");
       const result = registerHooks({ silent: true, settingsPath, claudeVersionInfo: versionInfo, backupKeep: 3 });
       assert.ok(result.backupPath, "each re-register over an existing file should back up");
@@ -1631,8 +1631,8 @@ describe("Hook installer settings backup", () => {
     }
 
     assert.strictEqual(countBaks(), 3, `backups must stay capped at backupKeep, found ${countBaks()}`);
-    // The live file still has Clawd's hooks plus the user's own hook preserved.
-    assert.ok(getClawdCommands(readSettings(settingsPath), "Stop").length > 0, "Clawd hooks still installed");
+    // The live file still has DeskBuddy's hooks plus the user's own hook preserved.
+    assert.ok(getDeskBuddyCommands(readSettings(settingsPath), "Stop").length > 0, "DeskBuddy hooks still installed");
   });
 });
 
@@ -1739,7 +1739,7 @@ describe("Claude Code statusline installer", () => {
   });
 
   it("registers into a UTF-8-BOM'd settings.json instead of throwing (Notepad's default save format)", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-install-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-install-"));
     const settingsPath = path.join(tmpDir, "settings.json");
     fs.writeFileSync(settingsPath, "﻿" + JSON.stringify({ model: "opus" }), "utf8");
     tempDirs.push(tmpDir);
@@ -1765,7 +1765,7 @@ describe("Claude Code statusline installer", () => {
     assert.strictEqual(readSettings(settingsPath).statusLine, undefined);
   });
 
-  it("unregister removes only a Clawd-owned statusline", () => {
+  it("unregister removes only a DeskBuddy-owned statusline", () => {
     const settingsPath = makeTempSettings({});
     registerClaudeStatusline({ silent: true, settingsPath, nodeBin: "/usr/local/bin/node" });
 

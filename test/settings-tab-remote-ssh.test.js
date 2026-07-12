@@ -12,8 +12,8 @@ const { SUPPORTED_LANGS } = require("../src/i18n");
 
 test("settings-tab-remote-ssh.js loads in a sandbox via the same IIFE pattern as siblings", () => {
   const code = fs.readFileSync(path.join(SRC_DIR, "settings-tab-remote-ssh.js"), "utf8");
-  // IIFE registration check — must call ClawdSettingsTabRemoteSsh = { init }.
-  assert.match(code, /root\.ClawdSettingsTabRemoteSsh\s*=\s*\{\s*init\s*\}/);
+  // IIFE registration check — must call DeskBuddySettingsTabRemoteSsh = { init }.
+  assert.match(code, /root\.DeskBuddySettingsTabRemoteSsh\s*=\s*\{\s*init\s*\}/);
   // Must register itself in core.tabs["remote-ssh"].
   assert.match(code, /core\.tabs\["remote-ssh"\]\s*=\s*\{\s*render\s*\}/);
 });
@@ -195,7 +195,7 @@ test("settings-i18n.js: hooks deploy status keys present in every supported lang
 
 test("settings-tab-remote-ssh.js can be evaluated without DOM (no top-level DOM access)", () => {
   // Provide a minimal fake globalThis stand-in. The module only uses globalThis
-  // to register `ClawdSettingsTabRemoteSsh`; render() is what actually touches
+  // to register `DeskBuddySettingsTabRemoteSsh`; render() is what actually touches
   // the DOM, and we don't call it here.
   const code = fs.readFileSync(path.join(SRC_DIR, "settings-tab-remote-ssh.js"), "utf8");
   const sandbox = { globalThis: undefined };
@@ -203,6 +203,6 @@ test("settings-tab-remote-ssh.js can be evaluated without DOM (no top-level DOM 
   // eslint-disable-next-line no-new-func
   const fn = new Function("globalThis", "crypto", "window", code);
   fn(sandbox.globalThis, undefined, undefined);
-  assert.ok(sandbox.globalThis.ClawdSettingsTabRemoteSsh, "tab module must register on globalThis");
-  assert.equal(typeof sandbox.globalThis.ClawdSettingsTabRemoteSsh.init, "function");
+  assert.ok(sandbox.globalThis.DeskBuddySettingsTabRemoteSsh, "tab module must register on globalThis");
+  assert.equal(typeof sandbox.globalThis.DeskBuddySettingsTabRemoteSsh.init, "function");
 });

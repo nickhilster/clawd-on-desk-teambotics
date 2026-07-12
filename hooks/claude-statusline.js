@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Clawd - Claude Code statusline adapter.
+// DeskBuddy - Claude Code statusline adapter.
 // Registered as `statusLine.command` in ~/.claude/settings.json by
 // hooks/install.js (registerClaudeStatusline). Claude Code pipes a JSON
 // telemetry payload (model, workspace, context_window, rate_limits, etc.)
@@ -89,7 +89,7 @@ async function main(deps = {}) {
   }
 
   try {
-    const remote = !!env.CLAWD_REMOTE;
+    const remote = !!env.DESKBUDDY_REMOTE;
     const body = buildStateBody(payload, quota, {
       remote,
       host: remote && deps.readHostPrefix ? deps.readHostPrefix() : undefined,

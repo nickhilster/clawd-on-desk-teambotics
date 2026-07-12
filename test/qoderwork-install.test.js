@@ -14,7 +14,7 @@ const { decodeWindowsEncodedCommand } = require("../hooks/json-utils");
 const tempDirs = [];
 
 function makeTempSettingsFile(initial = {}) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-qoderwork-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-qoderwork-"));
   const settingsPath = path.join(tmpDir, "settings.json");
   fs.writeFileSync(settingsPath, JSON.stringify(initial, null, 2), "utf8");
   tempDirs.push(tmpDir);
@@ -77,7 +77,7 @@ describe("QoderWork hook installer", () => {
       assert.strictEqual(entry.hooks.length, 1);
       const hook = entry.hooks[0];
       assert.strictEqual(hook.type, "command");
-      assert.strictEqual(hook.name, "clawd");
+      assert.strictEqual(hook.name, "deskbuddy");
       assert.ok(hook.command.includes(MARKER));
       assert.ok(hook.command.includes("/usr/local/bin/node"));
       assert.ok(hook.command.endsWith(`"${event}"`));
@@ -127,7 +127,7 @@ describe("QoderWork hook installer", () => {
     assert.ok(settings.hooks.SessionStart[1].hooks[0].command.includes(MARKER));
   });
 
-  it("normalizes a legacy flat clawd entry into the nested shape", () => {
+  it("normalizes a legacy flat deskbuddy entry into the nested shape", () => {
     const settingsPath = makeTempSettingsFile({
       hooks: { Stop: [{ matcher: "*", command: 'node "/old/path/qoderwork-hook.js" "Stop"' }] },
     });
@@ -138,11 +138,11 @@ describe("QoderWork hook installer", () => {
     const stop = readJson(settingsPath).hooks.Stop;
     assert.strictEqual(stop.length, 1);
     assert.ok(Array.isArray(stop[0].hooks));
-    assert.strictEqual(stop[0].hooks[0].name, "clawd");
+    assert.strictEqual(stop[0].hooks[0].name, "deskbuddy");
     assert.ok(stop[0].hooks[0].command.includes("/usr/local/bin/node"));
   });
 
-  it("collapses a disabled clawd command reference into the 'clawd' id", () => {
+  it("collapses a disabled deskbuddy command reference into the 'deskbuddy' id", () => {
     const settingsPath = makeTempSettingsFile({
       hooksConfig: { disabled: ['node "/x/qoderwork-hook.js" "Stop"', "user-hook"] },
     });
@@ -150,13 +150,13 @@ describe("QoderWork hook installer", () => {
     registerQoderWorkHooks({ silent: true, settingsPath, nodeBin: "/usr/local/bin/node", platform: "linux" });
 
     const disabled = readJson(settingsPath).hooksConfig.disabled;
-    assert.ok(disabled.includes("clawd"));
+    assert.ok(disabled.includes("deskbuddy"));
     assert.ok(disabled.includes("user-hook"));
     assert.ok(!disabled.some((e) => typeof e === "string" && e.includes("qoderwork-hook.js")));
   });
 
   it("skips when ~/.qoderwork/ does not exist", () => {
-    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-qoderwork-home-"));
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-qoderwork-home-"));
     tempDirs.push(fakeHome);
     const result = registerQoderWorkHooks({ silent: true, nodeBin: "/usr/local/bin/node", homeDir: fakeHome });
 
@@ -164,7 +164,7 @@ describe("QoderWork hook installer", () => {
     assert.strictEqual(fs.existsSync(path.join(fakeHome, ".qoderwork", "settings.json")), false);
   });
 
-  it("uninstall removes only clawd entries (incl. Windows-encoded) and keeps third-party", () => {
+  it("uninstall removes only deskbuddy entries (incl. Windows-encoded) and keeps third-party", () => {
     const settingsPath = makeTempSettingsFile({});
     // Install in the Windows-encoded form so uninstall must decode to detect the marker.
     registerQoderWorkHooks({ silent: true, settingsPath, nodeBin: "/usr/local/bin/node", platform: "win32" });
@@ -190,7 +190,7 @@ describe("QoderWork hook installer", () => {
         if (!entry || !entry.hooks) continue;
         for (const hook of entry.hooks) {
           const payload = commandPayload(hook.command || "");
-          assert.ok(!payload.includes(MARKER), `clawd entry found in ${event}: ${payload}`);
+          assert.ok(!payload.includes(MARKER), `deskbuddy entry found in ${event}: ${payload}`);
         }
       }
     }

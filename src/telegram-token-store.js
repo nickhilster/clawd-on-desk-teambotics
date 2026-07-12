@@ -2,10 +2,10 @@
 
 // Telegram bot token storage abstraction.
 //
-// Plan §298-304 invariant: the Clawd source must NEVER read the bot-token
+// Plan §298-304 invariant: the DeskBuddy source must NEVER read the bot-token
 // environment variable from the host process. The token lives only at
 // `userData/telegram-approval.env` (the same file the Go sidecar reads through
-// CLAWD_TG_BOT_TOKEN_FILE). This module exposes a TelegramTokenStore interface
+// DESKBUDDY_TG_BOT_TOKEN_FILE). This module exposes a TelegramTokenStore interface
 // so that callers (native client, sidecar bootstrap) take the store as a
 // dependency rather than touching the env file directly.
 //
@@ -16,7 +16,7 @@ const fsDefault = require("fs");
 const pathDefault = require("path");
 const { writeTokenEnvFile } = require("./telegram-approval-settings");
 
-const TOKEN_LINE_RE = /^\s*CLAWD_TG_BOT_TOKEN\s*=\s*(.+?)\s*$/m;
+const TOKEN_LINE_RE = /^\s*DESKBUDDY_TG_BOT_TOKEN\s*=\s*(.+?)\s*$/m;
 const BOT_TOKEN_RE = /^\d+:[A-Za-z0-9_-]{30,}$/;
 
 function isValidToken(value) {
@@ -32,7 +32,7 @@ function parseTokenFromEnvFileText(text) {
 }
 
 function buildEnvFileText(token) {
-  return `CLAWD_TG_BOT_TOKEN=${token}\n`;
+  return `DESKBUDDY_TG_BOT_TOKEN=${token}\n`;
 }
 
 // Factory: returns a store backed by the env file at `filePath`.

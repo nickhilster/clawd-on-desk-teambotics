@@ -61,8 +61,8 @@ describe("#406 state -> Telegram completion integration", () => {
     mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
     // Debounce is opt-in (default 0); these end-to-end cases exercise the
     // held -> promote flow, so turn it on explicitly.
-    savedDebounceEnv = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "1000";
+    savedDebounceEnv = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "1000";
     sent = [];
     const companion = createTelegramCompanion({
       getClient: () => ({
@@ -79,8 +79,8 @@ describe("#406 state -> Telegram completion integration", () => {
   afterEach(() => {
     api.cleanup();
     mock.timers.reset();
-    if (savedDebounceEnv === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
+    if (savedDebounceEnv === undefined) delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    else process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
   });
 
   it("a debounced Claude Stop pushes exactly one completion — after the window, not during the hold", async () => {

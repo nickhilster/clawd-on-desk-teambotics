@@ -55,15 +55,15 @@ describe("updateSession: Notification hook gate", () => {
   beforeEach(() => {
     // These tests exercise the Notification gate, not the #406 completion
     // debounce — disable the debounce so a Claude Stop settles immediately.
-    savedDebounceEnv = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    process.env.CLAWD_COMPLETION_DEBOUNCE_MS = "0";
+    savedDebounceEnv = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = "0";
   });
 
   afterEach(() => {
     if (api) api.cleanup();
     mock.timers.reset();
-    if (savedDebounceEnv === undefined) delete process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
-    else process.env.CLAWD_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
+    if (savedDebounceEnv === undefined) delete process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
+    else process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS = savedDebounceEnv;
   });
 
   it("mutes Notification bell + animation when the per-agent flag is off", () => {
@@ -215,10 +215,10 @@ describe("updateSession: Notification hook gate", () => {
 
   it("mutes Qoder state-only permission notifications when the per-agent flag is off", () => {
     // Qoder is state-only: hooks/qoder-hook.js maps its PermissionRequest /
-    // PermissionDenied events to a Clawd Notification event, so they ride this
+    // PermissionDenied events to a DeskBuddy Notification event, so they ride this
     // per-agent mute gate like any passive notification. This is the opposite
     // of a real permission agent (next test), whose PermissionRequest keeps its
-    // bell because Clawd actually answers that decision.
+    // bell because DeskBuddy actually answers that decision.
     mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
     ctx = makeCtx({ notificationHookEnabled: false });
     api = require("../src/state")(ctx);

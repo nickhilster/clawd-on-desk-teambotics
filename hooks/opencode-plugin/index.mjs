@@ -1,10 +1,10 @@
-// Clawd on Desk — opencode Plugin
+// DeskBuddy — opencode Plugin
 // Runs inside the opencode process (Bun runtime) and forwards session/tool
-// events to the Clawd HTTP server (127.0.0.1:23333-23337).
+// events to the DeskBuddy HTTP server (127.0.0.1:23333-23337).
 //
 // Design invariants:
 //   - Zero dependencies (Bun's built-in fetch + fs/os/path + Bun.serve + node:crypto)
-//   - fire-and-forget: event hook never awaits the fetch, so slow/broken Clawd
+//   - fire-and-forget: event hook never awaits the fetch, so slow/broken DeskBuddy
 //     cannot stall opencode
 //   - same-state dedup — consecutive identical states skip POST
 //   - self-healing port discovery: cache hit skips I/O; on miss we read
@@ -13,9 +13,9 @@
 // Phase 2 bridge (permission replies):
 //   opencode TUI does NOT bind an external HTTP listener (verified via
 //   Phase 2 Spike — ctx.serverUrl is a phantom URL, ctx.client.fetch is
-//   bound to Server.Default().fetch() in-process). So Clawd cannot call
+//   bound to Server.Default().fetch() in-process). So DeskBuddy cannot call
 //   opencode's REST API directly from outside the Bun process. Instead we
-//   start a tiny Bun.serve() bridge here: Clawd POSTs decisions to the
+//   start a tiny Bun.serve() bridge here: DeskBuddy POSTs decisions to the
 //   bridge, and the bridge calls ctx.client._client.post() — the same
 //   in-process Hono router that `opencode serve` would expose externally.
 //   A random 32-byte hex token gates the bridge endpoint since localhost
@@ -37,19 +37,19 @@ import {
   shouldDropMappedEventWithoutSessionId,
 } from "./session-ids.mjs";
 
-const CLAWD_DIR = join(homedir(), ".clawd");
-const RUNTIME_CONFIG_PATH = join(CLAWD_DIR, "runtime.json");
-const DEBUG_LOG_PATH = join(CLAWD_DIR, "opencode-plugin.log");
+const DESKBUDDY_DIR = join(homedir(), ".deskbuddy");
+const RUNTIME_CONFIG_PATH = join(DESKBUDDY_DIR, "runtime.json");
+const DEBUG_LOG_PATH = join(DESKBUDDY_DIR, "opencode-plugin.log");
 const SERVER_PORTS = [23333, 23334, 23335, 23336, 23337];
 const STATE_PATH = "/state";
 // Fire-and-forget: the IIFE never blocks the event hook's return value, so a
-// generous timeout is safe. 200ms was too tight when Clawd's IPC roundtrip
+// generous timeout is safe. 200ms was too tight when DeskBuddy's IPC roundtrip
 // (main → renderer → main) ran under load and silently timed out.
 const POST_TIMEOUT_MS = 1000;
 const AGENT_ID = "opencode";
 const HOOK_SOURCE = "opencode-plugin";
 
-// Process tree walk config — mirrors hooks/clawd-hook.js exactly, minus the
+// Process tree walk config — mirrors hooks/deskbuddy-hook.js exactly, minus the
 // Claude-specific detection. See docs/plans/plan-opencode-integration.md Phase 4.
 // Spike confirmed (2026-04-05): plugin runs in-process with opencode, so walk
 // starts at process.pid. Observed chains on Windows:
@@ -73,7 +73,7 @@ const TERMINAL_NAMES_LINUX = new Set([
 const SYSTEM_BOUNDARY_WIN = new Set(["explorer.exe", "services.exe", "winlogon.exe", "svchost.exe"]);
 const SYSTEM_BOUNDARY_MAC = new Set(["launchd", "init", "systemd"]);
 const SYSTEM_BOUNDARY_LINUX = new Set(["systemd", "init"]);
-// Editor detection drives URI-scheme tab focus (code://, cursor://) in Clawd.
+// Editor detection drives URI-scheme tab focus (code://, cursor://) in DeskBuddy.
 // Antigravity is NOT listed here — it's treated as a plain terminal window.
 const EDITOR_MAP_WIN = { "code.exe": "code", "cursor.exe": "cursor" };
 const EDITOR_MAP_MAC = { "code": "code", "cursor": "cursor" };
@@ -83,7 +83,7 @@ const EDITOR_MAP_LINUX = { "code": "code", "cursor": "cursor", "code-insiders": 
 let _cachedPort = null;
 // Per-session last-state tracking. Keyed by sessionId so that subagent
 // sessions (spawned by the `task` tool) don't clobber the root session's
-// dedup state. Each value is the last Clawd state sent for that session.
+// dedup state. Each value is the last DeskBuddy state sent for that session.
 const _lastStatePerSession = new Map();
 // Fallback session ID for permission.asked events, which lack sessionID
 // in their properties. Updated on every session.*/message.part.updated
@@ -91,7 +91,7 @@ const _lastStatePerSession = new Map();
 let _lastSeenSessionId = null;
 let _reqCounter = 0;
 // Phase 3: opencode subtasks are full child sessions (not subtask parts). When
-// session.created carries event.properties.info.parentID, Clawd treats the
+// session.created carries event.properties.info.parentID, DeskBuddy treats the
 // child as background/headless work owned by its parent: no HUD/focus/fanout,
 // and child session.idle maps to SessionEnd instead of the root happy path.
 // Root session fallback used for legacy idle/permission association.
@@ -122,7 +122,7 @@ let _serverUrl = "";
 // Captured at plugin init — the opencode SDK client. Used by the reverse
 // bridge to call in-process Hono routes (e.g. /permission/:id/reply).
 let _ctxClient = null;
-// Reverse bridge state. Set by startBridge() at plugin init. Clawd receives
+// Reverse bridge state. Set by startBridge() at plugin init. DeskBuddy receives
 // _bridgeUrl + _bridgeToken with every /permission forward and POSTs back.
 let _bridgeUrl = "";
 let _bridgeTokenHex = "";
@@ -156,7 +156,7 @@ function scheduleDebugFlush() {
 
 function resetDebugLog() {
   try {
-    mkdirSync(CLAWD_DIR, { recursive: true });
+    mkdirSync(DESKBUDDY_DIR, { recursive: true });
     writeFileSync(DEBUG_LOG_PATH, "", "utf8");
   } catch {}
 }
@@ -220,7 +220,7 @@ function getWindowsProcessSnapshot() {
 
 // Walks past the first terminal match to pick the OUTERMOST terminal —
 // matters for Electron terminals like Antigravity where the chain shows
-// renderer→main and we want the main process so Clawd activates the right
+// renderer→main and we want the main process so DeskBuddy activates the right
 // window. Cached after first call.
 function getStablePid() {
   if (_stablePid) return _stablePid;
@@ -299,11 +299,11 @@ function getStablePid() {
   return _stablePid;
 }
 
-// Fire-and-forget POST to any Clawd endpoint. Shared by /state and /permission
+// Fire-and-forget POST to any DeskBuddy endpoint. Shared by /state and /permission
 // so both benefit from port caching + self-healing discovery. Tries cached port
 // first; on failure walks runtime.json + fallback range. Caches the winning
 // port. Never throws.
-function postToClawd(urlPath, body, logTag) {
+function postToDeskBuddy(urlPath, body, logTag) {
   // Enrich every outbound body with process-tree fields. Cached after first
   // call so this is just a few object assignments per POST.
   if (_stablePid) {
@@ -334,11 +334,11 @@ function postToClawd(urlPath, body, logTag) {
         });
         clearTimeout(timer);
         const elapsed = Date.now() - t0;
-        const header = res.headers.get("x-clawd-server");
+        const header = res.headers.get("x-deskbuddy-server");
         debugLog(`POST[${reqId}] ${logTag} port=${port} status=${res.status} header=${header} elapsed=${elapsed}ms`);
         // Port range is unprivileged so another app could answer — require the
-        // Clawd identity header before trusting the response.
-        if (header === "clawd-on-desk") {
+        // DeskBuddy identity header before trusting the response.
+        if (header === "deskbuddy") {
           _cachedPort = port;
           try { await res.text(); } catch {}
           debugLog(`POST[${reqId}] ${logTag} OK port=${port}`);
@@ -358,23 +358,23 @@ function postToClawd(urlPath, body, logTag) {
   });
 }
 
-function postStateToClawd(body) {
-  postToClawd(STATE_PATH, body, `STATE state=${body.state}`);
+function postStateToDeskBuddy(body) {
+  postToDeskBuddy(STATE_PATH, body, `STATE state=${body.state}`);
 }
 
-// Fire-and-forget permission forward. Clawd decides allow/deny/always in its
+// Fire-and-forget permission forward. DeskBuddy decides allow/deny/always in its
 // bubble UI and — critically — replies to opencode's own REST API directly
 // (POST ${server_url}permission/:request_id/reply). The plugin never waits.
-function postPermissionToClawd(body) {
-  postToClawd("/permission", body, `PERM tool=${body.tool_name} req=${body.request_id}`);
+function postPermissionToDeskBuddy(body) {
+  postToDeskBuddy("/permission", body, `PERM tool=${body.tool_name} req=${body.request_id}`);
 }
 
 function buildStateBody(state, eventName, sessionId) {
   if (!state || !eventName) return null;
-  const clawdSessionId = normalizeOpencodeSessionId(sessionId) || DEFAULT_SESSION_ID;
+  const deskbuddySessionId = normalizeOpencodeSessionId(sessionId) || DEFAULT_SESSION_ID;
   const body = {
     state,
-    session_id: clawdSessionId,
+    session_id: deskbuddySessionId,
     event: eventName,
     agent_id: AGENT_ID,
     hook_source: HOOK_SOURCE,
@@ -382,13 +382,13 @@ function buildStateBody(state, eventName, sessionId) {
   // Phase 3 headless: child sessions (identified by parentID in
   // _sessionParentById) get headless: true so downstream session
   // handling can distinguish child sessions.
-  if (isChildSessionId(clawdSessionId, _sessionParentById)) {
+  if (isChildSessionId(deskbuddySessionId, _sessionParentById)) {
     body.headless = true;
   }
   return body;
 }
 
-// Clawd uses PascalCase event names matching Claude Code's hook vocabulary so
+// DeskBuddy uses PascalCase event names matching Claude Code's hook vocabulary so
 // state.js transition rules (e.g. SubagentStop → working whitelist) are
 // reusable across agents.
 function sendState(state, eventName, sessionId) {
@@ -405,11 +405,11 @@ function sendState(state, eventName, sessionId) {
   debugLog(`SEND ${lastState || "null"} → ${body.state} event=${body.event} session=${body.session_id}`);
   _lastStatePerSession.set(body.session_id, body.state);
 
-  postStateToClawd(body);
+  postStateToDeskBuddy(body);
 }
 
-// Translate an opencode event into a Clawd (state, eventName) pair, or null
-// if Clawd should ignore it. Event shape (from runtime dumps):
+// Translate an opencode event into a DeskBuddy (state, eventName) pair, or null
+// if DeskBuddy should ignore it. Event shape (from runtime dumps):
 //   { type: "session.status", properties: { sessionID, status: { type } } }
 //   { type: "message.part.updated", properties: { part: { type, tool, state: { status } } } }
 function translateEvent(event) {
@@ -457,7 +457,7 @@ function translateEvent(event) {
 
     case "session.idle": {
       // Phase 3 headless: child sessions (identified by parentID in
-      // _sessionParentById) end with SessionEnd so Clawd removes them
+      // _sessionParentById) end with SessionEnd so DeskBuddy removes them
       // from its tracking map — no happy flash, no menu pollution.
       if (isChildSessionId(sessionId, _sessionParentById)) {
         return { state: "sleeping", event: "SessionEnd" };
@@ -492,7 +492,7 @@ const __testInternals = {
 
 // Normalize ctx.serverUrl into a string with a trailing slash. opencode passes
 // a URL object in practice but we coerce defensively in case future versions
-// hand us a plain string. Trailing slash lets Clawd concat cleanly:
+// hand us a plain string. Trailing slash lets DeskBuddy concat cleanly:
 //   `${server_url}permission/${request_id}/reply`
 function normalizeServerUrl(raw) {
   if (!raw) return "";
@@ -505,7 +505,7 @@ function normalizeServerUrl(raw) {
 // properties (only `id` = requestID), so we use _lastSeenSessionId (the most
 // recently seen session from state events) as a fallback, then _rootSessionId.
 // Phase 1 dedup/state machine logic does not run for permission events — they
-// ride a parallel channel and never translate to a Clawd state transition.
+// ride a parallel channel and never translate to a DeskBuddy state transition.
 function handlePermissionAsked(event) {
   const p = (event && event.properties) || {};
   const requestId = p.id;
@@ -513,7 +513,7 @@ function handlePermissionAsked(event) {
     debugLog(`PERM skip: no request id in permission.asked`);
     return;
   }
-  postPermissionToClawd({
+  postPermissionToDeskBuddy({
     agent_id: AGENT_ID,
     hook_source: HOOK_SOURCE,
     tool_name: p.permission || "unknown",
@@ -523,7 +523,7 @@ function handlePermissionAsked(event) {
     session_id: resolveOpencodeSessionId(null, _lastSeenSessionId || _rootSessionId),
     request_id: requestId,
     server_url: _serverUrl,         // debug only, not used for replies
-    bridge_url: _bridgeUrl,         // ← Clawd POSTs decisions here
+    bridge_url: _bridgeUrl,         // ← DeskBuddy POSTs decisions here
     bridge_token: _bridgeTokenHex,  // ← and authenticates with this
   });
 }
@@ -541,7 +541,7 @@ function verifyBridgeToken(headerValue) {
   try { return timingSafeEqual(candidate, _bridgeTokenBuf); } catch { return false; }
 }
 
-// Handle POST /reply from Clawd. Reads { request_id, reply } and forwards to
+// Handle POST /reply from DeskBuddy. Reads { request_id, reply } and forwards to
 // the opencode in-process Hono router via ctx.client._client.post(). Return
 // 200 on success (opencode's own route returned 2xx), 4xx on auth/shape
 // errors, 502 if the upstream call itself throws.
@@ -667,7 +667,7 @@ const plugin = async (ctx) => {
           const parentID = getEventParentSessionId(event);
           if (parentID) {
             // Store with normalized keys so lookups from buildStateBody()
-            // (which uses clawdSessionId = normalizeOpencodeSessionId(sessionId))
+            // (which uses deskbuddySessionId = normalizeOpencodeSessionId(sessionId))
             // match consistently regardless of raw vs prefixed form.
             const normChild = normalizeOpencodeSessionId(sid);
             const normParent = normalizeOpencodeSessionId(parentID);
@@ -678,8 +678,8 @@ const plugin = async (ctx) => {
           }
         }
 
-        // Phase 2: permission.asked rides a parallel channel — forward to Clawd
-        // and skip state translation. Clawd replies directly to opencode's own
+        // Phase 2: permission.asked rides a parallel channel — forward to DeskBuddy
+        // and skip state translation. DeskBuddy replies directly to opencode's own
         // REST API, so we don't need to watch permission.replied here.
         if (event.type === "permission.asked") {
           handlePermissionAsked(event);

@@ -1018,22 +1018,22 @@ describe("doctor repair commands", () => {
     assert.strictEqual(r.commit.permissionBubblesEnabled, true);
   });
 
-  it("routes Doctor restart-clawd repair through deps.restartClawd", async () => {
+  it("routes Doctor restart-deskbuddy repair through deps.restartDeskBuddy", async () => {
     const calls = [];
     const r = await commandRegistry.repairDoctorIssue(
-      { type: "restart-clawd", confirmed: true },
-      { restartClawd: () => calls.push("restart") }
+      { type: "restart-deskbuddy", confirmed: true },
+      { restartDeskBuddy: () => calls.push("restart") }
     );
 
     assert.strictEqual(r.status, "ok");
     assert.deepStrictEqual(calls, ["restart"]);
   });
 
-  it("does not run Doctor restart-clawd repair without confirmation", async () => {
+  it("does not run Doctor restart-deskbuddy repair without confirmation", async () => {
     const calls = [];
     const r = await commandRegistry.repairDoctorIssue(
-      { type: "restart-clawd" },
-      { restartClawd: () => calls.push("restart") }
+      { type: "restart-deskbuddy" },
+      { restartDeskBuddy: () => calls.push("restart") }
     );
 
     assert.strictEqual(r.status, "error");
@@ -1041,11 +1041,11 @@ describe("doctor repair commands", () => {
     assert.deepStrictEqual(calls, []);
   });
 
-  it("returns an error when restart-clawd is dispatched without deps.restartClawd", async () => {
-    const r = await commandRegistry.repairDoctorIssue({ type: "restart-clawd", confirmed: true }, {});
+  it("returns an error when restart-deskbuddy is dispatched without deps.restartDeskBuddy", async () => {
+    const r = await commandRegistry.repairDoctorIssue({ type: "restart-deskbuddy", confirmed: true }, {});
 
     assert.strictEqual(r.status, "error");
-    assert.match(r.message, /restartClawd/);
+    assert.match(r.message, /restartDeskBuddy/);
   });
 
   it("rejects Doctor theme repair so Doctor does not reset user themes", async () => {

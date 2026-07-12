@@ -104,7 +104,7 @@ test("native runner sends nonce card and dispatches TEST_SUCCESS for matching ca
   assert.equal(server.calls[0].method, "getUpdates");
 
   await runner.sendTestCard();
-  assert.match(callbackData, /^clawd-test:[a-z0-9]+$/);
+  assert.match(callbackData, /^deskbuddy-test:[a-z0-9]+$/);
 
   releaseFirstPoll({ ok: true, result: [] });
   await tick();
@@ -383,7 +383,7 @@ test("native runner requestApproval ignores wrong user and resolves later callba
   server.enqueue("sendMessage", (payload) => {
     denyData = payload.reply_markup.inline_keyboard[0][1].callback_data;
     assert.match(denyData, /^cp:([a-z0-9]+):d$/);
-    legacyDenyData = denyData.replace(/^cp:([a-z0-9]+):d$/, "clawdperm:$1:deny");
+    legacyDenyData = denyData.replace(/^cp:([a-z0-9]+):d$/, "deskbuddyperm:$1:deny");
     return { ok: true, result: { message_id: 100, chat: { id: 123 } } };
   });
   server.enqueue("getUpdates", () => ({
@@ -624,7 +624,7 @@ test("native runner appends timeout status when an approval expires", async () =
   await tick();
 
   const decisionPromise = runner.requestApproval({ title: "claude-code requests Bash", detail: "Summary: Run tests" });
-  // The production approval timeout is unref'ed so it won't keep Clawd alive on
+  // The production approval timeout is unref'ed so it won't keep DeskBuddy alive on
   // shutdown. Keep this test alive with a normal timer until that timeout fires.
   await delay(30);
   const decision = await decisionPromise;

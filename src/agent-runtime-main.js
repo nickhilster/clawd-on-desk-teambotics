@@ -229,7 +229,7 @@ function createAgentRuntimeMain(options = {}) {
         mdownManagerPoller.start();
       }
     } catch (err) {
-      logWarn("Clawd: MDown Manager poller not started:", err && err.message);
+      logWarn("DeskBuddy: MDown Manager poller not started:", err && err.message);
     }
     return mdownManagerPoller;
   }

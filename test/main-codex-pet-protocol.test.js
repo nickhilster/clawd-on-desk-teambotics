@@ -21,7 +21,7 @@ test("main wires deskbuddy:// protocol dispatch through the Codex Pet importer",
   assert.ok(source.includes("codexPetMain.enqueueImportUrlsFromArgv(commandLine);"));
   assert.ok(source.includes("codexPetMain.enqueueImportUrlsFromArgv(process.argv);"));
   assert.ok(runtimeSource.includes('const defaultCodexPetImporter = require("./codex-pet-importer");'));
-  assert.ok(runtimeSource.includes("codexPetImporter.parseClawdImportUrl(rawUrl)"));
+  assert.ok(runtimeSource.includes("codexPetImporter.parseDeskBuddyImportUrl(rawUrl)"));
   assert.ok(runtimeSource.includes("codexPetImporter.importCodexPetFromUrl(parsed.url, {"));
   assert.ok(runtimeSource.includes("confirmReplaceExistingPackage: confirmReplaceExistingPackage"));
   assert.ok(runtimeSource.includes("codexPetImporter.ERR_REPLACE_DECLINED"));

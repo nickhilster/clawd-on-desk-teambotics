@@ -2,7 +2,7 @@
 
 // Remote SSH Node.js resolution helpers.
 //
-// Clawd runs remote commands through `ssh host <command>`, which is a
+// DeskBuddy runs remote commands through `ssh host <command>`, which is a
 // non-interactive remote shell. Node managers such as nvm/fnm/asdf/mise often
 // only populate PATH from interactive shell startup files, so a bare `node`
 // is not reliable on remotes. This module probes for an absolute Node binary
@@ -13,7 +13,7 @@ const { quoteForPosixShellArg } = require("./remote-ssh-quote");
 const { decodeShellBytes } = require("./remote-ssh-decode");
 
 const NODE_PROBE_TIMEOUT_MS = 60000;
-const NODE_PROBE_SENTINEL = "__CLAWD_REMOTE_NODE_PROBE__";
+const NODE_PROBE_SENTINEL = "__DESKBUDDY_REMOTE_NODE_PROBE__";
 const MIN_REMOTE_NODE_MAJOR = 14;
 
 const NODE_PROBE_SCRIPT = `
@@ -38,9 +38,9 @@ emit_node() {
   if [ ! -x "$p" ]; then return 1; fi
   v="$("$p" --version 2>/dev/null)" || return 1
   node_version_supported "$v" || return 1
-  printf 'CLAWD_REMOTE_NODE_BIN=%s\\n' "$p"
-  printf 'CLAWD_REMOTE_NODE_VERSION=%s\\n' "$v"
-  printf 'CLAWD_REMOTE_NODE_SOURCE=%s\\n' "$src"
+  printf 'DESKBUDDY_REMOTE_NODE_BIN=%s\\n' "$p"
+  printf 'DESKBUDDY_REMOTE_NODE_VERSION=%s\\n' "$v"
+  printf 'DESKBUDDY_REMOTE_NODE_SOURCE=%s\\n' "$src"
   exit 0
 }
 
@@ -164,12 +164,12 @@ function parseRemoteNodeProbeOutput(stdout) {
   };
   for (const rawLine of String(stdout || "").split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (line.startsWith("CLAWD_REMOTE_NODE_BIN=")) {
-      out.nodeBin = line.slice("CLAWD_REMOTE_NODE_BIN=".length);
-    } else if (line.startsWith("CLAWD_REMOTE_NODE_VERSION=")) {
-      out.version = line.slice("CLAWD_REMOTE_NODE_VERSION=".length);
-    } else if (line.startsWith("CLAWD_REMOTE_NODE_SOURCE=")) {
-      out.source = line.slice("CLAWD_REMOTE_NODE_SOURCE=".length);
+    if (line.startsWith("DESKBUDDY_REMOTE_NODE_BIN=")) {
+      out.nodeBin = line.slice("DESKBUDDY_REMOTE_NODE_BIN=".length);
+    } else if (line.startsWith("DESKBUDDY_REMOTE_NODE_VERSION=")) {
+      out.version = line.slice("DESKBUDDY_REMOTE_NODE_VERSION=".length);
+    } else if (line.startsWith("DESKBUDDY_REMOTE_NODE_SOURCE=")) {
+      out.source = line.slice("DESKBUDDY_REMOTE_NODE_SOURCE=".length);
     }
   }
   if (!isValidRemoteNodeBin(out.nodeBin) || !isSupportedRemoteNodeVersion(out.version)) {

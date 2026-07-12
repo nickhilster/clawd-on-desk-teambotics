@@ -7,37 +7,37 @@ const os = require("node:os");
 const path = require("node:path");
 const zlib = require("node:zlib");
 
-const SIDECAR_ROOT = path.join("bin", "cc-connect-clawd");
+const SIDECAR_ROOT = path.join("bin", "deskbuddy-connect");
 const FETCH_COMMAND = "node scripts/fetch-sidecar-binaries.js";
 const DEFAULT_RELEASE = Object.freeze({
   owner: "rullerzhou-afk",
-  repo: "cc-connect-clawd",
-  tag: "clawd-sidecar-v0.1.1",
+  repo: "deskbuddy-connect",
+  tag: "deskbuddy-sidecar-v0.1.1",
 });
 
 const TARGETS = Object.freeze([
-  Object.freeze({ platform: "windows", arch: "x64", dir: "windows-x64", exe: "cc-connect-clawd.exe", archiveExt: ".zip" }),
-  Object.freeze({ platform: "windows", arch: "arm64", dir: "windows-arm64", exe: "cc-connect-clawd.exe", archiveExt: ".zip" }),
-  Object.freeze({ platform: "darwin", arch: "x64", dir: "darwin-x64", exe: "cc-connect-clawd", archiveExt: ".tar.gz" }),
-  Object.freeze({ platform: "darwin", arch: "arm64", dir: "darwin-arm64", exe: "cc-connect-clawd", archiveExt: ".tar.gz" }),
-  Object.freeze({ platform: "linux", arch: "x64", dir: "linux-x64", exe: "cc-connect-clawd", archiveExt: ".tar.gz" }),
+  Object.freeze({ platform: "windows", arch: "x64", dir: "windows-x64", exe: "deskbuddy-connect.exe", archiveExt: ".zip" }),
+  Object.freeze({ platform: "windows", arch: "arm64", dir: "windows-arm64", exe: "deskbuddy-connect.exe", archiveExt: ".zip" }),
+  Object.freeze({ platform: "darwin", arch: "x64", dir: "darwin-x64", exe: "deskbuddy-connect", archiveExt: ".tar.gz" }),
+  Object.freeze({ platform: "darwin", arch: "arm64", dir: "darwin-arm64", exe: "deskbuddy-connect", archiveExt: ".tar.gz" }),
+  Object.freeze({ platform: "linux", arch: "x64", dir: "linux-x64", exe: "deskbuddy-connect", archiveExt: ".tar.gz" }),
 ]);
 
 const PINNED_CHECKSUMS = Object.freeze({
-  "windows-x64/cc-connect-clawd.exe": "60586745cf9e6c5883f46ef18745511e873ba87782d61ff045b26c5319795ab3",
-  "cc-connect-clawd-windows-x64.zip": "afb79e68f1cc12f33c74500c2596ec3eeb6b92d9ccf86afbe741d0cf41b12c1e",
-  "windows-arm64/cc-connect-clawd.exe": "dd4b364c5b239f2835148a295bf06e7057e74f852fd6ae7489081a109b67bdb1",
-  "cc-connect-clawd-windows-arm64.zip": "1d01482fbd5fc6da4eaea11ce0045db43fb3300c4d970c975abd5658c4adf260",
-  "darwin-x64/cc-connect-clawd": "4ba36a96a18440cb877f7ea41e721f441142724478e139e750f360e7ee324d23",
-  "cc-connect-clawd-darwin-x64.tar.gz": "1c80fbdf06ea5c9d570652e923a4bcd16e6b6e0eab263f3b368cb70e2ed97119",
-  "darwin-arm64/cc-connect-clawd": "e54c741e9c6f1b092c73fbf9a794891c9360936b3bb1b91207e5705ed069c0be",
-  "cc-connect-clawd-darwin-arm64.tar.gz": "70b34a42a0ab7eca7d1a487be0f0813c9499e940baf022a84048831524231638",
-  "linux-x64/cc-connect-clawd": "c56a64c69b685a4f9a6751a8556ec7a127929e141de03b6193e813cb8a8aa974",
-  "cc-connect-clawd-linux-x64.tar.gz": "9ff7fcd70e61b4198bf6b8a7a4be8930248139e57d1b0a15f75ea193ef7e1e51",
+  "windows-x64/deskbuddy-connect.exe": "60586745cf9e6c5883f46ef18745511e873ba87782d61ff045b26c5319795ab3",
+  "deskbuddy-connect-windows-x64.zip": "afb79e68f1cc12f33c74500c2596ec3eeb6b92d9ccf86afbe741d0cf41b12c1e",
+  "windows-arm64/deskbuddy-connect.exe": "dd4b364c5b239f2835148a295bf06e7057e74f852fd6ae7489081a109b67bdb1",
+  "deskbuddy-connect-windows-arm64.zip": "1d01482fbd5fc6da4eaea11ce0045db43fb3300c4d970c975abd5658c4adf260",
+  "darwin-x64/deskbuddy-connect": "4ba36a96a18440cb877f7ea41e721f441142724478e139e750f360e7ee324d23",
+  "deskbuddy-connect-darwin-x64.tar.gz": "1c80fbdf06ea5c9d570652e923a4bcd16e6b6e0eab263f3b368cb70e2ed97119",
+  "darwin-arm64/deskbuddy-connect": "e54c741e9c6f1b092c73fbf9a794891c9360936b3bb1b91207e5705ed069c0be",
+  "deskbuddy-connect-darwin-arm64.tar.gz": "70b34a42a0ab7eca7d1a487be0f0813c9499e940baf022a84048831524231638",
+  "linux-x64/deskbuddy-connect": "c56a64c69b685a4f9a6751a8556ec7a127929e141de03b6193e813cb8a8aa974",
+  "deskbuddy-connect-linux-x64.tar.gz": "9ff7fcd70e61b4198bf6b8a7a4be8930248139e57d1b0a15f75ea193ef7e1e51",
 });
 
 function archiveName(target) {
-  return `cc-connect-clawd-${target.dir}${target.archiveExt}`;
+  return `deskbuddy-connect-${target.dir}${target.archiveExt}`;
 }
 
 function binaryChecksumName(target) {
@@ -292,7 +292,7 @@ function downloadBuffer(url, redirects = 0, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: {
-        "User-Agent": "clawd-sidecar-fetcher",
+        "User-Agent": "deskbuddy-sidecar-fetcher",
         "Accept": "application/octet-stream",
       },
     }, (res) => {
@@ -356,7 +356,7 @@ async function main() {
   for (const item of result.installed) {
     console.log(`Installed ${item.target}: ${item.path}`);
   }
-  console.log(`Fetched ${result.installed.length} cc-connect-clawd sidecar binary/binaries from ${result.manifest.release.tag}.`);
+  console.log(`Fetched ${result.installed.length} deskbuddy-connect sidecar binary/binaries from ${result.manifest.release.tag}.`);
 }
 
 if (require.main === module) {

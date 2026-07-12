@@ -165,7 +165,7 @@ describe("updater visual flow", () => {
     );
   });
 
-  it("does not assume a clawd-specific checking override when the current theme has none", async () => {
+  it("does not assume a deskbuddy-specific checking override when the current theme has none", async () => {
     const visualStates = [];
     const bubbles = [];
     const applied = [];
@@ -619,11 +619,11 @@ describe("updater visual flow", () => {
         tag_name: "v0.6.1",
         assets: [
           {
-            name: "Clawd-on-Desk-Setup-0.6.1-x64.exe",
+            name: "DeskBuddy-on-Desk-Setup-0.6.1-x64.exe",
             browser_download_url: "https://example.invalid/x64.exe",
           },
           {
-            name: "Clawd-on-Desk-Setup-0.6.1-arm64.exe",
+            name: "DeskBuddy-on-Desk-Setup-0.6.1-arm64.exe",
             browser_download_url: "https://example.invalid/arm64.exe",
           },
         ],
@@ -635,7 +635,7 @@ describe("updater visual flow", () => {
     assert.deepStrictEqual(bubbles.map((bubble) => bubble.mode), ["checking", "available", "ready"]);
     assert.match(bubbles[1].title, /ARM64/);
     assert.match(bubbles[1].message, /native Windows ARM64 installer/i);
-    assert.match(bubbles[1].message, /Clawd v0\.6\.1/);
+    assert.match(bubbles[1].message, /DeskBuddy v0\.6\.1/);
     assert.doesNotMatch(bubbles[1].message, /vv0\.6\.1/);
     assert.strictEqual(openedUrls[0], "https://example.invalid/arm64.exe");
     assert.strictEqual(autoUpdateChecks, 0);
@@ -663,7 +663,7 @@ describe("updater visual flow", () => {
         tag_name: "v0.6.1",
         assets: [
           {
-            name: "Clawd-on-Desk-Setup-0.6.1-x64.exe",
+            name: "DeskBuddy-on-Desk-Setup-0.6.1-x64.exe",
             browser_download_url: "https://example.invalid/x64.exe",
           },
         ],
@@ -810,7 +810,7 @@ describe("updater visual flow", () => {
         tag_name: "v0.6.1",
         assets: [
           {
-            name: "Clawd-on-Desk-Setup-0.6.1-arm64.exe",
+            name: "DeskBuddy-on-Desk-Setup-0.6.1-arm64.exe",
             browser_download_url: "https://example.invalid/arm64.exe",
           },
         ],
@@ -858,7 +858,7 @@ describe("updater visual flow", () => {
       tag_name: "v0.6.1",
       assets: [
         {
-          name: "Clawd-on-Desk-Setup-0.6.1-arm64.exe",
+          name: "DeskBuddy-on-Desk-Setup-0.6.1-arm64.exe",
           browser_download_url: "https://example.invalid/arm64.exe",
         },
       ],
@@ -871,7 +871,7 @@ describe("updater visual flow", () => {
       tag_name: "v0.6.1",
       assets: [
         {
-          name: "Clawd-on-Desk-Setup-0.6.1-arm64.exe",
+          name: "DeskBuddy-on-Desk-Setup-0.6.1-arm64.exe",
           browser_download_url: "https://example.invalid/arm64.exe",
         },
       ],
@@ -930,7 +930,7 @@ describe("updater visual flow", () => {
       tag_name: "v0.6.1",
       assets: [
         {
-          name: "Clawd-on-Desk-Setup-0.6.1-arm64.exe",
+          name: "DeskBuddy-on-Desk-Setup-0.6.1-arm64.exe",
           browser_download_url: "https://example.invalid/arm64.exe",
         },
       ],
@@ -951,7 +951,7 @@ describe("updater visual flow", () => {
       tag_name: "v0.6.1",
       assets: [
         {
-          name: "Clawd-on-Desk-Setup-0.6.1-x64.exe",
+          name: "DeskBuddy-on-Desk-Setup-0.6.1-x64.exe",
           browser_download_url: "https://example.invalid/x64.exe",
         },
       ],
@@ -1146,9 +1146,9 @@ describe("updater Windows ARM64 migration helpers", () => {
     const { findWindowsArm64InstallerAsset } = initUpdater.__test;
     const asset = findWindowsArm64InstallerAsset({
       assets: [
-        { name: "Clawd-on-Desk-Setup-0.6.1-arm64.exe.blockmap", browser_download_url: "blockmap" },
-        { name: "Clawd-on-Desk-Setup-0.6.1-x64.exe", browser_download_url: "x64" },
-        { name: "Clawd-on-Desk-Setup-0.6.1-arm64.exe", browser_download_url: "arm64" },
+        { name: "DeskBuddy-on-Desk-Setup-0.6.1-arm64.exe.blockmap", browser_download_url: "blockmap" },
+        { name: "DeskBuddy-on-Desk-Setup-0.6.1-x64.exe", browser_download_url: "x64" },
+        { name: "DeskBuddy-on-Desk-Setup-0.6.1-arm64.exe", browser_download_url: "arm64" },
       ],
     });
 

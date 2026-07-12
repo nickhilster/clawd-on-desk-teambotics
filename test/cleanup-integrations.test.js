@@ -22,12 +22,12 @@ function readJson(filePath) {
 
 function listCleanupBackups(dir) {
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).filter((name) => name.includes(".clawd-cleanup-") && name.endsWith(".bak"));
+  return fs.readdirSync(dir).filter((name) => name.includes(".deskbuddy-cleanup-") && name.endsWith(".bak"));
 }
 
 describe("cleanupIntegrations", () => {
   it("builds explicit cleanup path overrides for every managed agent", () => {
-    const homeDir = path.join(os.tmpdir(), "clawd-target-home");
+    const homeDir = path.join(os.tmpdir(), "deskbuddy-target-home");
     const inheritedLocalAppData = path.join(os.tmpdir(), "admin-local-appdata");
     const targetLocalAppData = path.join(homeDir, "AppData", "Local");
     const targetAppData = path.join(homeDir, "AppData", "Roaming");
@@ -59,20 +59,20 @@ describe("cleanupIntegrations", () => {
   });
 
   it("removes managed hooks/plugins safely, backs up once, and is idempotent", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-cleanup-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-cleanup-"));
     const homeDir = path.join(root, "home");
     const pluginDir = resolvePluginDir();
     const codexPath = path.join(homeDir, ".codex", "hooks.json");
     const codewhalePath = path.join(homeDir, ".codewhale", "config.toml");
     const opencodePath = path.join(homeDir, ".config", "opencode", "opencode.json");
     const kiroTeamPath = path.join(homeDir, ".kiro", "agents", "team.json");
-    const kiroClawdPath = path.join(homeDir, ".kiro", "agents", "clawd.json");
+    const kiroDeskBuddyPath = path.join(homeDir, ".kiro", "agents", "deskbuddy.json");
 
     writeJson(codexPath, {
       hooks: {
         Stop: [
-          { hooks: [{ type: "command", command: 'node "C:/clawd/hooks/codex-hook.js"' }] },
-          { hooks: [{ type: "command", command: 'node "C:/clawd/hooks/codex-debug-hook.js"' }] },
+          { hooks: [{ type: "command", command: 'node "C:/deskbuddy/hooks/codex-hook.js"' }] },
+          { hooks: [{ type: "command", command: 'node "C:/deskbuddy/hooks/codex-debug-hook.js"' }] },
           { hooks: [{ type: "command", command: 'node "C:/user/hooks/keep.js"' }] },
         ],
       },
@@ -85,9 +85,9 @@ describe("cleanupIntegrations", () => {
         "enabled = true",
         "",
         "[[hooks.hooks]]",
-        "# managed by clawd-on-desk",
+        "# managed by deskbuddy",
         'event = "session_start"',
-        'command = "\\"node\\" \\"C:/clawd/hooks/codewhale-hook.js\\" \\"session_start\\""',
+        'command = "\\"node\\" \\"C:/deskbuddy/hooks/codewhale-hook.js\\" \\"session_start\\""',
         "",
         "[[hooks.hooks]]",
         'event = "session_start"',
@@ -107,16 +107,16 @@ describe("cleanupIntegrations", () => {
       name: "team",
       hooks: {
         userPromptSubmit: [
-          { command: 'node "C:/clawd/hooks/kiro-hook.js"' },
+          { command: 'node "C:/deskbuddy/hooks/kiro-hook.js"' },
           { command: 'node "C:/user/hooks/keep.js"' },
         ],
       },
     });
-    writeJson(kiroClawdPath, {
-      name: "clawd",
+    writeJson(kiroDeskBuddyPath, {
+      name: "deskbuddy",
       description: "customized",
       hooks: {
-        stop: [{ command: 'node "C:/clawd/hooks/kiro-hook.js"' }],
+        stop: [{ command: 'node "C:/deskbuddy/hooks/kiro-hook.js"' }],
       },
     });
 
@@ -146,10 +146,10 @@ describe("cleanupIntegrations", () => {
       assert.deepStrictEqual(kiroTeam.hooks.userPromptSubmit, [
         { command: 'node "C:/user/hooks/keep.js"' },
       ]);
-      assert.ok(fs.existsSync(kiroClawdPath), "cleanup must retain Kiro clawd.json");
-      assert.deepStrictEqual(readJson(kiroClawdPath).hooks, {});
+      assert.ok(fs.existsSync(kiroDeskBuddyPath), "cleanup must retain Kiro deskbuddy.json");
+      assert.deepStrictEqual(readJson(kiroDeskBuddyPath).hooks, {});
       const kiroAgent = result.agents.find((agent) => agent.agentId === "kiro-cli");
-      assert.ok(kiroAgent.notes.some((note) => note.includes("clawd.json")));
+      assert.ok(kiroAgent.notes.some((note) => note.includes("deskbuddy.json")));
       assert.deepStrictEqual(kiroAgent.warnings, []);
       assert.strictEqual(listCleanupBackups(path.dirname(kiroTeamPath)).length, 2);
 

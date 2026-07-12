@@ -331,7 +331,7 @@ describe("Codex official hook", () => {
     });
   });
 
-  it("renames upstream Codex agent fields without polluting Clawd agent_id", () => {
+  it("renames upstream Codex agent fields without polluting DeskBuddy agent_id", () => {
     const body = buildStateBody({
       hook_event_name: "PreToolUse",
       session_id: "s1",
@@ -510,8 +510,8 @@ describe("Codex official hook", () => {
   });
 
   describe("remote mode", () => {
-    before(() => { process.env.CLAWD_REMOTE = "1"; });
-    after(() => { delete process.env.CLAWD_REMOTE; });
+    before(() => { process.env.DESKBUDDY_REMOTE = "1"; });
+    after(() => { delete process.env.DESKBUDDY_REMOTE; });
 
     it("uses host instead of local pid fields", () => {
       const body = buildStateBody({ hook_event_name: "UserPromptSubmit", session_id: "s1" }, () => {

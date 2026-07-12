@@ -8,7 +8,7 @@ const serverConfig = require("../hooks/server-config");
 const tempDirs = [];
 
 function makeTempHome() {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-server-config-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-server-config-"));
   tempDirs.push(tmpDir);
   return tmpDir;
 }
@@ -22,7 +22,7 @@ afterEach(() => {
 describe("server-config helpers", () => {
   it("clearRuntimeConfig removes runtime.json when present", () => {
     const tmpHome = makeTempHome();
-    const runtimeDir = path.join(tmpHome, ".clawd");
+    const runtimeDir = path.join(tmpHome, ".deskbuddy");
     fs.mkdirSync(runtimeDir, { recursive: true });
     const runtimePath = path.join(runtimeDir, "runtime.json");
     fs.writeFileSync(runtimePath, JSON.stringify({ app: "deskbuddy", port: 23333 }));
@@ -39,7 +39,7 @@ describe("server-config helpers", () => {
     assert.ok(!result.fallback.includes(23335));
   });
 
-  it("probePort recognizes signed Clawd responses", async () => {
+  it("probePort recognizes signed DeskBuddy responses", async () => {
     await new Promise((resolve, reject) => {
       const req = {
         on(event, handler) {
@@ -95,12 +95,12 @@ describe("server-config helpers", () => {
       assert.strictEqual(result, "C:\\Program Files\\nodejs\\node.exe");
     });
 
-    it("rejects the packaged Clawd Electron host as execPath", () => {
+    it("rejects the packaged DeskBuddy Electron host as execPath", () => {
       const wherePath = "C:\\Program Files\\nodejs\\node.exe";
       const result = serverConfig.resolveNodeBin({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         accessSync(candidate) {
           if (candidate === wherePath) return;
           throw new Error("ENOENT");
@@ -116,7 +116,7 @@ describe("server-config helpers", () => {
       const result = serverConfig.resolveNodeBin({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         accessSync(candidate) {
           if (candidate === realNode) return;
           throw new Error("ENOENT");
@@ -131,7 +131,7 @@ describe("server-config helpers", () => {
       const result = serverConfig.resolveNodeBin({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         accessSync(candidate) {
           probed.push(candidate);
           if (candidate === "C:\\Program Files\\nodejs\\node.exe") return;
@@ -148,7 +148,7 @@ describe("server-config helpers", () => {
       const result = serverConfig.resolveNodeBin({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         accessSync(candidate) {
           if (candidate === realScoop) return;
           throw new Error("ENOENT");
@@ -158,16 +158,16 @@ describe("server-config helpers", () => {
       assert.strictEqual(result, realScoop);
     });
 
-    it("rejects Clawd on Desk.exe even when accessSync says it exists", () => {
-      // accessSync only succeeds for the Clawd.exe path so validator rejection
+    it("rejects DeskBuddy.exe even when accessSync says it exists", () => {
+      // accessSync only succeeds for the DeskBuddy.exe path so validator rejection
       // is the only thing standing between us and a wrong return value.
-      const clawdExe = "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe";
+      const deskbuddyExe = "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe";
       const result = serverConfig.resolveNodeBin({
         platform: "win32",
         env: WIN_ENV,
-        execPath: clawdExe,
+        execPath: deskbuddyExe,
         accessSync(candidate) {
-          if (candidate === clawdExe) return;
+          if (candidate === deskbuddyExe) return;
           throw new Error("ENOENT");
         },
         execFileSync() { return ""; },
@@ -180,7 +180,7 @@ describe("server-config helpers", () => {
       serverConfig.resolveNodeBin({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         accessSync() { throw new Error("ENOENT"); },
         execFileSync(cmd, args) {
           calls.push({ cmd, args });
@@ -195,17 +195,17 @@ describe("server-config helpers", () => {
       const result = serverConfig.resolveNodeBin({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         accessSync() { throw new Error("ENOENT"); },
         execFileSync() { throw new Error("where failed"); },
       });
       assert.strictEqual(result, null);
     });
 
-    it("validateWindowsNodeCandidate rejects Clawd, Electron, scoop shims, and non-node basenames", () => {
+    it("validateWindowsNodeCandidate rejects DeskBuddy, Electron, scoop shims, and non-node basenames", () => {
       const v = serverConfig.validateWindowsNodeCandidate;
       assert.strictEqual(v("C:\\Program Files\\nodejs\\node.exe"), "C:\\Program Files\\nodejs\\node.exe");
-      assert.strictEqual(v("C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe"), null);
+      assert.strictEqual(v("C:\\Program Files\\DeskBuddy\\DeskBuddy.exe"), null);
       assert.strictEqual(v("C:\\Windows\\System32\\Electron.exe"), null);
       assert.strictEqual(v("C:\\Users\\tester\\scoop\\shims\\node.exe"), null);
       assert.strictEqual(v("C:\\Users\\TESTER\\Scoop\\Shims\\node.exe"), null);
@@ -232,7 +232,7 @@ describe("server-config helpers", () => {
       const result = serverConfig.resolveNodeBin({
         platform: "win32",
         env: { ProgramFiles: "C:\\Program Files" },
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         execFileSync() { throw new Error("where failed"); },
         accessSync(candidate) {
           assert.ok(candidate.includes("\\"), `expected backslash in ${candidate}`);
@@ -263,7 +263,7 @@ describe("server-config helpers", () => {
       const fromWhere = await serverConfig.resolveNodeBinAsync({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         async access(candidate) {
           if (candidate === realNode) return;
           throw new Error("ENOENT");
@@ -275,7 +275,7 @@ describe("server-config helpers", () => {
       const fromCommon = await serverConfig.resolveNodeBinAsync({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         async access(candidate) {
           if (candidate === realNode) return;
           throw new Error("ENOENT");
@@ -287,7 +287,7 @@ describe("server-config helpers", () => {
       const none = await serverConfig.resolveNodeBinAsync({
         platform: "win32",
         env: WIN_ENV,
-        execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
+        execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
         async access() { throw new Error("ENOENT"); },
         async execFile() { throw new Error("where failed"); },
       });
@@ -596,7 +596,7 @@ describe("server-config helpers", () => {
     });
   });
 
-  it("postStateToRunningServer raises short timeouts in CLAWD_REMOTE mode", async () => {
+  it("postStateToRunningServer raises short timeouts in DESKBUDDY_REMOTE mode", async () => {
     const timeouts = [];
 
     await new Promise((resolve, reject) => {
@@ -605,7 +605,7 @@ describe("server-config helpers", () => {
         {
           timeoutMs: 100,
           preferredPort: 23333,
-          env: { CLAWD_REMOTE: "1" },
+          env: { DESKBUDDY_REMOTE: "1" },
           postStateToPort(port, _payload, timeoutMs, cb) {
             timeouts.push(timeoutMs);
             cb(true, port);
@@ -654,7 +654,7 @@ describe("server-config helpers", () => {
     });
   });
 
-  it("postStateToRunningServer lets remote false override CLAWD_REMOTE env", async () => {
+  it("postStateToRunningServer lets remote false override DESKBUDDY_REMOTE env", async () => {
     const timeouts = [];
 
     await new Promise((resolve, reject) => {
@@ -664,7 +664,7 @@ describe("server-config helpers", () => {
           timeoutMs: 100,
           preferredPort: 23333,
           remote: false,
-          env: { CLAWD_REMOTE: "1" },
+          env: { DESKBUDDY_REMOTE: "1" },
           postStateToPort(port, _payload, timeoutMs, cb) {
             timeouts.push(timeoutMs);
             cb(true, port);
@@ -684,7 +684,7 @@ describe("server-config helpers", () => {
     });
   });
 
-  it("postPermissionToRunningServer raises discovery timeout in CLAWD_REMOTE mode", async () => {
+  it("postPermissionToRunningServer raises discovery timeout in DESKBUDDY_REMOTE mode", async () => {
     let capturedTimeout = null;
 
     await new Promise((resolve, reject) => {
@@ -692,8 +692,8 @@ describe("server-config helpers", () => {
         JSON.stringify({ tool_name: "bash" }),
         {
           probeTimeoutMs: 100,
-          env: { CLAWD_REMOTE: "1" },
-          discoverClawdPort(options, cb) {
+          env: { DESKBUDDY_REMOTE: "1" },
+          discoverDeskBuddyPort(options, cb) {
             capturedTimeout = options.timeoutMs;
             cb(null);
           },
@@ -723,7 +723,7 @@ describe("server-config helpers", () => {
           probeTimeoutMs: 100,
           preferredPort: 23335,
           remote: true,
-          discoverClawdPort(options, cb) {
+          discoverDeskBuddyPort(options, cb) {
             capturedTimeout = options.timeoutMs;
             capturedPreferredPort = options.preferredPort;
             cb(23335);

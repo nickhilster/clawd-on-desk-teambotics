@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 function makeTempRoot() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-theme-metadata-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-theme-metadata-"));
   tempDirs.push(tmp);
   const builtinThemesDir = path.join(tmp, "themes");
   const userThemesDir = path.join(tmp, "userThemes");

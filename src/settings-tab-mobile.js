@@ -75,7 +75,7 @@
       html += `<button class="mobile-client-btn${preferredClient === "native" ? " active" : ""}" data-client="native">${escapeHtml(t("mobileClientNative") || "Native App")}</button>`;
       html += '</div>';
       if (preferredClient === "native") {
-        html += `<p class="mobile-client-note">${escapeHtml(t("mobileClientNativeNote") || "Requires the Clawd Mobile app to already be installed — this link won't fall back to a browser.")}</p>`;
+        html += `<p class="mobile-client-note">${escapeHtml(t("mobileClientNativeNote") || "Requires the DeskBuddy Mobile app to already be installed — this link won't fall back to a browser.")}</p>`;
       }
 
       // Connection details
@@ -104,8 +104,8 @@
         html += `<div class="mobile-qr-code">${info.qrSvg}</div>`;
         const qrHintKey = preferredClient === "native" ? "mobileQrHintNative" : "mobileQrHint";
         const qrHintFallback = preferredClient === "native"
-          ? "Scan with the Clawd Mobile app's built-in scanner"
-          : "Scan with your phone's camera to open Clawd on Mobile";
+          ? "Scan with the DeskBuddy Mobile app's built-in scanner"
+          : "Scan with your phone's camera to open DeskBuddy Mobile";
         html += `<p class="mobile-qr-hint">${escapeHtml(t(qrHintKey) || qrHintFallback)}</p>`;
         html += '</div>';
       }
@@ -185,12 +185,12 @@
 
     // Title & description
     const title = document.createElement("h3");
-    title.textContent = t("mobileTitle") || "Clawd on Mobile";
+    title.textContent = t("mobileTitle") || "DeskBuddy Mobile";
     section.appendChild(title);
 
     const desc = document.createElement("p");
     desc.className = "settings-tab-desc";
-    desc.textContent = t("mobileDesc") || "Add this machine to the Clawd on Mobile app on your phone to monitor sessions from anywhere.";
+    desc.textContent = t("mobileDesc") || "Add this machine to the DeskBuddy Mobile app on your phone to monitor sessions from anywhere.";
     section.appendChild(desc);
 
     // Enable toggle
@@ -230,5 +230,5 @@
     core.tabs["mobile"] = { render: renderMobileTab };
   }
 
-  root.ClawdSettingsTabMobile = { init };
+  root.DeskBuddySettingsTabMobile = { init };
 })(globalThis);

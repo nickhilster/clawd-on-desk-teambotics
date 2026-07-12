@@ -8,7 +8,7 @@ const { registerKiroHooks, KIRO_HOOK_EVENTS } = require("../hooks/kiro-install")
 const tempDirs = [];
 
 function makeTempKiroHome() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-kiro-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-kiro-"));
   const agentsDir = path.join(root, ".kiro", "agents");
   const settingsPath = path.join(root, ".kiro", "settings", "cli.json");
   fs.mkdirSync(agentsDir, { recursive: true });
@@ -28,18 +28,18 @@ afterEach(() => {
 });
 
 describe("Kiro hook installer", () => {
-  it("creates clawd.json from kiro_default template without changing cli settings", () => {
+  it("creates deskbuddy.json from kiro_default template without changing cli settings", () => {
     const { agentsDir, settingsPath } = makeTempKiroHome();
 
     const result = registerKiroHooks({
       silent: true,
       agentsDir,
       nodeBin: "/usr/local/bin/node",
-      syncClawdAgent(filePath) {
+      syncDeskBuddyAgent(filePath) {
         fs.writeFileSync(
           filePath,
           JSON.stringify({
-            name: "clawd",
+            name: "deskbuddy",
             description: "Default agent",
             prompt: "# Kiro CLI Default Agent",
             mcpServers: {},
@@ -61,26 +61,26 @@ describe("Kiro hook installer", () => {
       },
     });
 
-    const clawdPath = path.join(agentsDir, "clawd.json");
-    assert.ok(fs.existsSync(clawdPath));
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
+    assert.ok(fs.existsSync(deskbuddyPath));
 
-    const clawdAgent = readJson(clawdPath);
-    assert.strictEqual(clawdAgent.name, "clawd");
-    assert.strictEqual(clawdAgent.description, "Default agent");
-    assert.strictEqual(clawdAgent.prompt, "# Kiro CLI Default Agent");
-    assert.deepStrictEqual(clawdAgent.tools, ["*"]);
-    assert.deepStrictEqual(clawdAgent.resources, [
+    const deskbuddyAgent = readJson(deskbuddyPath);
+    assert.strictEqual(deskbuddyAgent.name, "deskbuddy");
+    assert.strictEqual(deskbuddyAgent.description, "Default agent");
+    assert.strictEqual(deskbuddyAgent.prompt, "# Kiro CLI Default Agent");
+    assert.deepStrictEqual(deskbuddyAgent.tools, ["*"]);
+    assert.deepStrictEqual(deskbuddyAgent.resources, [
       "file://AmazonQ.md",
       "file://AGENTS.md",
       "file://README.md",
     ]);
-    assert.strictEqual(clawdAgent.includeMcpJson, true);
-    assert.strictEqual(clawdAgent.model, null);
+    assert.strictEqual(deskbuddyAgent.includeMcpJson, true);
+    assert.strictEqual(deskbuddyAgent.model, null);
     for (const event of KIRO_HOOK_EVENTS) {
-      assert.ok(Array.isArray(clawdAgent.hooks[event]), `missing hooks for ${event}`);
-      assert.strictEqual(clawdAgent.hooks[event].length, 1);
-      assert.ok(clawdAgent.hooks[event][0].command.includes("kiro-hook.js"));
-      assert.ok(clawdAgent.hooks[event][0].command.includes("/usr/local/bin/node"));
+      assert.ok(Array.isArray(deskbuddyAgent.hooks[event]), `missing hooks for ${event}`);
+      assert.strictEqual(deskbuddyAgent.hooks[event].length, 1);
+      assert.ok(deskbuddyAgent.hooks[event][0].command.includes("kiro-hook.js"));
+      assert.ok(deskbuddyAgent.hooks[event][0].command.includes("/usr/local/bin/node"));
     }
 
     assert.strictEqual(fs.existsSync(settingsPath), false);
@@ -117,14 +117,14 @@ describe("Kiro hook installer", () => {
     }
   });
 
-  it("reseeds legacy hook-only clawd agent from kiro_default template", () => {
+  it("reseeds legacy hook-only deskbuddy agent from kiro_default template", () => {
     const { agentsDir } = makeTempKiroHome();
-    const clawdPath = path.join(agentsDir, "clawd.json");
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
     fs.writeFileSync(
-      clawdPath,
+      deskbuddyPath,
       JSON.stringify({
-        name: "clawd",
-        description: "Clawd desktop pet hook integration",
+        name: "deskbuddy",
+        description: "DeskBuddy desktop pet hook integration",
         hooks: {
           stop: [{ command: "\"/old/node\" \"/old/path/kiro-hook.js\"" }],
         },
@@ -136,11 +136,11 @@ describe("Kiro hook installer", () => {
       silent: true,
       agentsDir,
       nodeBin: "/usr/local/bin/node",
-      syncClawdAgent(filePath) {
+      syncDeskBuddyAgent(filePath) {
         fs.writeFileSync(
           filePath,
           JSON.stringify({
-            name: "clawd",
+            name: "deskbuddy",
             description: "Default agent",
             prompt: "# Kiro CLI Default Agent",
             tools: ["*"],
@@ -154,24 +154,24 @@ describe("Kiro hook installer", () => {
       },
     });
 
-    const clawdAgent = readJson(clawdPath);
-    assert.strictEqual(clawdAgent.description, "Default agent");
-    assert.strictEqual(clawdAgent.prompt, "# Kiro CLI Default Agent");
-    assert.deepStrictEqual(clawdAgent.tools, ["*"]);
-    assert.deepStrictEqual(clawdAgent.resources, ["file://README.md"]);
-    assert.strictEqual(clawdAgent.hooks.stop.length, 1);
-    assert.ok(clawdAgent.hooks.stop[0].command.includes("kiro-hook.js"));
-    assert.ok(!clawdAgent.hooks.stop[0].command.includes("/old/path/"));
+    const deskbuddyAgent = readJson(deskbuddyPath);
+    assert.strictEqual(deskbuddyAgent.description, "Default agent");
+    assert.strictEqual(deskbuddyAgent.prompt, "# Kiro CLI Default Agent");
+    assert.deepStrictEqual(deskbuddyAgent.tools, ["*"]);
+    assert.deepStrictEqual(deskbuddyAgent.resources, ["file://README.md"]);
+    assert.strictEqual(deskbuddyAgent.hooks.stop.length, 1);
+    assert.ok(deskbuddyAgent.hooks.stop[0].command.includes("kiro-hook.js"));
+    assert.ok(!deskbuddyAgent.hooks.stop[0].command.includes("/old/path/"));
   });
 
   it("updates stale hook paths without duplicating entries", () => {
     const { agentsDir, settingsPath } = makeTempKiroHome();
-    const clawdPath = path.join(agentsDir, "clawd.json");
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
     fs.writeFileSync(
-      clawdPath,
+      deskbuddyPath,
       JSON.stringify({
-        name: "clawd",
-        description: "Clawd desktop pet hook integration",
+        name: "deskbuddy",
+        description: "DeskBuddy desktop pet hook integration",
         hooks: {
           stop: [{ command: "\"/old/node\" \"/old/path/kiro-hook.js\"" }],
           preToolUse: [
@@ -187,28 +187,28 @@ describe("Kiro hook installer", () => {
       agentsDir,
       settingsPath,
       nodeBin: "/usr/local/bin/node",
-      syncClawdAgent(filePath) {
+      syncDeskBuddyAgent(filePath) {
         // Preserve existing content — sync is not the focus of this test
         const current = readJson(filePath);
         return { synced: true, changed: false };
       },
     });
 
-    const clawdAgent = readJson(clawdPath);
+    const deskbuddyAgent = readJson(deskbuddyPath);
     assert.strictEqual(result.updated, 2);
-    assert.strictEqual(clawdAgent.hooks.stop.length, 1);
-    assert.ok(clawdAgent.hooks.stop[0].command.includes("/usr/local/bin/node"));
-    assert.ok(clawdAgent.hooks.stop[0].command.includes("hooks/kiro-hook.js"));
-    assert.ok(!clawdAgent.hooks.stop[0].command.includes("/old/path/"));
+    assert.strictEqual(deskbuddyAgent.hooks.stop.length, 1);
+    assert.ok(deskbuddyAgent.hooks.stop[0].command.includes("/usr/local/bin/node"));
+    assert.ok(deskbuddyAgent.hooks.stop[0].command.includes("hooks/kiro-hook.js"));
+    assert.ok(!deskbuddyAgent.hooks.stop[0].command.includes("/old/path/"));
   });
 
-  it("re-syncs clawd.json from the latest kiro_default template on every run", () => {
+  it("re-syncs deskbuddy.json from the latest kiro_default template on every run", () => {
     const { agentsDir } = makeTempKiroHome();
-    const clawdPath = path.join(agentsDir, "clawd.json");
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
     fs.writeFileSync(
-      clawdPath,
+      deskbuddyPath,
       JSON.stringify({
-        name: "clawd",
+        name: "deskbuddy",
         description: "Old default agent",
         prompt: "outdated",
         tools: ["old-tool"],
@@ -226,12 +226,12 @@ describe("Kiro hook installer", () => {
       silent: true,
       agentsDir,
       nodeBin: "/usr/local/bin/node",
-      syncClawdAgent(filePath) {
+      syncDeskBuddyAgent(filePath) {
         const current = readJson(filePath);
         fs.writeFileSync(
           filePath,
           JSON.stringify({
-            name: "clawd",
+            name: "deskbuddy",
             description: "Default agent",
             prompt: "# Kiro CLI Default Agent",
             tools: ["*"],
@@ -246,22 +246,22 @@ describe("Kiro hook installer", () => {
       },
     });
 
-    const clawdAgent = readJson(clawdPath);
-    assert.strictEqual(clawdAgent.description, "Default agent");
-    assert.strictEqual(clawdAgent.prompt, "# Kiro CLI Default Agent");
-    assert.deepStrictEqual(clawdAgent.tools, ["*"]);
-    assert.deepStrictEqual(clawdAgent.resources, ["file://README.md"]);
-    assert.strictEqual(clawdAgent.includeMcpJson, true);
-    assert.strictEqual(clawdAgent.model, null);
+    const deskbuddyAgent = readJson(deskbuddyPath);
+    assert.strictEqual(deskbuddyAgent.description, "Default agent");
+    assert.strictEqual(deskbuddyAgent.prompt, "# Kiro CLI Default Agent");
+    assert.deepStrictEqual(deskbuddyAgent.tools, ["*"]);
+    assert.deepStrictEqual(deskbuddyAgent.resources, ["file://README.md"]);
+    assert.strictEqual(deskbuddyAgent.includeMcpJson, true);
+    assert.strictEqual(deskbuddyAgent.model, null);
     assert.ok(result.updated >= 1);
-    assert.ok(clawdAgent.hooks.stop[0].command.includes("hooks/kiro-hook.js"));
+    assert.ok(deskbuddyAgent.hooks.stop[0].command.includes("hooks/kiro-hook.js"));
   });
 
-  it("EXCLUDED_KEYS filtering: model/includeMcpJson absent, description always Clawd's", {
+  it("EXCLUDED_KEYS filtering: model/includeMcpJson absent, description always DeskBuddy's", {
     skip: process.platform === "win32" ? "fake kiro-cli uses POSIX shell script" : false,
   }, () => {
     const { agentsDir } = makeTempKiroHome();
-    const clawdPath = path.join(agentsDir, "clawd.json");
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
 
     // Create a fake kiro-cli script that writes a template JSON
     const fakeBin = path.join(agentsDir, "fake-kiro-cli");
@@ -298,18 +298,18 @@ fi
     fs.chmodSync(fakeBin, 0o755);
 
     const { __test } = require("../hooks/kiro-install");
-    const syncResult = __test.syncClawdAgentFromBuiltin(clawdPath, {
+    const syncResult = __test.syncDeskBuddyAgentFromBuiltin(deskbuddyPath, {
       homeDir: path.dirname(agentsDir),
       kiroCliCandidates: [fakeBin],
       silent: true,
     });
 
     assert.ok(syncResult.synced);
-    assert.ok(fs.existsSync(clawdPath));
+    assert.ok(fs.existsSync(deskbuddyPath));
 
-    const agent = readJson(clawdPath);
-    // Name is always overridden to "clawd"
-    assert.strictEqual(agent.name, "clawd");
+    const agent = readJson(deskbuddyPath);
+    // Name is always overridden to "deskbuddy"
+    assert.strictEqual(agent.name, "deskbuddy");
     // Prompt, tools, resources, mcpServers should pass through
     assert.strictEqual(agent.prompt, "# Default prompt");
     assert.deepStrictEqual(agent.tools, ["*"]);
@@ -320,27 +320,27 @@ fi
       "model should be excluded");
     assert.strictEqual(Object.prototype.hasOwnProperty.call(agent, "includeMcpJson"), false,
       "includeMcpJson should be excluded");
-    assert.strictEqual(agent.description, "Clawd desktop pet hook integration");
+    assert.strictEqual(agent.description, "DeskBuddy desktop pet hook integration");
     assert.deepStrictEqual(agent.hooks, {});
   });
 
   it("fallback to minimal agent when kiro-cli is unavailable", () => {
     const { agentsDir } = makeTempKiroHome();
-    const clawdPath = path.join(agentsDir, "clawd.json");
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
 
     const { __test } = require("../hooks/kiro-install");
-    const syncResult = __test.syncClawdAgentFromBuiltin(clawdPath, {
+    const syncResult = __test.syncDeskBuddyAgentFromBuiltin(deskbuddyPath, {
       homeDir: path.dirname(agentsDir),
       kiroCliCandidates: ["/nonexistent/kiro-cli"],
       silent: true,
     });
 
     assert.ok(syncResult.synced);
-    assert.ok(fs.existsSync(clawdPath));
+    assert.ok(fs.existsSync(deskbuddyPath));
 
-    const agent = readJson(clawdPath);
-    assert.strictEqual(agent.name, "clawd");
-    assert.strictEqual(agent.description, "Clawd desktop pet hook integration");
+    const agent = readJson(deskbuddyPath);
+    assert.strictEqual(agent.name, "deskbuddy");
+    assert.strictEqual(agent.description, "DeskBuddy desktop pet hook integration");
     // No prompt/tools/resources in fallback
     assert.strictEqual(Object.prototype.hasOwnProperty.call(agent, "prompt"), false);
     assert.strictEqual(Object.prototype.hasOwnProperty.call(agent, "tools"), false);
@@ -401,18 +401,18 @@ fi
       agentsDir,
       nodeBin: "node",
       platform: "win32",
-      syncClawdAgent(filePath) {
+      syncDeskBuddyAgent(filePath) {
         fs.writeFileSync(
           filePath,
-          JSON.stringify({ name: "clawd", description: "x", hooks: {} }, null, 2),
+          JSON.stringify({ name: "deskbuddy", description: "x", hooks: {} }, null, 2),
           "utf8"
         );
       },
     });
 
-    const clawdAgent = readJson(path.join(agentsDir, "clawd.json"));
+    const deskbuddyAgent = readJson(path.join(agentsDir, "deskbuddy.json"));
     for (const event of KIRO_HOOK_EVENTS) {
-      const cmd = clawdAgent.hooks[event][0].command;
+      const cmd = deskbuddyAgent.hooks[event][0].command;
       assert.ok(cmd.startsWith("& "), `${event} must start with PowerShell call operator: ${cmd}`);
       assert.ok(cmd.includes("kiro-hook.js"));
     }
@@ -422,7 +422,7 @@ fi
     skip: process.platform === "win32" ? "fake kiro-cli uses POSIX shell" : false,
   }, () => {
     const { agentsDir } = makeTempKiroHome();
-    const clawdPath = path.join(agentsDir, "clawd.json");
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
 
     // Fake kiro-cli: write the file, then exit 1 (simulates EDITOR mis-fire on Windows)
     const fakeBin = path.join(agentsDir, "fake-kiro-cli-failexit");
@@ -454,7 +454,7 @@ exit 1
     fs.chmodSync(fakeBin, 0o755);
 
     const { __test } = require("../hooks/kiro-install");
-    const result = __test.generateClawdTemplateFromBuiltin({
+    const result = __test.generateDeskBuddyTemplateFromBuiltin({
       homeDir: path.dirname(agentsDir),
       kiroCliCandidates: [fakeBin],
     });
@@ -463,24 +463,24 @@ exit 1
     assert.strictEqual(result.template.prompt, "# Survived non-zero exit");
   });
 
-  it("fallback preserves existing clawd.json when kiro-cli is unavailable", () => {
+  it("fallback preserves existing deskbuddy.json when kiro-cli is unavailable", () => {
     const { agentsDir } = makeTempKiroHome();
-    const clawdPath = path.join(agentsDir, "clawd.json");
+    const deskbuddyPath = path.join(agentsDir, "deskbuddy.json");
 
-    // Pre-seed a full clawd.json (simulates a prior successful sync)
+    // Pre-seed a full deskbuddy.json (simulates a prior successful sync)
     const preExisting = {
-      name: "clawd",
-      description: "Clawd desktop pet hook integration",
+      name: "deskbuddy",
+      description: "DeskBuddy desktop pet hook integration",
       prompt: "# Custom prompt from previous run",
       tools: ["*"],
       resources: ["file://README.md"],
       mcpServers: { foo: { command: "bar" } },
       hooks: { stop: [{ command: "node /path/to/kiro-hook.js" }] },
     };
-    fs.writeFileSync(clawdPath, JSON.stringify(preExisting, null, 2), "utf8");
+    fs.writeFileSync(deskbuddyPath, JSON.stringify(preExisting, null, 2), "utf8");
 
     const { __test } = require("../hooks/kiro-install");
-    const syncResult = __test.syncClawdAgentFromBuiltin(clawdPath, {
+    const syncResult = __test.syncDeskBuddyAgentFromBuiltin(deskbuddyPath, {
       homeDir: path.dirname(agentsDir),
       kiroCliCandidates: ["/nonexistent/kiro-cli"],
       silent: true,
@@ -488,6 +488,6 @@ exit 1
 
     assert.ok(syncResult.synced);
     assert.strictEqual(syncResult.changed, false, "should not touch existing file");
-    assert.deepStrictEqual(readJson(clawdPath), preExisting, "content must be byte-identical");
+    assert.deepStrictEqual(readJson(deskbuddyPath), preExisting, "content must be byte-identical");
   });
 });

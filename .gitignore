@@ -5,6 +5,9 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+.vscode/
+hs_err_pid*.log
+replay_pid*.log
 
 # Claude Code local config
 .claude/

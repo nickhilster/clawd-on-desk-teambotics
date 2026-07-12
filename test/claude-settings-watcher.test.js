@@ -63,7 +63,7 @@ function makeWatcher(overrides = {}) {
       Stop: [
         {
           matcher: "",
-          hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" Stop' }],
+          hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' }],
         },
       ],
       PermissionRequest: [
@@ -98,7 +98,7 @@ function makeWatcher(overrides = {}) {
     getHookServerPort: () => 23333,
     shouldManageClaudeHooks: () => true,
     isAgentEnabled: () => true,
-    syncClawdHooks: () => syncCalls.push("claude"),
+    syncDeskBuddyHooks: () => syncCalls.push("claude"),
     ...ctxOverrides,
   });
 
@@ -122,13 +122,13 @@ describe("settingsNeedClaudeHookResync", () => {
     const expectedUrl = "http://127.0.0.1:23333/permission";
     const intact = JSON.stringify({
       hooks: {
-        Stop: [{ matcher: "", hooks: [{ type: "command", command: "node clawd-hook.js Stop" }] }],
+        Stop: [{ matcher: "", hooks: [{ type: "command", command: "node deskbuddy-hook.js Stop" }] }],
         PermissionRequest: [{ matcher: "", hooks: [{ type: "http", url: expectedUrl }] }],
       },
     });
     const wrongPermissionPort = JSON.stringify({
       hooks: {
-        Stop: [{ matcher: "", hooks: [{ type: "command", command: "node clawd-hook.js Stop" }] }],
+        Stop: [{ matcher: "", hooks: [{ type: "command", command: "node deskbuddy-hook.js Stop" }] }],
         PermissionRequest: [{ matcher: "", hooks: [{ type: "http", url: "http://127.0.0.1:23335/permission" }] }],
       },
     });
@@ -182,7 +182,7 @@ describe("createClaudeSettingsWatcher", () => {
     assert.deepStrictEqual(syncCalls, ["claude"]);
   });
 
-  it("re-syncs when a healthy Clawd-only baseline loses hooks", () => {
+  it("re-syncs when a healthy DeskBuddy-only baseline loses hooks", () => {
     const { watcher, timers, syncCalls, getWatcher, setSettingsRaw } = makeWatcher();
 
     watcher.start();
@@ -193,14 +193,14 @@ describe("createClaudeSettingsWatcher", () => {
     assert.deepStrictEqual(syncCalls, ["claude"]);
   });
 
-  it("treats Clawd auto-start hooks as managed when checking for suspicious shrink", () => {
-    const clawdOnlyWithAutoStart = JSON.stringify({
+  it("treats DeskBuddy auto-start hooks as managed when checking for suspicious shrink", () => {
+    const deskbuddyOnlyWithAutoStart = JSON.stringify({
       hooks: {
         SessionStart: [{
           matcher: "",
           hooks: [
             { type: "command", command: 'node "/tmp/auto-start.js"' },
-            { type: "command", command: 'node "/tmp/clawd-hook.js" SessionStart' },
+            { type: "command", command: 'node "/tmp/deskbuddy-hook.js" SessionStart' },
           ],
         }],
         PermissionRequest: [{
@@ -210,7 +210,7 @@ describe("createClaudeSettingsWatcher", () => {
       },
     });
     const { watcher, timers, syncCalls, getWatcher, setSettingsRaw } = makeWatcher({
-      initialSettingsRaw: clawdOnlyWithAutoStart,
+      initialSettingsRaw: deskbuddyOnlyWithAutoStart,
     });
 
     watcher.start();
@@ -233,7 +233,7 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
       Stop: [{
         matcher: "",
         hooks: [
-          { type: "command", command: 'node "/tmp/clawd-hook.js" Stop' },
+          { type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' },
           { type: "command", command: "node /home/u/.claude/hooks/maestro-audit.mjs" },
           { type: "command", command: "node /home/u/.claude/hooks/secret-guard.js" },
         ],
@@ -264,7 +264,7 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
       Stop: [{
         matcher: "",
         hooks: [
-          { type: "command", command: 'node "/tmp/clawd-hook.js" Stop' },
+          { type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' },
           { type: "command", command: "node /home/u/.claude/hooks/my-auto-start.js" },
           { type: "command", command: "node /home/u/.claude/hooks/secret-guard.js" },
         ],
@@ -276,7 +276,7 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
     },
   });
 
-  // Marker-removed minor shrink — user removes clawd hook only; one command hook lost (13 -> 12), keys unchanged.
+  // Marker-removed minor shrink — user removes deskbuddy hook only; one command hook lost (13 -> 12), keys unchanged.
   const SETTINGS_AFTER_USER_REMOVES_ONE_HOOK = JSON.stringify({
     env: { FOO: "bar" },
     permissions: { allow: ["*"], deny: [], defaultMode: "ask" },
@@ -304,7 +304,7 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
     },
   });
 
-  const SETTINGS_AFTER_USER_REMOVES_CLAWD_AND_ONE_THIRD_PARTY_HOOK = JSON.stringify({
+  const SETTINGS_AFTER_USER_REMOVES_DESKBUDDY_AND_ONE_THIRD_PARTY_HOOK = JSON.stringify({
     env: { FOO: "bar" },
     permissions: { allow: ["*"], deny: [], defaultMode: "ask" },
     enabledPlugins: { a: 1, b: 2 },
@@ -350,10 +350,10 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
   });
 
   it("allows resync on first tick when start() found no healthy baseline to seed", () => {
-    // If Clawd boots while settings.json is already unhealthy (fresh install,
+    // If DeskBuddy boots while settings.json is already unhealthy (fresh install,
     // marker missing, parse error), the seed step skips and lastTrustedSnapshot
     // stays null. In that state the watcher must still resync on the first
-    // event, otherwise Clawd hooks would never get reinstalled.
+    // event, otherwise DeskBuddy hooks would never get reinstalled.
     const { watcher, timers, syncCalls, getWatcher, setSettingsRaw } = makeWatcher({
       initialSettingsRaw: '{"hooks":{}}',
     });
@@ -416,7 +416,7 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
     getWatcher().emitChange("settings.json");
     timers.flush();
 
-    setSettingsRaw(SETTINGS_AFTER_USER_REMOVES_CLAWD_AND_ONE_THIRD_PARTY_HOOK);
+    setSettingsRaw(SETTINGS_AFTER_USER_REMOVES_DESKBUDDY_AND_ONE_THIRD_PARTY_HOOK);
     getWatcher().emitChange("settings.json");
     timers.flush();
 
@@ -444,7 +444,7 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
   });
 
   it("seeds the baseline on start so the very first watcher event can trip the guard", () => {
-    // Cold start: Clawd just synced healthy hooks, then an external CLI minimizes
+    // Cold start: DeskBuddy just synced healthy hooks, then an external CLI minimizes
     // settings.json before the watcher has observed any healthy fs event itself.
     // Without seeding on start(), the first comparison would have a null baseline
     // and the guard would let the destructive resync through.
@@ -496,7 +496,7 @@ describe("createClaudeSettingsWatcher — suspicious shrink protection", () => {
     // currentSnapshot=null and bails out, letting the regular resync path run.
     // Treating malformed payloads as "not an attack" is intentional — they may
     // come from a partially-written file or an unrelated tool, and aggressively
-    // skipping resync there would leave Clawd unable to recover its own hooks.
+    // skipping resync there would leave DeskBuddy unable to recover its own hooks.
     // Rate limit is disabled here so both payloads can independently fire resync.
     const { watcher, timers, syncCalls, getWatcher, setSettingsRaw } = makeWatcher({
       initialSettingsRaw: HEALTHY_SETTINGS,

@@ -247,5 +247,5 @@
     core.tabs["mdown-manager"] = { render };
   }
 
-  root.ClawdSettingsTabMdownManager = { init };
+  root.DeskBuddySettingsTabMdownManager = { init };
 })(globalThis);

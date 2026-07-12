@@ -103,9 +103,9 @@ function createTopmostRuntime(options = {}) {
     if (!isMac) return;
     const apply = (win) => {
       if (!isLiveWindow(win)) return;
-      const deferUntil = Number(win.__clawdMacDeferredVisibilityUntil) || 0;
+      const deferUntil = Number(win.__deskbuddyMacDeferredVisibilityUntil) || 0;
       if (deferUntil > Date.now()) return;
-      if (deferUntil) delete win.__clawdMacDeferredVisibilityUntil;
+      if (deferUntil) delete win.__deskbuddyMacDeferredVisibilityUntil;
       win.setAlwaysOnTop(true, MAC_TOPMOST_LEVEL);
       if (!applyStationaryCollectionBehavior(win)) {
         const options = { visibleOnFullScreen: true };
@@ -301,7 +301,7 @@ function createTopmostRuntime(options = {}) {
 
   function startFocusablePoll() {
     if (!isWin || focusablePoll) return;
-    // Sync once up front: if Clawd starts (or this re-arms) while a fullscreen
+    // Sync once up front: if DeskBuddy starts (or this re-arms) while a fullscreen
     // game is already foreground, drop the hit window's activation immediately
     // rather than leaving it activatable for up to one poll interval (the hit
     // window is created focusable: true). Idempotent, so the desktop case is a

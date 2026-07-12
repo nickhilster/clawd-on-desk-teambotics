@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Clawd - Qwen Code lifecycle and permission hook.
+// DeskBuddy - Qwen Code lifecycle and permission hook.
 // Registered in ~/.qwen/settings.json by hooks/qwen-code-install.js
 
 const crypto = require("crypto");
@@ -89,7 +89,7 @@ function resolveHookName(payload, argvEvent) {
 }
 
 function readHookDebugMaxBytes(env = process.env) {
-  const raw = env.CLAWD_QWEN_HOOK_DEBUG_MAX_BYTES;
+  const raw = env.DESKBUDDY_QWEN_HOOK_DEBUG_MAX_BYTES;
   if (typeof raw !== "string" || !raw.trim()) return DEFAULT_HOOK_DEBUG_MAX_BYTES;
   const parsed = Number.parseInt(raw.trim(), 10);
   if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_HOOK_DEBUG_MAX_BYTES;
@@ -97,9 +97,9 @@ function readHookDebugMaxBytes(env = process.env) {
 }
 
 function appendHookDebug(entry, env = process.env) {
-  if (env.CLAWD_QWEN_HOOK_DEBUG !== "1") return;
-  const debugPath = env.CLAWD_QWEN_HOOK_DEBUG_PATH
-    || path.join(os.homedir(), ".clawd", "qwen-hook-debug.jsonl");
+  if (env.DESKBUDDY_QWEN_HOOK_DEBUG !== "1") return;
+  const debugPath = env.DESKBUDDY_QWEN_HOOK_DEBUG_PATH
+    || path.join(os.homedir(), ".deskbuddy", "qwen-hook-debug.jsonl");
   try {
     const line = `${JSON.stringify(entry)}\n`;
     const maxBytes = readHookDebugMaxBytes(env);
@@ -272,7 +272,7 @@ function requestQwenPermission(body, callback, deps = {}) {
 async function run(payload, argvEvent, deps = {}) {
   const env = deps.env || process.env;
   const hookName = resolveHookName(payload, argvEvent);
-  const remote = !!env.CLAWD_REMOTE;
+  const remote = !!env.DESKBUDDY_REMOTE;
   const resolve = deps.resolvePid || (() => ({}));
   const host = remote && deps.readHostPrefix ? deps.readHostPrefix() : undefined;
 

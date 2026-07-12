@@ -6,16 +6,16 @@ const assert = require("node:assert");
 const {
   INITIAL_DISCOVER_TIMEOUT_MS,
   STARTUP_DISCOVER_TIMEOUT_MS,
-  waitForClawdPort,
+  waitForDeskBuddyPort,
   main,
 } = require("../hooks/auto-start");
 
-test("auto-start exits without launching when Clawd is already listening", async () => {
+test("auto-start exits without launching when DeskBuddy is already listening", async () => {
   const calls = [];
 
   await new Promise((resolve) => {
     main({
-      discoverClawdPort(options, callback) {
+      discoverDeskBuddyPort(options, callback) {
         calls.push(["discover", options.timeoutMs]);
         callback(23333);
       },
@@ -41,7 +41,7 @@ test("auto-start waits for the cold-launched app before exiting", async () => {
 
   await new Promise((resolve) => {
     main({
-      discoverClawdPort(options, callback) {
+      discoverDeskBuddyPort(options, callback) {
         calls.push(["discover", options.timeoutMs]);
         callback(ports.shift() || null);
       },
@@ -70,17 +70,17 @@ test("auto-start waits for the cold-launched app before exiting", async () => {
   ]);
 });
 
-test("waitForClawdPort gives up after the startup deadline", async () => {
+test("waitForDeskBuddyPort gives up after the startup deadline", async () => {
   const calls = [];
   let now = 0;
 
   await new Promise((resolve) => {
-    waitForClawdPort({
+    waitForDeskBuddyPort({
       timeoutMs: 250,
       intervalMs: 100,
       discoverTimeoutMs: 10,
       now: () => now,
-      discoverClawdPort(options, callback) {
+      discoverDeskBuddyPort(options, callback) {
         calls.push(["discover", options.timeoutMs, now]);
         callback(null);
       },

@@ -8,7 +8,7 @@ const { registerOpencodePlugin, resolvePluginDir } = require("../hooks/opencode-
 const tempDirs = [];
 
 function makeTempConfigDir(initial) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-opencode-install-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-opencode-install-"));
   tempDirs.push(tmpDir);
   const configPath = path.join(tmpDir, "opencode.json");
   if (initial !== undefined) {
@@ -30,11 +30,11 @@ afterEach(() => {
 describe("opencode plugin installer", () => {
   it("creates opencode.json when missing and registers the plugin path", () => {
     const configPath = path.join(
-      fs.mkdtempSync(path.join(os.tmpdir(), "clawd-opencode-install-")),
+      fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-opencode-install-")),
       "opencode.json",
     );
     tempDirs.push(path.dirname(configPath));
-    const pluginDir = "/fake/clawd/hooks/opencode-plugin";
+    const pluginDir = "/fake/deskbuddy/hooks/opencode-plugin";
 
     const result = registerOpencodePlugin({ silent: true, configPath, pluginDir });
 
@@ -48,7 +48,7 @@ describe("opencode plugin installer", () => {
 
   it("appends to an existing empty config without clobbering $schema", () => {
     const configPath = makeTempConfigDir({ $schema: "https://opencode.ai/config.json" });
-    const pluginDir = "/fake/clawd/hooks/opencode-plugin";
+    const pluginDir = "/fake/deskbuddy/hooks/opencode-plugin";
 
     const result = registerOpencodePlugin({ silent: true, configPath, pluginDir });
 
@@ -63,7 +63,7 @@ describe("opencode plugin installer", () => {
     const configPath = makeTempConfigDir({
       plugin: ["opencode-wakatime", "@someone/other-plugin"],
     });
-    const pluginDir = "/fake/clawd/hooks/opencode-plugin";
+    const pluginDir = "/fake/deskbuddy/hooks/opencode-plugin";
 
     registerOpencodePlugin({ silent: true, configPath, pluginDir });
 
@@ -77,7 +77,7 @@ describe("opencode plugin installer", () => {
 
   it("is idempotent on repeated registration", () => {
     const configPath = makeTempConfigDir({});
-    const pluginDir = "/fake/clawd/hooks/opencode-plugin";
+    const pluginDir = "/fake/deskbuddy/hooks/opencode-plugin";
 
     registerOpencodePlugin({ silent: true, configPath, pluginDir });
     const second = registerOpencodePlugin({ silent: true, configPath, pluginDir });
@@ -113,7 +113,7 @@ describe("opencode plugin installer", () => {
     // substring. Basename equality requires the full final segment to match.
     const thirdParty = "/some/where/opencode-plugin-wakatime";
     const configPath = makeTempConfigDir({ plugin: [thirdParty] });
-    const pluginDir = "/fake/clawd/hooks/opencode-plugin";
+    const pluginDir = "/fake/deskbuddy/hooks/opencode-plugin";
 
     const result = registerOpencodePlugin({ silent: true, configPath, pluginDir });
 
@@ -125,13 +125,13 @@ describe("opencode plugin installer", () => {
   it("does not stomp scoped npm packages named opencode-plugin", () => {
     // opencode.json accepts both absolute paths and npm package specifiers.
     // path.basename("@vendor/opencode-plugin") === "opencode-plugin", so a
-    // naive basename check would clobber the scoped package. Clawd only ever
+    // naive basename check would clobber the scoped package. DeskBuddy only ever
     // writes absolute paths, so the stale-path match must be gated on the
     // entry actually being an absolute path.
     const scoped = "@vendor/opencode-plugin";
     const bareNpm = "opencode-plugin"; // hypothetical unscoped npm pkg
     const configPath = makeTempConfigDir({ plugin: [scoped, bareNpm] });
-    const pluginDir = "/fake/clawd/hooks/opencode-plugin";
+    const pluginDir = "/fake/deskbuddy/hooks/opencode-plugin";
 
     const result = registerOpencodePlugin({ silent: true, configPath, pluginDir });
 
@@ -143,9 +143,9 @@ describe("opencode plugin installer", () => {
   it("updates stale Windows absolute plugin paths", () => {
     // Config files can roam between machines; a Windows-style absolute path
     // (C:/...) should still be recognized as stale even when tests run on POSIX.
-    const staleWin = "C:/old/clawd/hooks/opencode-plugin";
+    const staleWin = "C:/old/deskbuddy/hooks/opencode-plugin";
     const configPath = makeTempConfigDir({ plugin: [staleWin] });
-    const pluginDir = "/new/clawd/hooks/opencode-plugin";
+    const pluginDir = "/new/deskbuddy/hooks/opencode-plugin";
 
     const result = registerOpencodePlugin({ silent: true, configPath, pluginDir });
 
@@ -156,7 +156,7 @@ describe("opencode plugin installer", () => {
 
   it("skips silently when ~/.config/opencode/ does not exist (no configPath override)", () => {
     // Use a non-existent home dir by overriding HOME temporarily
-    const fakeHome = path.join(os.tmpdir(), `clawd-opencode-no-config-${Date.now()}`);
+    const fakeHome = path.join(os.tmpdir(), `deskbuddy-opencode-no-config-${Date.now()}`);
     const prevHome = process.env.HOME;
     const prevUserProfile = process.env.USERPROFILE;
     process.env.HOME = fakeHome;
@@ -175,7 +175,7 @@ describe("opencode plugin installer", () => {
 
   it("initializes plugin array when config has none", () => {
     const configPath = makeTempConfigDir({ $schema: "https://opencode.ai/config.json", theme: "dark" });
-    const pluginDir = "/fake/clawd/hooks/opencode-plugin";
+    const pluginDir = "/fake/deskbuddy/hooks/opencode-plugin";
 
     registerOpencodePlugin({ silent: true, configPath, pluginDir });
 
@@ -191,14 +191,14 @@ describe("resolvePluginDir", () => {
   // POSIX-style absolute paths, so we check suffix/shape rather than exact strings.
 
   it("returns a path ending with /opencode-plugin and uses forward slashes", () => {
-    const result = resolvePluginDir("/app/clawd/hooks");
+    const result = resolvePluginDir("/app/deskbuddy/hooks");
     assert.ok(result.endsWith("/opencode-plugin"), `got: ${result}`);
     assert.ok(!result.includes("\\"), `backslashes leaked: ${result}`);
-    assert.ok(result.includes("/app/clawd/hooks/"), `base dir missing: ${result}`);
+    assert.ok(result.includes("/app/deskbuddy/hooks/"), `base dir missing: ${result}`);
   });
 
   it("replaces app.asar with app.asar.unpacked for packaged builds", () => {
-    const result = resolvePluginDir("/Applications/Clawd.app/Contents/Resources/app.asar/hooks");
+    const result = resolvePluginDir("/Applications/DeskBuddy.app/Contents/Resources/app.asar/hooks");
     assert.ok(
       result.includes("app.asar.unpacked/hooks/opencode-plugin"),
       `expected app.asar.unpacked segment, got: ${result}`,
@@ -211,8 +211,8 @@ describe("resolvePluginDir", () => {
   });
 
   it("leaves non-asar paths unchanged apart from suffix append", () => {
-    const result = resolvePluginDir("/home/user/clawd-dev/hooks");
-    assert.ok(result.endsWith("/home/user/clawd-dev/hooks/opencode-plugin"), `got: ${result}`);
+    const result = resolvePluginDir("/home/user/deskbuddy-dev/hooks");
+    assert.ok(result.endsWith("/home/user/deskbuddy-dev/hooks/opencode-plugin"), `got: ${result}`);
     assert.ok(!result.includes("asar"), `asar keyword leaked: ${result}`);
   });
 });

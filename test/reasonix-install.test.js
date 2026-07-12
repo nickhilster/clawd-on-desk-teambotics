@@ -15,7 +15,7 @@ const { decodeWindowsEncodedCommand } = require("../hooks/json-utils");
 const tempDirs = [];
 
 function makeTempHome() {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-reasonix-home-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-reasonix-home-"));
   tempDirs.push(home);
   fs.mkdirSync(path.join(home, ".reasonix"), { recursive: true });
   return home;
@@ -51,7 +51,7 @@ describe("Reasonix hook installer", () => {
   });
 
   it("installs into the Windows Reasonix home under APPDATA", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-reasonix-appdata-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-reasonix-appdata-"));
     tempDirs.push(root);
     const appData = path.join(root, "Roaming");
     const reasonixHome = path.join(appData, "reasonix");
@@ -138,7 +138,7 @@ describe("Reasonix hook installer", () => {
     };
     const staleCommand = __test.buildReasonixHookCommand(
       "C:\\Old Node\\node.exe",
-      "C:/old-clawd/hooks/reasonix-hook.js",
+      "C:/old-deskbuddy/hooks/reasonix-hook.js",
       options
     );
     fs.writeFileSync(settingsPath, JSON.stringify({
@@ -160,7 +160,7 @@ describe("Reasonix hook installer", () => {
     assert.strictEqual(settings.hooks.Stop[1].command, "echo user-hook");
     const decoded = decodeWindowsEncodedCommand(settings.hooks.Stop[0].command);
     assert.match(decoded, /reasonix-hook\.js/);
-    assert.doesNotMatch(decoded, /old-clawd/);
+    assert.doesNotMatch(decoded, /old-deskbuddy/);
     assert.match(decoded, /C:\\Program Files\\nodejs\\node\.exe/);
   });
 
@@ -178,7 +178,7 @@ describe("Reasonix hook installer", () => {
 
   it("uses PowerShell EncodedCommand on Windows when node path has spaces", () => {
     const nodeBin = "C:\\Program Files\\nodejs\\node.exe";
-    const scriptPath = "D:/clawd/Clawd on Desk/resources/hooks/reasonix-hook.js";
+    const scriptPath = "D:/deskbuddy/DeskBuddy/resources/hooks/reasonix-hook.js";
     const command = __test.buildReasonixHookCommand(
       nodeBin,
       scriptPath,
@@ -199,7 +199,7 @@ describe("Reasonix hook installer", () => {
 
   it("uses PowerShell EncodedCommand on Windows when script path has spaces", () => {
     const nodeBin = "C:\\nodejs\\node.exe";
-    const scriptPath = "D:/Clawd on Desk/hooks/reasonix-hook.js";
+    const scriptPath = "D:/DeskBuddy/hooks/reasonix-hook.js";
     const command = __test.buildReasonixHookCommand(
       nodeBin,
       scriptPath,
@@ -207,12 +207,12 @@ describe("Reasonix hook installer", () => {
     );
 
     // nodeBin has no spaces, so no encoded wrapper (only nodeBin triggers it)
-    // This is fine because cmd /c node "D:/Clawd on Desk/..." with quotes works
+    // This is fine because cmd /c node "D:/DeskBuddy/..." with quotes works
     // when node itself has no spaces.
     assert.ok(command.includes("reasonix-hook.js"));
   });
 
-  it("uninstall removes only Clawd entries", () => {
+  it("uninstall removes only DeskBuddy entries", () => {
     const homeDir = makeTempHome();
     const settingsPath = path.join(homeDir, ".reasonix", "settings.json");
     fs.writeFileSync(settingsPath, JSON.stringify({

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Merge Clawd Copilot CLI hooks into <copilot-home>/hooks/hooks.json
+// Merge DeskBuddy Copilot CLI hooks into <copilot-home>/hooks/hooks.json
 // (append-only, idempotent). Called by both local startup integration sync
 // and `scripts/remote-deploy.sh` for SSH remotes.
 //
 // Copilot's hooks.json schema uses `bash` + `powershell` per-platform command
 // strings (not the single `command` field used by Claude/Cursor), so the
 // installer writes both fields. Marker-based reconciliation keeps existing
-// user-authored entries untouched and rewrites only the Clawd entry.
+// user-authored entries untouched and rewrites only the DeskBuddy entry.
 //
 // `<copilot-home>` resolves to `$COPILOT_HOME` (trimmed, non-empty) when set,
 // else `~/.copilot`. See `resolveCopilotHome()` below. Paths are resolved at
@@ -48,12 +48,12 @@ function resolveCopilotSettingsPath(options = {}) {
 }
 
 // Copilot CLI hook events are split into two purposes:
-//   - state events fire-and-forget into Clawd's /state route; they MUST be
+//   - state events fire-and-forget into DeskBuddy's /state route; they MUST be
 //     fast so Copilot's CLI doesn't visibly stutter on every tool call. 5s.
-//   - permission events block Copilot until the user answers a Clawd bubble
-//     or Clawd returns no-decision. They MUST allow a long wait. 600s.
+//   - permission events block Copilot until the user answers a DeskBuddy bubble
+//     or DeskBuddy returns no-decision. They MUST allow a long wait. 600s.
 //
-// PERMISSION_HTTP_TIMEOUT_MS is the internal Clawd /permission HTTP timeout.
+// PERMISSION_HTTP_TIMEOUT_MS is the internal DeskBuddy /permission HTTP timeout.
 // It MUST stay strictly below PERMISSION_TIMEOUT_SEC × 1000 so the hook
 // always returns and exits cleanly *before* Copilot kills it on timeoutSec
 // expiry — Phase 0 capture confirmed Copilot 1.0.54 deadlocks the prompt
@@ -81,7 +81,7 @@ const COPILOT_PERMISSION_HOOK_EVENTS = [
 ];
 
 // Combined list kept for backward-compat exports. Doctor + tests use this
-// as the "Clawd should manage these events" canonical list.
+// as the "DeskBuddy should manage these events" canonical list.
 const COPILOT_HOOK_EVENTS = [
   ...COPILOT_STATE_HOOK_EVENTS,
   ...COPILOT_PERMISSION_HOOK_EVENTS,
@@ -114,11 +114,11 @@ function quote(value) {
 function buildCopilotHookCommands(nodeBin, hookScript, eventName, options = {}) {
   const tail = `${quote(hookScript)} ${quote(eventName)}`;
   const command = `${quote(nodeBin)} ${tail}`;
-  const bash = options.remote ? `CLAWD_REMOTE=1 ${command}` : command;
+  const bash = options.remote ? `DESKBUDDY_REMOTE=1 ${command}` : command;
   // PowerShell needs `&` to invoke a quoted exe path as a command, otherwise
   // the quoted string is parsed as a literal.
   const powershell = options.remote
-    ? `$env:CLAWD_REMOTE='1'; & ${command}`
+    ? `$env:DESKBUDDY_REMOTE='1'; & ${command}`
     : `& ${command}`;
   return { bash, powershell };
 }
@@ -137,15 +137,15 @@ function buildCopilotHookEntry(nodeBin, hookScript, eventName, options = {}) {
 // Copilot runs ALL permissionRequest hooks across the entire `<copilot-home>/hooks/`
 // directory (per GitHub Copilot CLI docs — user-level loading merges every
 // `*.json` file in that directory). Later outputs override earlier outputs,
-// so blindly appending a Clawd "allow" anywhere along the chain could
+// so blindly appending a DeskBuddy "allow" anywhere along the chain could
 // silently overwrite a user's deny coming from a different file
 // (e.g. `~/.copilot/hooks/security-audit.json`).
 //
 // Two-layer check, both must pass:
-//   1. The hooks.json `permissionRequest` array contains only Clawd entries
+//   1. The hooks.json `permissionRequest` array contains only DeskBuddy entries
 //      (or is empty).
 //   2. No OTHER `*.json` file in the same directory declares any
-//      `permissionRequest` entry — even Clawd-looking ones (Clawd never
+//      `permissionRequest` entry — even DeskBuddy-looking ones (DeskBuddy never
 //      writes outside hooks.json, so anything found there is user-authored).
 //
 // The doctor surfaces a warning when this path is hit so the user can
@@ -158,7 +158,7 @@ function isCopilotPermissionRegistrable(arr) {
 // Return true if any `*.json` file in `<copilot-home>/hooks/` OTHER than
 // `hooks.json` declares a `permissionRequest` entry. Conservative: any
 // directory read or parse error is treated as "no other hook found" so a
-// transient FS hiccup doesn't permanently block Clawd registration.
+// transient FS hiccup doesn't permanently block DeskBuddy registration.
 function hasUserPermissionHookInOtherFiles(hooksDir, hooksPath, options = {}) {
   const fsImpl = options.fs || fs;
   const HOOKS_JSON = "hooks.json";
@@ -197,11 +197,11 @@ function hasUserPermissionHookInOtherFiles(hooksDir, hooksPath, options = {}) {
 // `hooks.permissionRequest` entry. Per Copilot CLI hooks reference, the
 // settings.json `hooks` block participates in the same merged hook chain
 // as user-level hooks/*.json and repo-level .github/hooks/*.json, so a
-// user audit/deny hook here also needs to block Clawd's safe-v1 path.
+// user audit/deny hook here also needs to block DeskBuddy's safe-v1 path.
 //
 // Same conservative posture as hasUserPermissionHookInOtherFiles: any read
 // or parse error is treated as "no inline hook" so a transient FS hiccup
-// doesn't permanently break Clawd registration.
+// doesn't permanently break DeskBuddy registration.
 function hasUserPermissionHookInSettingsJson(settingsPath, options = {}) {
   const fsImpl = options.fs || fs;
   let raw;
@@ -228,7 +228,7 @@ function entryHasMarker(entry) {
   if (!entry || typeof entry !== "object") return false;
   // Match doctor's scan in findCopilotHookCommandsForEvent: any of the three
   // platform fields (bash / powershell / legacy `command`) counts. Otherwise
-  // a legacy command-only Clawd entry would be missed here, the installer
+  // a legacy command-only DeskBuddy entry would be missed here, the installer
   // would append a fresh bash/powershell entry, and the same Copilot event
   // would fire two HTTP state posts.
   for (const field of ["bash", "powershell", "command"]) {
@@ -239,7 +239,7 @@ function entryHasMarker(entry) {
 }
 
 /**
- * Register Clawd hooks into <copilot-home>/hooks/hooks.json.
+ * Register DeskBuddy hooks into <copilot-home>/hooks/hooks.json.
  *
  * @param {object} [options]
  * @param {boolean} [options.silent]      suppress console output (used by tests)
@@ -323,19 +323,19 @@ function registerCopilotHooks(options = {}) {
 
     const arr = settings.hooks[event];
 
-    // Safe-v1: for permissionRequest only, refuse to add or update the Clawd
-    // entry if EITHER the in-file array carries a non-Clawd entry OR any
+    // Safe-v1: for permissionRequest only, refuse to add or update the DeskBuddy
+    // entry if EITHER the in-file array carries a non-DeskBuddy entry OR any
     // other `*.json` file in the same hooks directory declares any
     // permissionRequest hook. Copilot merges hooks across every file in the
-    // directory and runs them all; appending Clawd anywhere could silently
+    // directory and runs them all; appending DeskBuddy anywhere could silently
     // weaken a user-authored deny.
     //
-    // We don't just `continue`: a Clawd entry registered by an earlier run
+    // We don't just `continue`: a DeskBuddy entry registered by an earlier run
     // (before the user added their audit/deny hook) would still sit in the
     // merged hook chain and could override that deny. So when safe-v1
-    // trips, also strip out every existing Clawd-managed entry from this
+    // trips, also strip out every existing DeskBuddy-managed entry from this
     // array. The user's entries are preserved byte-for-byte. Doctor surfaces
-    // a warning afterwards so the user can wire Clawd in manually if they
+    // a warning afterwards so the user can wire DeskBuddy in manually if they
     // want to.
     if (event === "permissionRequest"
         && (!isCopilotPermissionRegistrable(arr)
@@ -379,10 +379,10 @@ function registerCopilotHooks(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Copilot hooks → ${hooksPath}`);
+    console.log(`DeskBuddy Copilot hooks → ${hooksPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
     if (permissionSkippedDueToUserHook) {
-      console.log(`  Note: permissionRequest left untouched because a non-Clawd hook is already registered.`);
+      console.log(`  Note: permissionRequest left untouched because a non-DeskBuddy hook is already registered.`);
     }
   }
 
@@ -420,7 +420,7 @@ function unregisterCopilotHooks(options = {}) {
 
   let backupPath = null;
   if (changed) backupPath = writeJsonAtomicWithBackup(hooksPath, settings, options);
-  if (!options.silent) console.log(`Clawd Copilot hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Copilot hooks removed: ${removed}`);
   const result = { removed, changed, configChanged: changed, hooksPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;

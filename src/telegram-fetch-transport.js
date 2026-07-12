@@ -15,7 +15,7 @@
 // `sessionFactory` so this module stays unit-testable without a live Electron app;
 // when no factory is supplied (tests / non-Electron) it falls back to plain fetch.
 //
-// Phase 1 scope (this file): system proxy + a CLAWD_TG_PROXY escape hatch
+// Phase 1 scope (this file): system proxy + a DESKBUDDY_TG_PROXY escape hatch
 // (direct | system | <url>). Environment-variable proxy parsing (ALL_PROXY /
 // HTTPS_PROXY) and NO_PROXY translation are Phase 2 and intentionally NOT here.
 
@@ -24,11 +24,11 @@ const TELEGRAM_API_BASE = "https://api.telegram.org";
 const PROXY_PROBE_URL = "https://api.telegram.org/";
 const DEFAULT_RESOLVE_TIMEOUT_MS = 2000;
 
-// Phase 1 proxy selection: CLAWD_TG_PROXY escape hatch, else follow the OS
+// Phase 1 proxy selection: DESKBUDDY_TG_PROXY escape hatch, else follow the OS
 // system proxy. Phase 2 will extend this with ALL_PROXY / HTTPS_PROXY +
 // NO_PROXY → proxyBypassRules translation.
 function resolveProxyConfig(env = {}) {
-  const override = String((env && env.CLAWD_TG_PROXY) || "").trim();
+  const override = String((env && env.DESKBUDDY_TG_PROXY) || "").trim();
   if (override === "direct") return { mode: "direct" };
   if (override === "system") return { mode: "system" };
   // Escape hatch: a raw proxy URL the user is responsible for formatting in

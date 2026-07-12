@@ -9,8 +9,8 @@ const {
 } = require("./fetch-sidecar-binaries");
 
 const ENSURE_COMMAND = "node scripts/ensure-sidecar-binaries.js";
-const SKIP_ENV = "CLAWD_SKIP_SIDECAR_FETCH";
-const OVERRIDE_ENV = "CLAWD_CC_CONNECT_CLAWD_PATH";
+const SKIP_ENV = "DESKBUDDY_SKIP_SIDECAR_FETCH";
+const OVERRIDE_ENV = "DESKBUDDY_DESKBUDDY_CONNECT_PATH";
 const DEFAULT_PREFLIGHT_REQUEST_TIMEOUT_MS = 30000;
 
 function runtimePlatformName(platform = process.platform) {
@@ -50,7 +50,7 @@ function sidecarFetchCommand(targetDir) {
 }
 
 function runtimeExecutableName(platform = process.platform) {
-  return platform === "win32" ? "cc-connect-clawd.exe" : "cc-connect-clawd";
+  return platform === "win32" ? "deskbuddy-connect.exe" : "deskbuddy-connect";
 }
 
 function resolveOverridePath(rawValue, options = {}) {
@@ -98,7 +98,7 @@ async function ensureCurrentPlatformSidecar(options = {}) {
     }
     const launchMessage = options.strict
       ? "Strict mode will stop launch until the override path is fixed, or unset to allow automatic sidecar fetch."
-      : "Clawd will still launch. Fix the override path, or unset it to allow automatic sidecar fetch.";
+      : "DeskBuddy will still launch. Fix the override path, or unset it to allow automatic sidecar fetch.";
     write(stderr, [
       `${OVERRIDE_ENV} is set but no sidecar executable was found: ${overridePath || env[OVERRIDE_ENV]}`,
       launchMessage,
@@ -126,7 +126,7 @@ async function ensureCurrentPlatformSidecar(options = {}) {
     return { ok: false, missing: true, target: target.dir, path: binaryPath, command };
   }
 
-  write(stdout, `Missing ${target.dir} cc-connect-clawd sidecar; fetching pinned binary...\n`);
+  write(stdout, `Missing ${target.dir} deskbuddy-connect sidecar; fetching pinned binary...\n`);
   try {
     const fetch = options.fetchSidecarBinaries || fetchSidecarBinaries;
     await fetch({

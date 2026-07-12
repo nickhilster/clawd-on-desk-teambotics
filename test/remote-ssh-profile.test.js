@@ -869,7 +869,7 @@ test("real controller: update + markDeployed serialize via shared lockKey", asyn
   const path = require("path");
   const fs = require("fs");
   const os = require("os");
-  const tmp = path.join(os.tmpdir(), `clawd-prefs-race-${Date.now()}.json`);
+  const tmp = path.join(os.tmpdir(), `deskbuddy-prefs-race-${Date.now()}.json`);
   try {
     const startProfile = basicProfile({ label: "Pi" });
     const ctrl = createSettingsController({
@@ -909,7 +909,7 @@ test("real controller: delete + markDeployed serialize (no resurrected profile)"
   const path = require("path");
   const fs = require("fs");
   const os = require("os");
-  const tmp = path.join(os.tmpdir(), `clawd-prefs-race-del-${Date.now()}.json`);
+  const tmp = path.join(os.tmpdir(), `deskbuddy-prefs-race-del-${Date.now()}.json`);
   try {
     const startProfile = basicProfile();
     const ctrl = createSettingsController({

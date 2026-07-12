@@ -280,7 +280,7 @@ describe("buildElectronLaunchConfig()", () => {
   it("strips ELECTRON_RUN_AS_NODE and preserves forwarded args", () => {
     const sourceEnv = {
       ELECTRON_RUN_AS_NODE: "1",
-      CLAWD_DISABLE_SANDBOX: "0",
+      DESKBUDDY_DISABLE_SANDBOX: "0",
       KEEP_ME: "yes",
     };
 
@@ -301,7 +301,7 @@ describe("buildElectronLaunchConfig()", () => {
     const cfg = buildElectronLaunchConfig("/app", {
       platform: "linux",
       env: {
-        CLAWD_DISABLE_SANDBOX: "1",
+        DESKBUDDY_DISABLE_SANDBOX: "1",
         ELECTRON_RUN_AS_NODE: "1",
       },
       forwardedArgs: ["--foo"],

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Merge Clawd Reasonix hooks into <Reasonix home>/settings.json (append-only, idempotent)
+// Merge DeskBuddy Reasonix hooks into <Reasonix home>/settings.json (append-only, idempotent)
 // Reasonix hook format: { "hooks": { "EventName": [{ "match", "command", ... }] } }
 
 const fs = require("fs");
@@ -68,7 +68,7 @@ const REASONIX_HOOK_EVENTS = [
   "PreCompact",
 ];
 
-function isClawdHookCommand(command) {
+function isDeskBuddyHookCommand(command) {
   return commandMatchesMarker(command, MARKER);
 }
 
@@ -107,7 +107,7 @@ function normalizeReasonixHookEntries(entries, desiredCommand) {
     const entry = entries[index];
     if (!entry || typeof entry !== "object") continue;
 
-    if (isClawdHookCommand(entry.command)) {
+    if (isDeskBuddyHookCommand(entry.command)) {
       matched = true;
       if (dedicatedIndex === -1) {
         const cmdChanged = entry.command !== desiredCommand;
@@ -136,7 +136,7 @@ function normalizeReasonixHookEntries(entries, desiredCommand) {
 }
 
 /**
- * Register Clawd hooks into <Reasonix home>/settings.json
+ * Register DeskBuddy hooks into <Reasonix home>/settings.json
  * @param {object} [options]
  * @param {boolean} [options.silent]
  * @param {string} [options.settingsPath]
@@ -149,7 +149,7 @@ function registerReasonixHooks(options = {}) {
   // Skip if Reasonix home doesn't exist (Reasonix not installed/initialized).
   const reasonixDir = path.dirname(settingsPath);
   if (!options.settingsPath && !fs.existsSync(reasonixDir)) {
-    if (!options.silent) console.log(`Clawd: ${reasonixDir} not found — skipping Reasonix hook registration`);
+    if (!options.silent) console.log(`DeskBuddy: ${reasonixDir} not found — skipping Reasonix hook registration`);
     return { added: 0, skipped: 0, updated: 0 };
   }
 
@@ -210,7 +210,7 @@ function registerReasonixHooks(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Reasonix hooks → ${settingsPath}`);
+    console.log(`DeskBuddy Reasonix hooks → ${settingsPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
   }
 
@@ -247,7 +247,7 @@ function unregisterReasonixHooks(options = {}) {
 
   let backupPath = null;
   if (changed) backupPath = writeJsonAtomicWithBackup(settingsPath, settings, options);
-  if (!options.silent) console.log(`Clawd Reasonix hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Reasonix hooks removed: ${removed}`);
   const result = { removed, changed, settingsPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;

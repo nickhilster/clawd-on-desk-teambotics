@@ -1,5 +1,5 @@
 // OpenClaw agent configuration
-// Perception via OpenClaw plugin hooks -> HTTP POST to Clawd.
+// Perception via OpenClaw plugin hooks -> HTTP POST to DeskBuddy.
 
 module.exports = {
   id: "openclaw",

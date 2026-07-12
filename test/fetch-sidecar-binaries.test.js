@@ -25,19 +25,19 @@ const {
   fetchSidecarBinaries,
 } = require("../scripts/fetch-sidecar-binaries");
 
-test("release source is pinned to the public Clawd fork tag", () => {
+test("release source is pinned to the public DeskBuddy fork tag", () => {
   assert.deepEqual(DEFAULT_RELEASE, {
     owner: "rullerzhou-afk",
-    repo: "cc-connect-clawd",
-    tag: "clawd-sidecar-v0.1.1",
+    repo: "deskbuddy-connect",
+    tag: "deskbuddy-sidecar-v0.1.1",
   });
   assert.equal(
-    checksumFor("cc-connect-clawd-windows-x64.zip"),
+    checksumFor("deskbuddy-connect-windows-x64.zip"),
     "afb79e68f1cc12f33c74500c2596ec3eeb6b92d9ccf86afbe741d0cf41b12c1e"
   );
   assert.equal(
-    releaseAssetUrl("cc-connect-clawd-windows-x64.zip"),
-    "https://github.com/rullerzhou-afk/cc-connect-clawd/releases/download/clawd-sidecar-v0.1.1/cc-connect-clawd-windows-x64.zip"
+    releaseAssetUrl("deskbuddy-connect-windows-x64.zip"),
+    "https://github.com/rullerzhou-afk/deskbuddy-connect/releases/download/deskbuddy-sidecar-v0.1.1/deskbuddy-connect-windows-x64.zip"
   );
 });
 
@@ -46,17 +46,17 @@ test("package exposes the sidecar fetch command", () => {
   assert.equal(pkg.scripts["fetch:sidecars"], FETCH_COMMAND);
 });
 
-test("manifest maps archives and install paths to Clawd sidecar layout", () => {
+test("manifest maps archives and install paths to DeskBuddy sidecar layout", () => {
   const rootDir = "D:\\repo";
   const manifest = buildReleaseManifest({ rootDir, target: "windows-x64,linux-x64" });
   assert.deepEqual(manifest.targets.map((target) => target.dir), ["windows-x64", "linux-x64"]);
-  assert.equal(manifest.targets[0].archive, "cc-connect-clawd-windows-x64.zip");
-  assert.equal(manifest.targets[0].archiveSha256, PINNED_CHECKSUMS["cc-connect-clawd-windows-x64.zip"]);
-  assert.equal(manifest.targets[0].binaryChecksumName, "windows-x64/cc-connect-clawd.exe");
-  assert.equal(manifest.targets[0].binarySha256, PINNED_CHECKSUMS["windows-x64/cc-connect-clawd.exe"]);
+  assert.equal(manifest.targets[0].archive, "deskbuddy-connect-windows-x64.zip");
+  assert.equal(manifest.targets[0].archiveSha256, PINNED_CHECKSUMS["deskbuddy-connect-windows-x64.zip"]);
+  assert.equal(manifest.targets[0].binaryChecksumName, "windows-x64/deskbuddy-connect.exe");
+  assert.equal(manifest.targets[0].binarySha256, PINNED_CHECKSUMS["windows-x64/deskbuddy-connect.exe"]);
   assert.equal(
     manifest.targets[0].binaryPath,
-    path.join(rootDir, "bin", "cc-connect-clawd", "windows-x64", "cc-connect-clawd.exe")
+    path.join(rootDir, "bin", "deskbuddy-connect", "windows-x64", "deskbuddy-connect.exe")
   );
 });
 
@@ -75,27 +75,27 @@ test("selectTargets dedupes and rejects Go arch directory names", () => {
 });
 
 test("parseChecksums accepts release checksum format and rejects unsafe names", () => {
-  const checksums = parseChecksums(`${"a".repeat(64)}  windows-x64/cc-connect-clawd.exe\n`);
-  assert.equal(checksums.get("windows-x64/cc-connect-clawd.exe"), "a".repeat(64));
+  const checksums = parseChecksums(`${"a".repeat(64)}  windows-x64/deskbuddy-connect.exe\n`);
+  assert.equal(checksums.get("windows-x64/deskbuddy-connect.exe"), "a".repeat(64));
   assert.throws(() => parseChecksums(`${"b".repeat(64)}  ../secret\n`), /Unsafe checksum path/);
 });
 
 test("extractZipEntry reads the single sidecar executable", () => {
   const data = Buffer.from("windows binary");
-  const archive = makeZip("cc-connect-clawd.exe", data);
-  assert.deepEqual(extractZipEntry(archive, "cc-connect-clawd.exe"), data);
+  const archive = makeZip("deskbuddy-connect.exe", data);
+  assert.deepEqual(extractZipEntry(archive, "deskbuddy-connect.exe"), data);
   assert.throws(() => extractZipEntry(archive, "missing.exe"), /missing/);
 });
 
 test("extractTarGzEntry reads the single sidecar executable", () => {
   const data = Buffer.from("linux binary");
-  const archive = makeTarGz("cc-connect-clawd", data);
-  assert.deepEqual(extractTarGzEntry(archive, "cc-connect-clawd"), data);
+  const archive = makeTarGz("deskbuddy-connect", data);
+  assert.deepEqual(extractTarGzEntry(archive, "deskbuddy-connect"), data);
   assert.throws(() => extractTarGzEntry(archive, "missing"), /missing/);
 });
 
 test("fetchSidecarBinaries downloads, verifies, extracts, and installs selected target", async () => {
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-sidecars-"));
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-sidecars-"));
   const release = { owner: "owner", repo: "repo", tag: "tag" };
   const target = selectTargets("windows-x64")[0];
   const binary = Buffer.from("verified windows binary");
@@ -127,7 +127,7 @@ test("fetchSidecarBinaries downloads, verifies, extracts, and installs selected 
 });
 
 test("fetchSidecarBinaries fails closed on checksum mismatch", async () => {
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-sidecars-"));
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-sidecars-"));
   const release = { owner: "owner", repo: "repo", tag: "tag" };
   const target = selectTargets("windows-x64")[0];
   const binary = Buffer.from("verified windows binary");

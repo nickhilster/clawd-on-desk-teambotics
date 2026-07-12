@@ -94,11 +94,11 @@ describe("Kimi permission hold by session", () => {
     assert.strictEqual(api.resolveDisplayState(), "idle");
   });
 
-  it("CLAWD_KIMI_PERMISSION_MAX_MS=0 disables the safety timer entirely", () => {
-    const old = process.env.CLAWD_KIMI_PERMISSION_MAX_MS;
+  it("DESKBUDDY_KIMI_PERMISSION_MAX_MS=0 disables the safety timer entirely", () => {
+    const old = process.env.DESKBUDDY_KIMI_PERMISSION_MAX_MS;
     api.cleanup();
     try {
-      process.env.CLAWD_KIMI_PERMISSION_MAX_MS = "0";
+      process.env.DESKBUDDY_KIMI_PERMISSION_MAX_MS = "0";
       ctx = makeCtx();
       api = require("../src/state")(ctx);
 
@@ -109,8 +109,8 @@ describe("Kimi permission hold by session", () => {
       mock.timers.tick(60 * 60 * 1000); // 1h
       assert.strictEqual(api.resolveDisplayState(), "notification");
     } finally {
-      if (old == null) delete process.env.CLAWD_KIMI_PERMISSION_MAX_MS;
-      else process.env.CLAWD_KIMI_PERMISSION_MAX_MS = old;
+      if (old == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_MAX_MS;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_MAX_MS = old;
     }
   });
 

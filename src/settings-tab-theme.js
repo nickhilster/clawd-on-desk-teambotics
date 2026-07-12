@@ -556,5 +556,5 @@
     };
   }
 
-  root.ClawdSettingsTabTheme = { init };
+  root.DeskBuddySettingsTabTheme = { init };
 })(globalThis);

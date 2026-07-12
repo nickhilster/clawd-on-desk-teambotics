@@ -16,7 +16,7 @@ const {
 const VALID = "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ-_0123456789";
 
 function tmpDir(label) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `clawd-tg-store-${label}-`));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `deskbuddy-tg-store-${label}-`));
   return {
     dir,
     file: path.join(dir, "telegram-approval.env"),
@@ -33,19 +33,19 @@ test("isValidToken matches Telegram bot token shape", () => {
   assert.equal(isValidToken(null), false);
 });
 
-test("parseTokenFromEnvFileText accepts the standard CLAWD_TG_BOT_TOKEN line", () => {
-  assert.equal(parseTokenFromEnvFileText(`CLAWD_TG_BOT_TOKEN=${VALID}\n`), VALID);
-  assert.equal(parseTokenFromEnvFileText(`  CLAWD_TG_BOT_TOKEN = ${VALID}  \n`), VALID);
+test("parseTokenFromEnvFileText accepts the standard DESKBUDDY_TG_BOT_TOKEN line", () => {
+  assert.equal(parseTokenFromEnvFileText(`DESKBUDDY_TG_BOT_TOKEN=${VALID}\n`), VALID);
+  assert.equal(parseTokenFromEnvFileText(`  DESKBUDDY_TG_BOT_TOKEN = ${VALID}  \n`), VALID);
 });
 
 test("parseTokenFromEnvFileText rejects malformed contents", () => {
   assert.equal(parseTokenFromEnvFileText(""), null);
   assert.equal(parseTokenFromEnvFileText("OTHER_VAR=foo"), null);
-  assert.equal(parseTokenFromEnvFileText("CLAWD_TG_BOT_TOKEN=garbage"), null);
+  assert.equal(parseTokenFromEnvFileText("DESKBUDDY_TG_BOT_TOKEN=garbage"), null);
 });
 
 test("buildEnvFileText produces the line the sidecar expects", () => {
-  assert.equal(buildEnvFileText(VALID), `CLAWD_TG_BOT_TOKEN=${VALID}\n`);
+  assert.equal(buildEnvFileText(VALID), `DESKBUDDY_TG_BOT_TOKEN=${VALID}\n`);
 });
 
 test("envFileTokenStore requires filePath + fs.readFileSync", () => {
@@ -59,7 +59,7 @@ test("envFileTokenStore requires filePath + fs.readFileSync", () => {
 test("envFileTokenStore.getToken reads the file and parses", async (t) => {
   const tmp = tmpDir("get");
   t.after(tmp.cleanup);
-  fs.writeFileSync(tmp.file, `CLAWD_TG_BOT_TOKEN=${VALID}\n`);
+  fs.writeFileSync(tmp.file, `DESKBUDDY_TG_BOT_TOKEN=${VALID}\n`);
   const store = envFileTokenStore({ filePath: tmp.file });
   assert.equal(await store.getToken(), VALID);
   assert.equal(await store.hasToken(), true);
@@ -113,12 +113,12 @@ test("envFileTokenStore.deleteToken removes the file silently if missing", async
   // First delete with no file present.
   await store.deleteToken();
   // Then create + delete.
-  fs.writeFileSync(tmp.file, `CLAWD_TG_BOT_TOKEN=${VALID}\n`);
+  fs.writeFileSync(tmp.file, `DESKBUDDY_TG_BOT_TOKEN=${VALID}\n`);
   await store.deleteToken();
   assert.equal(fs.existsSync(tmp.file), false);
 });
 
-test("Source invariant: src/telegram-token-store.js never references process.env.CLAWD_TG_BOT_TOKEN", () => {
+test("Source invariant: src/telegram-token-store.js never references process.env.DESKBUDDY_TG_BOT_TOKEN", () => {
   // Mirrors the existing invariant test for telegram-approval-settings.js.
   const fs = require("node:fs");
   const path = require("node:path");
@@ -127,12 +127,12 @@ test("Source invariant: src/telegram-token-store.js never references process.env
     "utf8",
   );
   assert.equal(
-    source.includes("process.env.CLAWD_TG_BOT_TOKEN"),
+    source.includes("process.env.DESKBUDDY_TG_BOT_TOKEN"),
     false,
-    "token store must not read CLAWD_TG_BOT_TOKEN from process.env",
+    "token store must not read DESKBUDDY_TG_BOT_TOKEN from process.env",
   );
   assert.equal(
-    /process\.env\s*\.\s*CLAWD_TG_BOT_TOKEN/.test(source),
+    /process\.env\s*\.\s*DESKBUDDY_TG_BOT_TOKEN/.test(source),
     false,
   );
 });

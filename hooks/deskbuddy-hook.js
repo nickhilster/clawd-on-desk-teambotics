@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Clawd Desktop Pet — Claude Code Hook Script
-// Usage: node clawd-hook.js <event_name>
+// DeskBuddy Desktop Pet — Claude Code Hook Script
+// Usage: node deskbuddy-hook.js <event_name>
 // Reads stdin JSON from Claude Code for session_id
 
 const crypto = require("crypto");
@@ -419,7 +419,7 @@ function buildStateBody(event, payload, resolve) {
   // cron wakeups, or a Stop-hook continuation (stop_hook_active), is not a real
   // turn completion. Forward only counts + the boolean — never the task
   // command/description — so state.js can suppress the celebration without
-  // leaking shell contents into Clawd state.
+  // leaking shell contents into DeskBuddy state.
   if (body.event === "Stop") {
     const bgCount = Array.isArray(payload.background_tasks) ? payload.background_tasks.length : 0;
     const cronCount = Array.isArray(payload.session_crons) ? payload.session_crons.length : 0;
@@ -427,7 +427,7 @@ function buildStateBody(event, payload, resolve) {
     if (cronCount > 0) body.session_crons_count = cronCount;
     if (payload.stop_hook_active === true) body.stop_hook_active = true;
   }
-  if (process.env.CLAWD_REMOTE) {
+  if (process.env.DESKBUDDY_REMOTE) {
     body.host = readHostPrefix();
   } else {
     const { stablePid, agentPid, agentCommandLine, detectedEditor, pidChain, foregroundWtHwnd, tmuxSocket, tmuxClient } = resolve();
@@ -435,7 +435,7 @@ function buildStateBody(event, payload, resolve) {
     if (detectedEditor) body.editor = detectedEditor;
     if (agentPid) {
       body.agent_pid = agentPid;
-      body.claude_pid = agentPid; // backward compat with older Clawd versions
+      body.claude_pid = agentPid; // backward compat with older DeskBuddy versions
       if (agentCommandLine && /\s(-p|--print)(\s|$)/.test(agentCommandLine)) {
         body.headless = true;
       }
@@ -483,7 +483,7 @@ function main() {
 
   // Pre-resolve on SessionStart (runs during stdin buffering, not after)
   // Remote mode: skip PID collection — remote PIDs are meaningless on the local machine
-  if (event === "SessionStart" && !process.env.CLAWD_REMOTE) resolve();
+  if (event === "SessionStart" && !process.env.DESKBUDDY_REMOTE) resolve();
 
   readStdinJsonDetailed({ timeoutMs: STDIN_READ_TIMEOUT_MS })
     .then((stdinRead) => {
@@ -493,8 +493,8 @@ function main() {
       attachStdinDiag(body, stdinRead);
       // Completion events (Stop) fire the happy animation, are low-frequency,
       // and matter more than a few ms of latency. Give them a generous POST
-      // timeout so a momentarily slow (but alive) Clawd still receives them;
-      // connection-refused (Clawd not running) still fails instantly, so an
+      // timeout so a momentarily slow (but alive) DeskBuddy still receives them;
+      // connection-refused (DeskBuddy not running) still fails instantly, so an
       // idle machine is never penalized. High-frequency events keep 100ms so
       // they never stall the agent.
       const isCompletionEvent = body.event === "Stop";

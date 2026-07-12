@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Merge Clawd CodeBuddy hooks into ~/.codebuddy/settings.json (append-only, idempotent)
+// Merge DeskBuddy CodeBuddy hooks into ~/.codebuddy/settings.json (append-only, idempotent)
 // CodeBuddy uses Claude Code-compatible hook format: { matcher, hooks: [{ type, command }] }
 
 const fs = require("fs");
@@ -57,7 +57,7 @@ function isManagedPermissionUrl(value) {
 }
 
 /**
- * Register Clawd hooks into ~/.codebuddy/settings.json
+ * Register DeskBuddy hooks into ~/.codebuddy/settings.json
  * Uses Claude Code-compatible nested format: { matcher, hooks: [{ type, command }] }
  * @param {object} [options]
  * @param {boolean} [options.silent]
@@ -70,7 +70,7 @@ function registerCodeBuddyHooks(options = {}) {
   // Skip if ~/.codebuddy/ doesn't exist (CodeBuddy not installed)
   const codebuddyDir = path.dirname(settingsPath);
   if (!options.settingsPath && !fs.existsSync(codebuddyDir)) {
-    if (!options.silent) console.log("Clawd: ~/.codebuddy/ not found — skipping CodeBuddy hook registration");
+    if (!options.silent) console.log("DeskBuddy: ~/.codebuddy/ not found — skipping CodeBuddy hook registration");
     return { added: 0, skipped: 0, updated: 0 };
   }
 
@@ -196,7 +196,7 @@ function registerCodeBuddyHooks(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd CodeBuddy hooks → ${settingsPath}`);
+    console.log(`DeskBuddy CodeBuddy hooks → ${settingsPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
   }
 
@@ -245,7 +245,7 @@ function unregisterCodeBuddyHooks(options = {}) {
 
   let backupPath = null;
   if (changed) backupPath = writeJsonAtomicWithBackup(settingsPath, settings, options);
-  if (!options.silent) console.log(`Clawd CodeBuddy hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy CodeBuddy hooks removed: ${removed}`);
   const result = { removed, changed, settingsPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;

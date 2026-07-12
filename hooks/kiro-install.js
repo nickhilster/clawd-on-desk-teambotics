@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Merge Clawd hooks into Kiro agent configs under ~/.kiro/agents/
+// Merge DeskBuddy hooks into Kiro agent configs under ~/.kiro/agents/
 // Kiro hooks are per-agent (no global hooks yet), so we inject into every
-// custom agent config file and maintain a dedicated "clawd" agent config.
+// custom agent config file and maintain a dedicated "deskbuddy" agent config.
 // Built-in agents are not backed by editable JSON files, so we cannot
 // "override" kiro_default by creating ~/.kiro/agents/kiro_default.json.
-// Users who want hooks must explicitly use the generated "clawd" agent.
+// Users who want hooks must explicitly use the generated "deskbuddy" agent.
 // Docs: https://kiro.dev/docs/cli/hooks/
 // Config reference: https://kiro.dev/docs/cli/custom-agents/configuration-reference/
 
@@ -23,8 +23,8 @@ const {
   removeMatchingCommandHooks,
 } = require("./json-utils");
 const MARKER = "kiro-hook.js";
-const CLAWD_AGENT_NAME = "clawd";
-const CLAWD_AGENT_DESCRIPTION = "Clawd desktop pet hook integration";
+const DESKBUDDY_AGENT_NAME = "deskbuddy";
+const DESKBUDDY_AGENT_DESCRIPTION = "DeskBuddy desktop pet hook integration";
 const BUILTIN_DEFAULT_AGENT = "kiro_default";
 const DEFAULT_PARENT_DIR = path.join(os.homedir(), ".kiro");
 const DEFAULT_AGENTS_DIR = path.join(DEFAULT_PARENT_DIR, "agents");
@@ -38,7 +38,7 @@ const KIRO_HOOK_EVENTS = [
 ];
 
 /**
- * Inject Clawd hooks into a single agent config file.
+ * Inject DeskBuddy hooks into a single agent config file.
  * @param {string} filePath
  * @param {object} [options]
  * @returns {{ added: number, skipped: number, updated: number, created: boolean }}
@@ -64,9 +64,9 @@ function injectHooksIntoFile(filePath, options = {}) {
     changed = true;
   }
   if (created) {
-    settings.description = baseName === CLAWD_AGENT_NAME
-      ? CLAWD_AGENT_DESCRIPTION
-      : `${baseName} agent with Clawd desktop pet hooks`;
+    settings.description = baseName === DESKBUDDY_AGENT_NAME
+      ? DESKBUDDY_AGENT_DESCRIPTION
+      : `${baseName} agent with DeskBuddy desktop pet hooks`;
   }
 
   // Resolve node path; if detection fails, preserve existing absolute path
@@ -164,7 +164,7 @@ function getKiroCliCandidates(homeDir = os.homedir(), platformOverride, env = pr
 // Properties excluded from kiro_default template.
 const EXCLUDED_KEYS = new Set(["model", "includeMcpJson", "description", "hooks", "name"]);
 
-function generateClawdTemplateFromBuiltin(options = {}) {
+function generateDeskBuddyTemplateFromBuiltin(options = {}) {
   const homeDir = options.homeDir || os.homedir();
   const platform = options.platform || process.platform;
   const env = options.env || process.env;
@@ -174,8 +174,8 @@ function generateClawdTemplateFromBuiltin(options = {}) {
   // Windows; `cmd /c exit` is the closest portable equivalent on Windows.
   const noopEditor = platform === "win32" ? "cmd /c exit" : "true";
   let lastError = null;
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-kiro-seed-"));
-  const tempName = `clawd-seed-${process.pid}-${Date.now()}`;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-kiro-seed-"));
+  const tempName = `deskbuddy-seed-${process.pid}-${Date.now()}`;
   const templatePath = path.join(tempDir, `${tempName}.json`);
 
   try {
@@ -213,7 +213,7 @@ function generateClawdTemplateFromBuiltin(options = {}) {
   return { template: null, error: lastError };
 }
 
-function syncClawdAgentFromBuiltin(filePath, options = {}) {
+function syncDeskBuddyAgentFromBuiltin(filePath, options = {}) {
   let current = null;
   try {
     current = JSON.parse(fs.readFileSync(filePath, "utf-8"));
@@ -221,20 +221,20 @@ function syncClawdAgentFromBuiltin(filePath, options = {}) {
     if (err.code !== "ENOENT") throw err;
   }
 
-  const result = generateClawdTemplateFromBuiltin(options);
+  const result = generateDeskBuddyTemplateFromBuiltin(options);
 
   if (!result.template) {
     // Preserve existing file — may have prompt/tools/resources from a prior successful sync.
     if (!options.silent) {
       const fate = current
         ? `preserving existing ${path.basename(filePath)}`
-        : "seeding minimal clawd agent (no prompt/tools/resources)";
-      console.warn(`Clawd: kiro-cli template generation failed — ${fate}. Reason: ${result.error?.message || "unknown"}`);
+        : "seeding minimal deskbuddy agent (no prompt/tools/resources)";
+      console.warn(`DeskBuddy: kiro-cli template generation failed — ${fate}. Reason: ${result.error?.message || "unknown"}`);
     }
     if (current) return { synced: true, changed: false };
     const minimal = {
-      name: CLAWD_AGENT_NAME,
-      description: CLAWD_AGENT_DESCRIPTION,
+      name: DESKBUDDY_AGENT_NAME,
+      description: DESKBUDDY_AGENT_DESCRIPTION,
       hooks: {},
     };
     writeJsonAtomic(filePath, minimal);
@@ -242,8 +242,8 @@ function syncClawdAgentFromBuiltin(filePath, options = {}) {
   }
 
   const desired = {
-    name: CLAWD_AGENT_NAME,
-    description: CLAWD_AGENT_DESCRIPTION,
+    name: DESKBUDDY_AGENT_NAME,
+    description: DESKBUDDY_AGENT_DESCRIPTION,
   };
   for (const key of Object.keys(result.template)) {
     if (!EXCLUDED_KEYS.has(key)) {
@@ -263,7 +263,7 @@ function syncClawdAgentFromBuiltin(filePath, options = {}) {
 }
 
 /**
- * Register Clawd hooks into Kiro agent configs under ~/.kiro/agents/
+ * Register DeskBuddy hooks into Kiro agent configs under ~/.kiro/agents/
  * @param {object} [options]
  * @param {boolean} [options.silent]
  * @returns {{ added: number, skipped: number, updated: number, files: string[] }}
@@ -274,7 +274,7 @@ function registerKiroHooks(options = {}) {
 
   // Skip if ~/.kiro/ doesn't exist (Kiro CLI not installed)
   if (!fs.existsSync(agentsDir)) {
-    if (!options.silent) console.log("Clawd: ~/.kiro/ not found — skipping Kiro hook registration");
+    if (!options.silent) console.log("DeskBuddy: ~/.kiro/ not found — skipping Kiro hook registration");
     return { added: 0, skipped: 0, updated: 0, files: [] };
   }
 
@@ -308,41 +308,41 @@ function registerKiroHooks(options = {}) {
         files.push(file);
       }
     } catch (err) {
-      if (!options.silent) console.warn(`Clawd: failed to process ${file}: ${err.message}`);
+      if (!options.silent) console.warn(`DeskBuddy: failed to process ${file}: ${err.message}`);
     }
   }
 
-  const clawdPath = path.join(agentsDir, `${CLAWD_AGENT_NAME}.json`);
-  let clawdTemplateChanged = false;
+  const deskbuddyPath = path.join(agentsDir, `${DESKBUDDY_AGENT_NAME}.json`);
+  let deskbuddyTemplateChanged = false;
   try {
-    const seedFn = typeof options.syncClawdAgent === "function"
-      ? options.syncClawdAgent
-      : syncClawdAgentFromBuiltin;
-    const syncResult = seedFn(clawdPath, options);
-    clawdTemplateChanged = !!(syncResult && syncResult.changed);
+    const seedFn = typeof options.syncDeskBuddyAgent === "function"
+      ? options.syncDeskBuddyAgent
+      : syncDeskBuddyAgentFromBuiltin;
+    const syncResult = seedFn(deskbuddyPath, options);
+    deskbuddyTemplateChanged = !!(syncResult && syncResult.changed);
   } catch (err) {
-    if (!options.silent) console.warn(`Clawd: failed to sync ${CLAWD_AGENT_NAME}.json from ${BUILTIN_DEFAULT_AGENT}: ${err.message}`);
+    if (!options.silent) console.warn(`DeskBuddy: failed to sync ${DESKBUDDY_AGENT_NAME}.json from ${BUILTIN_DEFAULT_AGENT}: ${err.message}`);
   }
   try {
-    const result = injectHooksIntoFile(clawdPath, options);
+    const result = injectHooksIntoFile(deskbuddyPath, options);
     totalAdded += result.added;
     totalSkipped += result.skipped;
-    totalUpdated += result.updated + (clawdTemplateChanged ? 1 : 0);
-    if (result.added > 0 || result.updated > 0 || clawdTemplateChanged) {
-      files.push(result.created ? `${CLAWD_AGENT_NAME}.json (created)` : `${CLAWD_AGENT_NAME}.json`);
+    totalUpdated += result.updated + (deskbuddyTemplateChanged ? 1 : 0);
+    if (result.added > 0 || result.updated > 0 || deskbuddyTemplateChanged) {
+      files.push(result.created ? `${DESKBUDDY_AGENT_NAME}.json (created)` : `${DESKBUDDY_AGENT_NAME}.json`);
     }
   } catch (err) {
-    if (!options.silent) console.warn(`Clawd: failed to sync ${CLAWD_AGENT_NAME}.json: ${err.message}`);
+    if (!options.silent) console.warn(`DeskBuddy: failed to sync ${DESKBUDDY_AGENT_NAME}.json: ${err.message}`);
   }
 
   if (!options.silent) {
     if (files.length > 0) {
-      console.log(`Clawd: Kiro hooks injected into ${files.length} agent config(s): ${files.join(", ")}`);
+      console.log(`DeskBuddy: Kiro hooks injected into ${files.length} agent config(s): ${files.join(", ")}`);
       console.log(`  Added: ${totalAdded}, updated: ${totalUpdated}, skipped: ${totalSkipped}`);
     } else {
-      console.log("Clawd: all Kiro agent configs already up to date");
+      console.log("DeskBuddy: all Kiro agent configs already up to date");
     }
-    console.log(`Clawd: use "kiro-cli --agent ${CLAWD_AGENT_NAME}" or run "/agent swap ${CLAWD_AGENT_NAME}" inside Kiro to enable hooks`);
+    console.log(`DeskBuddy: use "kiro-cli --agent ${DESKBUDDY_AGENT_NAME}" or run "/agent swap ${DESKBUDDY_AGENT_NAME}" inside Kiro to enable hooks`);
   }
 
   return { added: totalAdded, skipped: totalSkipped, updated: totalUpdated, files };
@@ -386,7 +386,7 @@ function unregisterKiroHooks(options = {}) {
   const agentsDir = options.agentsDir || path.join(homeDir, ".kiro", "agents");
 
   if (!fs.existsSync(agentsDir)) {
-    if (!options.silent) console.log("Clawd: ~/.kiro/ not found - skipping Kiro hook cleanup");
+    if (!options.silent) console.log("DeskBuddy: ~/.kiro/ not found - skipping Kiro hook cleanup");
     return { removed: 0, changed: false, files: [], warnings: [], agentsDir };
   }
 
@@ -430,12 +430,12 @@ function unregisterKiroHooks(options = {}) {
     }
   }
 
-  const retainedClawdAgent = fs.existsSync(path.join(agentsDir, `${CLAWD_AGENT_NAME}.json`));
+  const retainedDeskBuddyAgent = fs.existsSync(path.join(agentsDir, `${DESKBUDDY_AGENT_NAME}.json`));
   if (!options.silent) {
-    console.log(`Clawd Kiro hooks removed: ${removed}`);
+    console.log(`DeskBuddy Kiro hooks removed: ${removed}`);
     for (const warning of warnings) console.warn(`  Warning: ${warning}`);
   }
-  const result = { removed, changed, files, warnings, agentsDir, retainedClawdAgent };
+  const result = { removed, changed, files, warnings, agentsDir, retainedDeskBuddyAgent };
   if (options.backup === true) result.backupPaths = backupPaths;
   return result;
 }
@@ -448,11 +448,11 @@ module.exports = {
   KIRO_HOOK_EVENTS,
   __test: {
     formatHookCommand,
-    generateClawdTemplateFromBuiltin,
+    generateDeskBuddyTemplateFromBuiltin,
     getKiroCliCandidates,
     injectHooksIntoFile,
     removeHooksFromKiroFile,
-    syncClawdAgentFromBuiltin,
+    syncDeskBuddyAgentFromBuiltin,
   },
 };
 

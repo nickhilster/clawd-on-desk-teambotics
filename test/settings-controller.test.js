@@ -11,7 +11,7 @@ const { createSettingsController } = require("../src/settings-controller");
 
 const tempDirs = [];
 function makeTempPath() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-controller-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-controller-"));
   tempDirs.push(dir);
   return path.join(dir, "deskbuddy-prefs.json");
 }

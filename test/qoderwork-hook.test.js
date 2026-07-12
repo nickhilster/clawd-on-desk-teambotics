@@ -195,10 +195,10 @@ describe("QoderWork hook runtime (Phase 1 state-only)", () => {
     assert.strictEqual(resolveHookName(null, null), "");
   });
 
-  it("shouldResolvePid returns true for mapped events and false when CLAWD_REMOTE is set", () => {
+  it("shouldResolvePid returns true for mapped events and false when DESKBUDDY_REMOTE is set", () => {
     assert.strictEqual(shouldResolvePid("Stop", {}), true);
     assert.strictEqual(shouldResolvePid("PreToolUse", {}), true);
-    assert.strictEqual(shouldResolvePid("Stop", { CLAWD_REMOTE: "1" }), false);
+    assert.strictEqual(shouldResolvePid("Stop", { DESKBUDDY_REMOTE: "1" }), false);
     assert.strictEqual(shouldResolvePid("UnknownEvent", {}), false);
   });
 

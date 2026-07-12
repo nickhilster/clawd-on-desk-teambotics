@@ -11,7 +11,7 @@ const settings = require("../src/telegram-approval-settings");
 const tempDirs = [];
 
 function tempDir() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-tg-approval-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-tg-approval-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -147,20 +147,20 @@ test("writeTokenEnvFile validates and stores token outside prefs", () => {
   const result = settings.writeTokenEnvFile({ fs, path, filePath, token, platform: "linux" });
   assert.equal(result.status, "ok");
   const text = fs.readFileSync(filePath, "utf8");
-  assert.equal(text, `CLAWD_TG_BOT_TOKEN=${token}\n`);
+  assert.equal(text, `DESKBUDDY_TG_BOT_TOKEN=${token}\n`);
 });
 
 test("writeTokenEnvFile tightens an existing token file on POSIX", { skip: process.platform === "win32" }, () => {
   const filePath = path.join(tempDir(), "telegram-approval.env");
   const token = "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi_jklmnop";
-  fs.writeFileSync(filePath, "CLAWD_TG_BOT_TOKEN=old\n", { encoding: "utf8", mode: 0o644 });
+  fs.writeFileSync(filePath, "DESKBUDDY_TG_BOT_TOKEN=old\n", { encoding: "utf8", mode: 0o644 });
   fs.chmodSync(filePath, 0o644);
 
   const result = settings.writeTokenEnvFile({ fs, path, filePath, token, platform: process.platform });
 
   assert.equal(result.status, "ok");
   assert.equal(fs.statSync(filePath).mode & 0o777, 0o600);
-  assert.equal(fs.readFileSync(filePath, "utf8"), `CLAWD_TG_BOT_TOKEN=${token}\n`);
+  assert.equal(fs.readFileSync(filePath, "utf8"), `DESKBUDDY_TG_BOT_TOKEN=${token}\n`);
 });
 
 test("tokenStatus checks file presence without reading the token file", () => {
@@ -181,7 +181,7 @@ test("tokenStatus checks file presence without reading the token file", () => {
   };
   const status = settings.tokenStatus({
     fs: fakeFs,
-    filePath: "C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk\\telegram-approval.env",
+    filePath: "C:\\Users\\me\\AppData\\Roaming\\DeskBuddy\\telegram-approval.env",
   });
   assert.deepEqual(status, {
     tokenConfigured: true,
@@ -189,8 +189,8 @@ test("tokenStatus checks file presence without reading the token file", () => {
     tokenFileMtimeMs: 1234,
   });
   assert.deepEqual(calls, [
-    ["existsSync", "C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk\\telegram-approval.env"],
-    ["statSync", "C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk\\telegram-approval.env"],
+    ["existsSync", "C:\\Users\\me\\AppData\\Roaming\\DeskBuddy\\telegram-approval.env"],
+    ["statSync", "C:\\Users\\me\\AppData\\Roaming\\DeskBuddy\\telegram-approval.env"],
   ]);
 });
 
@@ -217,7 +217,7 @@ test("readMaskedBotToken returns only the masked preview, not the raw token", ()
   const dir = tempDir();
   const filePath = path.join(dir, "telegram-approval.env");
   const token = "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi_jklmnop";
-  fs.writeFileSync(filePath, `CLAWD_TG_BOT_TOKEN=${token}\n`, "utf8");
+  fs.writeFileSync(filePath, `DESKBUDDY_TG_BOT_TOKEN=${token}\n`, "utf8");
   const masked = settings.readMaskedBotToken({ fs, filePath });
   assert.equal(masked, "ABCD……mnop");
   // Sanity: the raw token (with bot id) must not appear in the masked preview.
@@ -234,15 +234,15 @@ test("readMaskedBotToken returns empty string when no token is stored", () => {
   assert.equal(settings.readMaskedBotToken({ fs, filePath: empty }), "");
 });
 
-test("tokenStatus ignores process.env.CLAWD_TG_BOT_TOKEN — file is the only signal", () => {
+test("tokenStatus ignores process.env.DESKBUDDY_TG_BOT_TOKEN — file is the only signal", () => {
   // Old behaviour: env-exported token would flip tokenConfigured=true without
   // any file on disk. New behaviour: the env value is ignored so the bot token
-  // never has a route into Clawd's main process.
+  // never has a route into DeskBuddy's main process.
   const fakeFs = { existsSync: () => false, statSync: () => ({ mtimeMs: 0 }) };
   const status = settings.tokenStatus({
     fs: fakeFs,
     filePath: "/nonexistent/telegram-approval.env",
-    env: { CLAWD_TG_BOT_TOKEN: "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi" },
+    env: { DESKBUDDY_TG_BOT_TOKEN: "123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi" },
   });
   assert.equal(status.tokenConfigured, false);
   assert.equal(status.tokenStored, false);
@@ -262,17 +262,17 @@ test("redactionSecretsForTelegramApproval includes whole session key and numeric
   ]);
 });
 
-test("invariant: Clawd source never reads process.env.CLAWD_TG_BOT_TOKEN", () => {
+test("invariant: DeskBuddy source never reads process.env.DESKBUDDY_TG_BOT_TOKEN", () => {
   // The bot token is only allowed to live at userData/telegram-approval.env on
-  // disk. Any code that reads process.env.CLAWD_TG_BOT_TOKEN pulls the token
-  // string into Clawd's main process, defeating that invariant. This grep
+  // disk. Any code that reads process.env.DESKBUDDY_TG_BOT_TOKEN pulls the token
+  // string into DeskBuddy's main process, defeating that invariant. This grep
   // test fails loudly if a future refactor re-introduces the read.
   //
-  // Note: the literal string "CLAWD_TG_BOT_TOKEN" is allowed to appear in
+  // Note: the literal string "DESKBUDDY_TG_BOT_TOKEN" is allowed to appear in
   // src/telegram-approval-settings.js (it writes that key into the env-file
   // content for the sidecar to read) and in src/telegram-approval-sidecar.js
   // (handshake constants and child env stripping). What's forbidden is
-  // process.env access to that specific name in Clawd's own code.
+  // process.env access to that specific name in DeskBuddy's own code.
   const srcDir = path.join(__dirname, "..", "src");
   // Cover main.js plus every src/telegram-*.js (sidecar, settings, the new
   // native-client / owner-manager / migration-state / token-store added in
@@ -286,7 +286,7 @@ test("invariant: Clawd source never reads process.env.CLAWD_TG_BOT_TOKEN", () =>
       .map((name) => path.join(srcDir, name)),
   ];
   const offenders = [];
-  const needle = "process.env.CLAWD_TG_BOT_TOKEN";
+  const needle = "process.env.DESKBUDDY_TG_BOT_TOKEN";
   for (const file of sourceFiles) {
     const text = fs.readFileSync(file, "utf8");
     if (text.includes(needle)) offenders.push(file);

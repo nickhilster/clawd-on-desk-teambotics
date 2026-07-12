@@ -101,7 +101,7 @@ describe("extractExistingNodeBin", () => {
   it("extracts node path from a UNC share", () => {
     const settings = {
       hooks: {
-        stop: [{ command: '"\\\\fileserver\\tools\\nodejs\\node.exe" "C:\\Clawd\\cursor-hook.js"' }],
+        stop: [{ command: '"\\\\fileserver\\tools\\nodejs\\node.exe" "C:\\DeskBuddy\\cursor-hook.js"' }],
       },
     };
     assert.strictEqual(
@@ -248,7 +248,7 @@ describe("buildPortableStatuslineCommand", () => {
 
 describe("writeJsonAtomicAsync", () => {
   it("writes pretty JSON atomically and cleans up tmp files", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-json-utils-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-json-utils-"));
     const filePath = path.join(tmpDir, "settings.json");
     try {
       await writeJsonAtomicAsync(filePath, { hooks: { Stop: [] } });
@@ -263,7 +263,7 @@ describe("writeJsonAtomicAsync", () => {
 });
 
 describe("backup pruning", () => {
-  const PREFIX = "settings.json.clawd-cleanup-";
+  const PREFIX = "settings.json.deskbuddy-cleanup-";
   // 17-digit, lexically-increasing creation stamp (matches YYYYMMDDHHMMSSmmm width).
   const stampAt = (i) => `20260630000000${String(i).padStart(3, "0")}`;
   const bakOf = (stamp, suffix) => `${PREFIX}${stamp}${suffix != null ? "." + suffix : ""}.bak`;
@@ -281,11 +281,11 @@ describe("backup pruning", () => {
     return fs.readdirSync(dir).filter((n) => n.startsWith(PREFIX) && n.endsWith(".bak")).sort();
   }
   function withTmp(fn) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-prune-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-prune-"));
     try { return fn(dir); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
   async function withTmpAsync(fn) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-prune-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-prune-"));
     try { return await fn(dir); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
 
@@ -321,7 +321,7 @@ describe("backup pruning", () => {
       fs.utimesSync(settingsPath, weekAgo, weekAgo); // source looks old
       // 5 pre-existing backups that look "newer" by mtime
       for (let i = 1; i <= 5; i++) seedBak(dir, stampAt(i), { mtimeSec: 1_800_000_000 + i });
-      const created = writeJsonAtomicWithBackup(settingsPath, { user: "config", clawd: true }, { backup: true, backupKeep: 5 });
+      const created = writeJsonAtomicWithBackup(settingsPath, { user: "config", deskbuddy: true }, { backup: true, backupKeep: 5 });
       assert.ok(created, "should return a backup path");
       assert.ok(fs.existsSync(created), "the just-written backup must NOT be pruned away");
       assert.ok(bakNames(dir).includes(path.basename(created)), "new backup is among survivors");
@@ -376,7 +376,7 @@ describe("backup pruning", () => {
     withTmp((dir) => {
       const settingsPath = path.join(dir, "settings.json");
       for (let i = 1; i <= 6; i++) seedBak(dir, stampAt(i));
-      const otherBak = path.join(dir, `other.json.clawd-cleanup-${stampAt(1)}.bak`);
+      const otherBak = path.join(dir, `other.json.deskbuddy-cleanup-${stampAt(1)}.bak`);
       fs.writeFileSync(otherBak, "{}", "utf8");
       fs.writeFileSync(settingsPath, "{}", "utf8");
       pruneOldBackups(settingsPath, { backupKeep: 2 });

@@ -3,7 +3,7 @@
 // ── Preferences (pure data layer) ──
 //
 // This module is the canonical schema definition + load/save/migrate/validate
-// for `clawd-prefs.json`. It has zero dependencies on Electron, the store, the
+// for `deskbuddy-prefs.json`. It has zero dependencies on Electron, the store, the
 // controller, or anything stateful — it deals in plain snapshots.
 //
 // `load(prefsPath)`  — read file, migrate to current version, validate, return snapshot
@@ -12,7 +12,7 @@
 // `validate(snapshot)` — coerces an arbitrary object into a valid snapshot, dropping bad fields
 // `migrate(raw)` — applies version-to-version migrations, returns the upgraded raw snapshot
 //
-// Bad-file handling: read failure → backup as `clawd-prefs.json.bak` → return defaults.
+// Bad-file handling: read failure → backup as `deskbuddy-prefs.json.bak` → return defaults.
 // Future-version handling: read succeeds but version > current → warn + refuse to overwrite
 //   (caller still gets a valid snapshot, but `save()` becomes a no-op via the locked flag).
 
@@ -209,7 +209,7 @@ const SCHEMA = {
   lowPowerIdleMode: { type: "boolean", default: false },
   mobilePreviewEnabled: { type: "boolean", default: false },
   // Which client the pairing QR/link should target: the browser-based PWA
-  // (works everywhere, no install) or the native Clawd Mobile Android app
+  // (works everywhere, no install) or the native DeskBuddy Mobile Android app
   // (deskbuddy:// deep link — only opens if the app is already installed, no
   // browser fallback if it isn't).
   mobilePreferredClient: { type: "string", default: "pwa", enum: ["pwa", "native"] },
@@ -271,7 +271,7 @@ const SCHEMA = {
       "copilot-cli": { integrationInstalled: false, enabled: false, permissionsEnabled: true, notificationHookEnabled: true },
       "cursor-agent": { integrationInstalled: false, enabled: false, permissionsEnabled: true, notificationHookEnabled: true },
       "gemini-cli": { integrationInstalled: false, enabled: false, permissionsEnabled: true, notificationHookEnabled: true },
-      // Antigravity is state-only post-D2 — Clawd never surfaces a permission
+      // Antigravity is state-only post-D2 — DeskBuddy never surfaces a permission
       // bubble for agy regardless of this flag (see server-route-permission.js
       // antigravity branch). Default kept as false so legacy reads don't see a
       // stale "true" implying bubbles are enabled.
@@ -312,7 +312,7 @@ const SCHEMA = {
     defaultFactory: () => ({}),
     normalize: normalizeThemeOverrides,
   },
-  // Phase 3b-swap: per-theme variant selection (e.g. {clawd: "chill", calico: "default"}).
+  // Phase 3b-swap: per-theme variant selection (e.g. {deskbuddy: "chill", calico: "default"}).
   // Missing key for a theme = use that theme's `default` variant. Unknown variantIds
   // get lenient-fallback to default at load time (see theme-loader._resolveVariant).
   themeVariant: {
@@ -470,7 +470,7 @@ function validate(raw) {
 }
 
 // Hand-edited-file fallback: if a user manually inverted the pair in
-// clawd-prefs.json, clamp workingStaleMs down to sessionStaleMs at load time
+// deskbuddy-prefs.json, clamp workingStaleMs down to sessionStaleMs at load time
 // so the live mirror is consistent. Primary enforcement lives in the
 // per-key validators in settings-actions.js and the
 // commandRegistry["sessionCleanup.setTriple"] command — this function is
@@ -498,7 +498,7 @@ function normalizeStaleTriple(out) {
 // v2 → v3: raise passive notification bubble default from 3s to 6s. Users
 //   who explicitly chose 3s in v2 are indistinguishable from defaulted-3 and
 //   are migrated too; other non-default values are preserved.
-// v3 → v4: Pi returns to a state-only integration. Clawd no longer inserts a
+// v3 → v4: Pi returns to a state-only integration. DeskBuddy no longer inserts a
 //   permission prompt into Pi's default YOLO flow, so the Pi permission subgate
 //   is reset off.
 function migrate(raw) {
@@ -634,7 +634,7 @@ function migrate(raw) {
   }
   // v10 -> v11: agent integrations are installed on demand. Entries that were
   // actually present in an old prefs file predate `integrationInstalled`, so
-  // keep them managed by Clawd. Missing entries fall through to v11 defaults
+  // keep them managed by DeskBuddy. Missing entries fall through to v11 defaults
   // instead of pretending that a never-seen/newer agent was installed.
   if (out.version < 11) {
     if (out.agents && typeof out.agents === "object") {

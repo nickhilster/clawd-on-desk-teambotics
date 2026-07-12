@@ -370,7 +370,7 @@ describe("settings-effect-router", () => {
 
     emit({ showTray: true });
 
-    assert.deepStrictEqual(logs, [["Clawd: tray toggle failed:", "tray broke"]]);
+    assert.deepStrictEqual(logs, [["DeskBuddy: tray toggle failed:", "tray broke"]]);
     assert.deepStrictEqual(calls, [
       ["updateMirrors", { showTray: true }],
       ["rebuildAllMenus"],

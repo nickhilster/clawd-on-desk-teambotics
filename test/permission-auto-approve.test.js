@@ -200,7 +200,7 @@ describe("auto-pilot: showPermissionBubble auto-approve chokepoint", () => {
 // Auto-pilot must emit each agent's own "allow" wire format, not just resolve
 // the entry. resolvePermissionEntry(entry, "allow") branches on the is* flags,
 // so this walks every agent that actually routes through showPermissionBubble
-// (the "A class" agents that hand their permission decision to Clawd) and
+// (the "A class" agents that hand their permission decision to DeskBuddy) and
 // asserts the captured HTTP/bridge reply is a real allow in that agent's shape.
 
 const http = require("node:http");

@@ -79,7 +79,7 @@ function makeServer(overrides = {}) {
       Stop: [
         {
           matcher: "",
-          hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" Stop' }],
+          hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' }],
         },
       ],
       PermissionRequest: [
@@ -111,7 +111,7 @@ function makeServer(overrides = {}) {
         return settingsRaw;
       },
     },
-    syncClawdHooksImpl: () => syncCalls.push("claude"),
+    syncDeskBuddyHooksImpl: () => syncCalls.push("claude"),
     syncGeminiHooksImpl: () => syncCalls.push("gemini"),
     syncAntigravityHooksImpl: () => syncCalls.push("antigravity"),
     syncCursorHooksImpl: () => syncCalls.push("cursor"),
@@ -153,7 +153,7 @@ function healthyClaudeSettingsWithThirdPartyHook() {
       Stop: [{
         matcher: "",
         hooks: [
-          { type: "command", command: 'node "/tmp/clawd-hook.js" Stop' },
+          { type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' },
           { type: "command", command: "node /home/u/.claude/hooks/third-party.js" },
         ],
       }],
@@ -268,7 +268,7 @@ describe("server Claude hook management", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" Stop' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' }],
           },
         ],
       },
@@ -288,7 +288,7 @@ describe("server Claude hook management", () => {
         Stop: [
           {
             matcher: "",
-            hooks: [{ type: "command", command: 'node "/tmp/clawd-hook.js" Stop' }],
+            hooks: [{ type: "command", command: 'node "/tmp/deskbuddy-hook.js" Stop' }],
           },
         ],
         PermissionRequest: [
@@ -338,7 +338,7 @@ describe("server Claude hook management", () => {
 
   it("keeps suspicious-shrink guard status when Claude repair fails and clears it on cleanup", () => {
     const { api, timers, getWatcher, setSettingsRaw } = makeServer({
-      syncClawdHooksImpl: () => ({ status: "error", message: "write failed" }),
+      syncDeskBuddyHooksImpl: () => ({ status: "error", message: "write failed" }),
     });
     setSettingsRaw(JSON.stringify(healthyClaudeSettingsWithThirdPartyHook()));
 

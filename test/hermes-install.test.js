@@ -16,15 +16,15 @@ const {
 
 const tempDirs = [];
 
-function makeTempDir(prefix = "clawd-hermes-install-") {
+function makeTempDir(prefix = "deskbuddy-hermes-install-") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   tempDirs.push(dir);
   return dir;
 }
 
 function makeSourcePlugin() {
-  const dir = makeTempDir("clawd-hermes-source-");
-  fs.writeFileSync(path.join(dir, "plugin.yaml"), "name: clawd-on-desk\n", "utf8");
+  const dir = makeTempDir("deskbuddy-hermes-source-");
+  fs.writeFileSync(path.join(dir, "plugin.yaml"), "name: deskbuddy\n", "utf8");
   fs.writeFileSync(path.join(dir, "__init__.py"), "# plugin\n", "utf8");
   return dir;
 }
@@ -75,11 +75,11 @@ describe("Hermes plugin installer", () => {
     assert.strictEqual(spawnSync.calls[0].options.env.HERMES_HOME, hermesHome);
     assert.strictEqual(
       fs.readFileSync(path.join(result.pluginDir, "plugin.yaml"), "utf8"),
-      "name: clawd-on-desk\n"
+      "name: deskbuddy\n"
     );
   });
 
-  it("enables Clawd in every Hermes profile config", () => {
+  it("enables DeskBuddy in every Hermes profile config", () => {
     const sourcePluginDir = makeSourcePlugin();
     const hermesHome = makeTempDir();
     const opsHome = path.join(hermesHome, "profiles", "ops");
@@ -368,7 +368,7 @@ describe("Hermes plugin installer", () => {
     const siblingDir = path.join(hermesHome, "plugins", "other-plugin");
     fs.mkdirSync(pluginDir, { recursive: true });
     fs.mkdirSync(siblingDir, { recursive: true });
-    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: clawd-on-desk\n", "utf8");
+    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: deskbuddy\n", "utf8");
     fs.writeFileSync(path.join(siblingDir, "plugin.yaml"), "name: other\n", "utf8");
     const spawnSync = makeSpawn();
 

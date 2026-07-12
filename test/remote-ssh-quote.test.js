@@ -59,8 +59,8 @@ test("quoteForCmd round-trips through real cmd.exe without env expansion", { ski
     "foo bar",
     'he said "hi"',
     "a&b|c<d>e^f",
-    "%CLAWD_QUOTE_TEST%",
-    "!CLAWD_QUOTE_TEST!",
+    "%DESKBUDDY_QUOTE_TEST%",
+    "!DESKBUDDY_QUOTE_TEST!",
     "path\\",
     "树莓派",
   ];
@@ -73,7 +73,7 @@ test("quoteForCmd round-trips through real cmd.exe without env expansion", { ski
   ].join(" ");
   const r = spawnSync("cmd.exe", ["/d", "/v:off", "/s", "/c", command], {
     encoding: "utf8",
-    env: { ...process.env, CLAWD_QUOTE_TEST: 'bad"&echo injected' },
+    env: { ...process.env, DESKBUDDY_QUOTE_TEST: 'bad"&echo injected' },
     windowsVerbatimArguments: true,
   });
   const detail = JSON.stringify({

@@ -45,7 +45,7 @@ html, body {
   cursor: grabbing;
 }
 
-#pet-motion > #clawd {
+#pet-motion > #deskbuddy {
   width: 190%;
   height: 130%;
   position: absolute;
@@ -61,7 +61,7 @@ html, body {
 /* 3D render path (renderer-3d.js). Hidden until a render3d-enabled theme's
    GLB finishes loading, at which point renderer-3d.js toggles this class on
    #pet-container so the 2D layer never flashes if the model fails to load. */
-#clawd3d-canvas {
+#deskbuddy3d-canvas {
   display: none;
   position: absolute;
   inset: 0;
@@ -74,7 +74,7 @@ html, body {
   display: none;
 }
 
-#pet-container.render-3d-active #clawd3d-canvas {
+#pet-container.render-3d-active #deskbuddy3d-canvas {
   display: block;
 }
 

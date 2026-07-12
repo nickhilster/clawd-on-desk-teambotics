@@ -13,7 +13,7 @@ const MARKER = "cursor-hook.js";
 const tempDirs = [];
 
 function makeTempHooksFile(initial = {}) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-cursor-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-cursor-"));
   const hooksPath = path.join(tmpDir, "hooks.json");
   fs.writeFileSync(hooksPath, JSON.stringify(initial, null, 2), "utf8");
   tempDirs.push(tmpDir);
@@ -144,7 +144,7 @@ describe("Cursor hook installer", () => {
   });
 
   it("skips when ~/.cursor/ does not exist", () => {
-    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-cursor-home-"));
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-cursor-home-"));
     tempDirs.push(fakeHome);
     const result = registerCursorHooks({
       silent: true,

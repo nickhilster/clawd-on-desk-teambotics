@@ -19,7 +19,7 @@ afterEach(() => {
 //   <tmp>/assets/svg/    (referenced by init for built-in svgs)
 //   <tmp>/userData/themes/<id>/theme.json   (user-installed)
 function makeFixture(themes) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-theme-"));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-theme-"));
   const appDir = path.join(tmp, "src");
   fs.mkdirSync(appDir, { recursive: true });
   fs.mkdirSync(path.join(tmp, "assets", "svg"), { recursive: true });

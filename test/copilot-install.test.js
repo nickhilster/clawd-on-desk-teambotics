@@ -26,7 +26,7 @@ const MARKER = "copilot-hook.js";
 const tempDirs = [];
 
 function makeTempHomeWithCopilot(initialJson) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-install-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-install-"));
   const copilotDir = path.join(tmpDir, ".copilot");
   const hooksDir = path.join(copilotDir, "hooks");
   fs.mkdirSync(hooksDir, { recursive: true });
@@ -38,7 +38,7 @@ function makeTempHomeWithCopilot(initialJson) {
 }
 
 function makeTempHomeWithoutCopilot() {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-install-no-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-install-no-"));
   tempDirs.push(tmpDir);
   return { homeDir: tmpDir };
 }
@@ -48,7 +48,7 @@ function readJson(filePath) {
 }
 
 function listCleanupBackups(dir) {
-  return fs.readdirSync(dir).filter((name) => name.includes(".clawd-cleanup-") && name.endsWith(".bak"));
+  return fs.readdirSync(dir).filter((name) => name.includes(".deskbuddy-cleanup-") && name.endsWith(".bak"));
 }
 
 afterEach(() => {
@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe("COPILOT_HOOK_EVENTS", () => {
-  it("state events stay exactly 10 (Clawd EVENT_TO_STATE coverage)", () => {
+  it("state events stay exactly 10 (DeskBuddy EVENT_TO_STATE coverage)", () => {
     assert.strictEqual(COPILOT_STATE_HOOK_EVENTS.length, 10);
     for (const event of [
       "sessionStart", "userPromptSubmitted", "preToolUse", "postToolUse", "sessionEnd",
@@ -110,21 +110,21 @@ describe("isCopilotPermissionRegistrable", () => {
     assert.strictEqual(isCopilotPermissionRegistrable(undefined), true);
   });
 
-  it("allows update when only Clawd-managed entries are present", () => {
+  it("allows update when only DeskBuddy-managed entries are present", () => {
     const arr = [
       { type: "command", bash: "node \"path/copilot-hook.js\" \"permissionRequest\"", powershell: "..." },
     ];
     assert.strictEqual(isCopilotPermissionRegistrable(arr), true);
   });
 
-  it("refuses registration when a non-Clawd entry exists (safe-v1)", () => {
+  it("refuses registration when a non-DeskBuddy entry exists (safe-v1)", () => {
     const arr = [
       { type: "command", bash: "/usr/bin/user-audit-hook --deny-dangerous", powershell: "..." },
     ];
     assert.strictEqual(isCopilotPermissionRegistrable(arr), false);
   });
 
-  it("refuses registration even if a Clawd entry sits alongside a user entry", () => {
+  it("refuses registration even if a DeskBuddy entry sits alongside a user entry", () => {
     const arr = [
       { type: "command", bash: "node \"path/copilot-hook.js\" \"permissionRequest\"" },
       { type: "command", bash: "/usr/bin/user-audit-hook" },
@@ -135,11 +135,11 @@ describe("isCopilotPermissionRegistrable", () => {
 
 describe("hasUserPermissionHookInOtherFiles", () => {
   // Copilot CLI loads every *.json in ~/.copilot/hooks/, not just hooks.json.
-  // Safe-v1 must inspect siblings so a Clawd "allow" can't override a user
+  // Safe-v1 must inspect siblings so a DeskBuddy "allow" can't override a user
   // deny that lives in security-audit.json. See plan v2.2 + codex-review-1.
 
   function makeTmpHooksDir() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-other-hooks-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-other-hooks-"));
     const hooksDir = path.join(root, "hooks");
     fs.mkdirSync(hooksDir);
     return { root, hooksDir, hooksPath: path.join(hooksDir, "hooks.json") };
@@ -173,8 +173,8 @@ describe("hasUserPermissionHookInOtherFiles", () => {
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
-  it("treats Clawd-marker sibling entries as user-authored (Clawd never writes outside hooks.json)", () => {
-    // If a Clawd marker shows up in another file the user must have copy/pasted
+  it("treats DeskBuddy-marker sibling entries as user-authored (DeskBuddy never writes outside hooks.json)", () => {
+    // If a DeskBuddy marker shows up in another file the user must have copy/pasted
     // it — treat conservatively, do not assume we can re-register safely.
     const { root, hooksDir, hooksPath } = makeTmpHooksDir();
     try {
@@ -194,7 +194,7 @@ describe("hasUserPermissionHookInOtherFiles", () => {
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
-  it("returns false when sibling JSON is malformed (transient FS hiccup must not block Clawd)", () => {
+  it("returns false when sibling JSON is malformed (transient FS hiccup must not block DeskBuddy)", () => {
     const { root, hooksDir, hooksPath } = makeTmpHooksDir();
     try {
       fs.writeFileSync(path.join(hooksDir, "broken.json"), "{ not valid json");
@@ -203,7 +203,7 @@ describe("hasUserPermissionHookInOtherFiles", () => {
   });
 
   it("returns false when the directory does not exist", () => {
-    const result = hasUserPermissionHookInOtherFiles(path.join(os.tmpdir(), "clawd-nope-" + Date.now()), "hooks.json");
+    const result = hasUserPermissionHookInOtherFiles(path.join(os.tmpdir(), "deskbuddy-nope-" + Date.now()), "hooks.json");
     assert.strictEqual(result, false);
   });
 
@@ -240,7 +240,7 @@ describe("hasUserPermissionHookInSettingsJson", () => {
   // ~/.copilot/settings.json into the same chain as hooks/*.json. Safe-v1
   // must see those too.
   function makeTmpSettings() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-settings-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-settings-"));
     return { root, settingsPath: path.join(root, "settings.json") };
   }
 
@@ -291,7 +291,7 @@ describe("hasUserPermissionHookInSettingsJson", () => {
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 
-  it("returns false for malformed settings.json (transient FS hiccup must not block Clawd)", () => {
+  it("returns false for malformed settings.json (transient FS hiccup must not block DeskBuddy)", () => {
     const { root, settingsPath } = makeTmpSettings();
     try {
       fs.writeFileSync(settingsPath, "{ not valid json");
@@ -376,7 +376,7 @@ describe("buildCopilotHookCommands", () => {
     assert.ok(bash.includes('"node\\""'));
   });
 
-  it("adds CLAWD_REMOTE env prefixes for remote hook commands", () => {
+  it("adds DESKBUDDY_REMOTE env prefixes for remote hook commands", () => {
     const { bash, powershell } = buildCopilotHookCommands(
       "/usr/bin/node",
       "/home/u/.claude/hooks/copilot-hook.js",
@@ -385,11 +385,11 @@ describe("buildCopilotHookCommands", () => {
     );
     assert.strictEqual(
       bash,
-      'CLAWD_REMOTE=1 "/usr/bin/node" "/home/u/.claude/hooks/copilot-hook.js" "sessionStart"'
+      'DESKBUDDY_REMOTE=1 "/usr/bin/node" "/home/u/.claude/hooks/copilot-hook.js" "sessionStart"'
     );
     assert.strictEqual(
       powershell,
-      '$env:CLAWD_REMOTE=\'1\'; & "/usr/bin/node" "/home/u/.claude/hooks/copilot-hook.js" "sessionStart"'
+      '$env:DESKBUDDY_REMOTE=\'1\'; & "/usr/bin/node" "/home/u/.claude/hooks/copilot-hook.js" "sessionStart"'
     );
   });
 });
@@ -415,7 +415,7 @@ describe("registerCopilotHooks", () => {
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.added, COPILOT_HOOK_EVENTS.length);
@@ -433,7 +433,7 @@ describe("registerCopilotHooks", () => {
       assert.strictEqual(entry.timeoutSec, timeoutSecForCopilotEvent(event),
         `timeoutSec mismatch for ${event}`);
       assert.ok(entry.bash.includes("/usr/local/bin/node"));
-      assert.ok(entry.bash.includes("/srv/clawd/hooks/copilot-hook.js"));
+      assert.ok(entry.bash.includes("/srv/deskbuddy/hooks/copilot-hook.js"));
       assert.ok(entry.bash.includes(event));
       assert.ok(entry.powershell.startsWith("& "));
       assert.ok(entry.powershell.includes(event));
@@ -446,14 +446,14 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(settings.hooks.permissionRequest[0].timeoutSec, PERMISSION_TIMEOUT_SEC);
   });
 
-  it("registers remote hooks with CLAWD_REMOTE in both platform commands", () => {
+  it("registers remote hooks with DESKBUDDY_REMOTE in both platform commands", () => {
     const { homeDir, hooksPath } = makeTempHomeWithCopilot();
 
     const result = registerCopilotHooks({
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
       remote: true,
     });
 
@@ -462,9 +462,9 @@ describe("registerCopilotHooks", () => {
     const settings = readJson(hooksPath);
     for (const event of COPILOT_HOOK_EVENTS) {
       const entry = settings.hooks[event][0];
-      assert.ok(entry.bash.startsWith("CLAWD_REMOTE=1 "));
+      assert.ok(entry.bash.startsWith("DESKBUDDY_REMOTE=1 "));
       assert.ok(entry.bash.includes(event));
-      assert.ok(entry.powershell.startsWith("$env:CLAWD_REMOTE='1'; & "));
+      assert.ok(entry.powershell.startsWith("$env:DESKBUDDY_REMOTE='1'; & "));
       assert.ok(entry.powershell.includes(event));
     }
   });
@@ -475,13 +475,13 @@ describe("registerCopilotHooks", () => {
     registerCopilotHooks({
       silent: true,
       homeDir,
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
       remote: true,
     });
 
     const entry = readJson(hooksPath).hooks.sessionStart[0];
     assert.ok(entry.bash.includes(`"${process.execPath.replace(/"/g, '\\"')}"`));
-    assert.ok(!entry.bash.startsWith('CLAWD_REMOTE=1 "node" '));
+    assert.ok(!entry.bash.startsWith('DESKBUDDY_REMOTE=1 "node" '));
   });
 
   it("is idempotent on second run (no rewrite when state matches)", () => {
@@ -506,7 +506,7 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(fs.statSync(hooksPath).mtimeMs, beforeMtime);
   });
 
-  it("updates the Clawd entry when the hook script path changes (no append)", () => {
+  it("updates the DeskBuddy entry when the hook script path changes (no append)", () => {
     const { homeDir, hooksPath } = makeTempHomeWithCopilot();
     registerCopilotHooks({
       silent: true,
@@ -557,7 +557,7 @@ describe("registerCopilotHooks", () => {
     });
 
     const settings = readJson(hooksPath);
-    // User entries preserved, Clawd entry appended
+    // User entries preserved, DeskBuddy entry appended
     assert.strictEqual(settings.hooks.sessionStart.length, 2);
     assert.ok(settings.hooks.sessionStart.some((e) => e.bash === "echo my-custom-hook"));
     assert.ok(settings.hooks.sessionStart.some((e) => e.bash.includes(MARKER)));
@@ -567,7 +567,7 @@ describe("registerCopilotHooks", () => {
     assert.ok(settings.hooks.userPromptSubmitted.some((e) => e.bash.includes(MARKER)));
   });
 
-  it("updates the existing Clawd entry in place when other entries are present", () => {
+  it("updates the existing DeskBuddy entry in place when other entries are present", () => {
     const customSession = { type: "command", bash: "echo custom", powershell: "echo custom" };
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
@@ -595,7 +595,7 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(settings.hooks.sessionStart.length, 2);
     // Custom entry untouched and still first
     assert.deepStrictEqual(settings.hooks.sessionStart[0], customSession);
-    // Clawd entry updated in place at index 1, not appended at index 2
+    // DeskBuddy entry updated in place at index 1, not appended at index 2
     assert.ok(settings.hooks.sessionStart[1].bash.includes("/new/copilot-hook.js"));
     assert.ok(!settings.hooks.sessionStart[1].bash.includes("/old/copilot-hook.js"));
   });
@@ -637,7 +637,7 @@ describe("registerCopilotHooks", () => {
     }
   });
 
-  it("repairs schema drift on the Clawd entry (e.g., missing powershell, wrong timeoutSec)", () => {
+  it("repairs schema drift on the DeskBuddy entry (e.g., missing powershell, wrong timeoutSec)", () => {
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
       hooks: {
@@ -700,7 +700,7 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(result.added, COPILOT_HOOK_EVENTS.length - 1);
 
     const sessionStart = readJson(hooksPath).hooks.sessionStart;
-    assert.strictEqual(sessionStart.length, 1, "no duplicate Clawd entries");
+    assert.strictEqual(sessionStart.length, 1, "no duplicate DeskBuddy entries");
     assert.ok(sessionStart[0].bash.includes("/new/copilot-hook.js"));
     assert.ok(sessionStart[0].powershell.includes("/new/copilot-hook.js"));
   });
@@ -744,7 +744,7 @@ describe("registerCopilotHooks", () => {
   });
 
   it("writes to env.COPILOT_HOME when set, not homeDir/.copilot", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-home-env-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-home-env-"));
     tempDirs.push(tmpDir);
     const customCopilot = path.join(tmpDir, "custom-cli");
     fs.mkdirSync(path.join(customCopilot, "hooks"), { recursive: true });
@@ -768,7 +768,7 @@ describe("registerCopilotHooks", () => {
   });
 
   it("options.copilotHome wins over env.COPILOT_HOME and homeDir", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-opt-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-opt-"));
     tempDirs.push(tmpDir);
     const optHome = path.join(tmpDir, "opt-copilot");
     fs.mkdirSync(path.join(optHome, "hooks"), { recursive: true });
@@ -806,7 +806,7 @@ describe("registerCopilotHooks", () => {
   });
 
   it("skips registration when env.COPILOT_HOME points at a missing directory", () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-env-missing-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-env-missing-"));
     tempDirs.push(tmpDir);
     const fakeHome = path.join(tmpDir, "fake-home");
     fs.mkdirSync(fakeHome, { recursive: true });
@@ -828,7 +828,7 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(fs.existsSync(nonexistent), false);
   });
 
-  it("unregister removes stale Clawd markers from any Copilot event", () => {
+  it("unregister removes stale DeskBuddy markers from any Copilot event", () => {
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
       hooks: {
@@ -878,7 +878,7 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(listCleanupBackups(path.dirname(hooksPath)).length, 1);
   });
 
-  it("safe-v1: leaves permissionRequest untouched when a non-Clawd hook exists", () => {
+  it("safe-v1: leaves permissionRequest untouched when a non-DeskBuddy hook exists", () => {
     const userPermissionHook = {
       type: "command",
       bash: "/usr/local/bin/user-audit-hook.sh",
@@ -896,7 +896,7 @@ describe("registerCopilotHooks", () => {
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     // State events still register fully (10 added). permissionRequest is
@@ -912,9 +912,9 @@ describe("registerCopilotHooks", () => {
   });
 
   it("safe-v1: skips permissionRequest when a sibling *.json declares the same event", () => {
-    // Cross-file safe-v1: even with an empty (or pure-Clawd) permissionRequest
+    // Cross-file safe-v1: even with an empty (or pure-DeskBuddy) permissionRequest
     // array in hooks.json, the presence of a user hook in any sibling file
-    // means appending Clawd here would still inject into the merged hook
+    // means appending DeskBuddy here would still inject into the merged hook
     // chain Copilot executes. See codex-review-1 alongside Phase 6 follow-up.
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
@@ -940,7 +940,7 @@ describe("registerCopilotHooks", () => {
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.added, COPILOT_STATE_HOOK_EVENTS.length);
@@ -955,17 +955,17 @@ describe("registerCopilotHooks", () => {
     );
   });
 
-  it("safe-v1: removes an existing Clawd permissionRequest entry when a user hook appears in hooks.json", () => {
-    // Regression for codex-review-2: a previous run left a Clawd entry in
+  it("safe-v1: removes an existing DeskBuddy permissionRequest entry when a user hook appears in hooks.json", () => {
+    // Regression for codex-review-2: a previous run left a DeskBuddy entry in
     // hooks.json. The user then added their own deny hook. We must strip
-    // the leftover Clawd entry so it can't override the user deny via the
+    // the leftover DeskBuddy entry so it can't override the user deny via the
     // "later output wins" semantics. The user entry must be preserved.
     const userHook = {
       type: "command",
       bash: "/usr/local/bin/user-audit.sh",
       timeoutSec: 30,
     };
-    const oldClawd = {
+    const oldDeskBuddy = {
       type: "command",
       bash: "\"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
       powershell: "& \"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
@@ -973,30 +973,30 @@ describe("registerCopilotHooks", () => {
     };
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
-      hooks: { permissionRequest: [oldClawd, userHook] },
+      hooks: { permissionRequest: [oldDeskBuddy, userHook] },
     });
 
     const result = registerCopilotHooks({
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.permissionSkippedDueToUserHook, true);
 
     const settings = readJson(hooksPath);
     assert.strictEqual(settings.hooks.permissionRequest.length, 1,
-      "the legacy Clawd entry must be removed; only the user entry survives");
+      "the legacy DeskBuddy entry must be removed; only the user entry survives");
     assert.deepStrictEqual(settings.hooks.permissionRequest[0], userHook,
       "user hook must be preserved byte-for-byte");
   });
 
-  it("safe-v1: removes an existing Clawd permissionRequest entry when a sibling *.json declares the event", () => {
+  it("safe-v1: removes an existing DeskBuddy permissionRequest entry when a sibling *.json declares the event", () => {
     // Same as above but the conflict comes from a different file. The
-    // Clawd entry in hooks.json must still be removed because Copilot
+    // DeskBuddy entry in hooks.json must still be removed because Copilot
     // merges all *.json in the hooks directory.
-    const oldClawd = {
+    const oldDeskBuddy = {
       type: "command",
       bash: "\"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
       powershell: "& \"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
@@ -1004,7 +1004,7 @@ describe("registerCopilotHooks", () => {
     };
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
-      hooks: { permissionRequest: [oldClawd] },
+      hooks: { permissionRequest: [oldDeskBuddy] },
     });
     const hooksDir = path.dirname(hooksPath);
     fs.writeFileSync(
@@ -1020,7 +1020,7 @@ describe("registerCopilotHooks", () => {
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.permissionSkippedDueToUserHook, true);
@@ -1028,21 +1028,21 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(
       Array.isArray(settings.hooks.permissionRequest) ? settings.hooks.permissionRequest.length : 0,
       0,
-      "Clawd entry must be stripped from hooks.json when a sibling file owns the event",
+      "DeskBuddy entry must be stripped from hooks.json when a sibling file owns the event",
     );
   });
 
   it("parses hooks.json with a UTF-8 BOM (PowerShell Set-Content default) and applies safe-v1", () => {
     // Regression for codex-review-2 + Phase 9 M10: PowerShell's default
     // `Set-Content -Encoding utf8` prepends a BOM. JSON.parse rejected it,
-    // syncCopilotHooks silently swallowed the throw, and the Clawd entry
+    // syncCopilotHooks silently swallowed the throw, and the DeskBuddy entry
     // stayed in hooks.json even though safe-v1 should have stripped it.
     const userHook = {
       type: "command",
       bash: "/usr/local/bin/user-audit.sh",
       timeoutSec: 30,
     };
-    const oldClawd = {
+    const oldDeskBuddy = {
       type: "command",
       bash: "\"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
       powershell: "& \"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
@@ -1053,7 +1053,7 @@ describe("registerCopilotHooks", () => {
     const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
     const body = Buffer.from(JSON.stringify({
       version: 1,
-      hooks: { permissionRequest: [userHook, oldClawd] },
+      hooks: { permissionRequest: [userHook, oldDeskBuddy] },
     }, null, 2));
     fs.writeFileSync(hooksPath, Buffer.concat([bom, body]));
 
@@ -1061,21 +1061,21 @@ describe("registerCopilotHooks", () => {
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.permissionSkippedDueToUserHook, true,
       "BOM must not block safe-v1 from triggering");
     const settings = readJson(hooksPath);
     assert.strictEqual(settings.hooks.permissionRequest.length, 1,
-      "old Clawd entry must be stripped despite the BOM");
+      "old DeskBuddy entry must be stripped despite the BOM");
     assert.deepStrictEqual(settings.hooks.permissionRequest[0], userHook);
   });
 
   it("safe-v1: skips permissionRequest when settings.json declares an inline hook", () => {
     // Codex review 3 — settings.json `hooks` block participates in Copilot's
     // merged hook chain. Installer + doctor must both treat it as user-owned
-    // and refuse to register Clawd permissionRequest.
+    // and refuse to register DeskBuddy permissionRequest.
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
       hooks: {}, // hooks.json clean
@@ -1089,7 +1089,7 @@ describe("registerCopilotHooks", () => {
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.permissionSkippedDueToUserHook, true,
@@ -1101,8 +1101,8 @@ describe("registerCopilotHooks", () => {
     );
   });
 
-  it("safe-v1: strips a leftover Clawd entry when settings.json inline hook appears later", () => {
-    const oldClawd = {
+  it("safe-v1: strips a leftover DeskBuddy entry when settings.json inline hook appears later", () => {
+    const oldDeskBuddy = {
       type: "command",
       bash: "\"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
       powershell: "& \"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
@@ -1110,7 +1110,7 @@ describe("registerCopilotHooks", () => {
     };
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
-      hooks: { permissionRequest: [oldClawd] },
+      hooks: { permissionRequest: [oldDeskBuddy] },
     });
     const settingsPath = path.join(homeDir, ".copilot", "settings.json");
     fs.writeFileSync(settingsPath, JSON.stringify({
@@ -1121,7 +1121,7 @@ describe("registerCopilotHooks", () => {
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.permissionSkippedDueToUserHook, true);
@@ -1129,12 +1129,12 @@ describe("registerCopilotHooks", () => {
     assert.strictEqual(
       Array.isArray(settings.hooks.permissionRequest) ? settings.hooks.permissionRequest.length : 0,
       0,
-      "Clawd entry in hooks.json must be stripped when settings.json owns the event",
+      "DeskBuddy entry in hooks.json must be stripped when settings.json owns the event",
     );
   });
 
-  it("safe-v1: still updates Clawd-managed permissionRequest entry in place", () => {
-    const existingClawd = {
+  it("safe-v1: still updates DeskBuddy-managed permissionRequest entry in place", () => {
+    const existingDeskBuddy = {
       type: "command",
       bash: "\"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
       powershell: "& \"/old/node\" \"/old/copilot-hook.js\" \"permissionRequest\"",
@@ -1142,14 +1142,14 @@ describe("registerCopilotHooks", () => {
     };
     const { homeDir, hooksPath } = makeTempHomeWithCopilot({
       version: 1,
-      hooks: { permissionRequest: [existingClawd] },
+      hooks: { permissionRequest: [existingDeskBuddy] },
     });
 
     const result = registerCopilotHooks({
       silent: true,
       homeDir,
       nodeBin: "/usr/local/bin/node",
-      hookScript: "/srv/clawd/hooks/copilot-hook.js",
+      hookScript: "/srv/deskbuddy/hooks/copilot-hook.js",
     });
 
     assert.strictEqual(result.permissionSkippedDueToUserHook, false);

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Clawd — Kiro CLI hook (stdin JSON with hook_event_name; exit code gating)
-// Registered in ~/.kiro/agents/clawd.json by hooks/kiro-install.js
+// DeskBuddy — Kiro CLI hook (stdin JSON with hook_event_name; exit code gating)
+// Registered in ~/.kiro/agents/deskbuddy.json by hooks/kiro-install.js
 
 const { postStateToRunningServer, readHostPrefix } = require("./server-config");
 const { createPidResolver, readStdinJson, getPlatformConfig } = require("./shared-process");
 
-// Kiro CLI hook event → { state, event } for the Clawd state machine
+// Kiro CLI hook event → { state, event } for the DeskBuddy state machine
 const HOOK_MAP = {
   agentSpawn:       { state: "idle",      event: "agentSpawn" },
   userPromptSubmit: { state: "thinking",  event: "userPromptSubmit" },
@@ -30,7 +30,7 @@ readStdinJson()
     }
 
     const { state, event } = mapped;
-    if (hookName === "agentSpawn" && !process.env.CLAWD_REMOTE) resolve();
+    if (hookName === "agentSpawn" && !process.env.DESKBUDDY_REMOTE) resolve();
 
     // Kiro CLI stdin has no session_id — use "default" (all sessions merged)
     const sessionId = "default";
@@ -41,7 +41,7 @@ readStdinJson()
     const body = { state, session_id: sessionId, event };
     body.agent_id = "kiro-cli";
     if (cwd) body.cwd = cwd;
-    if (process.env.CLAWD_REMOTE) {
+    if (process.env.DESKBUDDY_REMOTE) {
       body.host = readHostPrefix();
     } else {
       body.source_pid = stablePid;

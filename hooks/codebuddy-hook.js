@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Clawd — CodeBuddy hook (stdin JSON with hook_event_name; stdout JSON for gating hooks)
+// DeskBuddy — CodeBuddy hook (stdin JSON with hook_event_name; stdout JSON for gating hooks)
 // Registered in ~/.codebuddy/settings.json by hooks/codebuddy-install.js
 // CodeBuddy uses Claude Code-compatible hook format with identical event names.
 
 const { postStateToRunningServer, readHostPrefix } = require("./server-config");
 const { createPidResolver, readStdinJson, getPlatformConfig } = require("./shared-process");
 
-// CodeBuddy hook event → { state, event } for the Clawd state machine
+// CodeBuddy hook event → { state, event } for the DeskBuddy state machine
 const HOOK_MAP = {
   SessionStart:     { state: "idle",         event: "SessionStart" },
   SessionEnd:       { state: "sleeping",     event: "SessionEnd" },
@@ -49,7 +49,7 @@ let safetyTimer = null;
 
 // Write the stdout response exactly once. Kept separate from process exit so the
 // hook can answer CodeBuddy immediately yet still let the fire-and-forget POST
-// to Clawd leave the process before it exits.
+// to DeskBuddy leave the process before it exits.
 function writeStdoutOnce(outLine) {
   if (_wrote) return;
   _wrote = true;
@@ -78,7 +78,7 @@ readStdinJson()
     }
 
     const { state, event } = mapped;
-    if (hookName === "SessionStart" && !process.env.CLAWD_REMOTE) resolve();
+    if (hookName === "SessionStart" && !process.env.DESKBUDDY_REMOTE) resolve();
 
     const sessionId = (payload && payload.session_id) || "default";
     const cwd = (payload && payload.cwd) || "";
@@ -88,7 +88,7 @@ readStdinJson()
     const body = { state, session_id: sessionId, event };
     body.agent_id = "codebuddy";
     if (cwd) body.cwd = cwd;
-    if (process.env.CLAWD_REMOTE) {
+    if (process.env.DESKBUDDY_REMOTE) {
       body.host = readHostPrefix();
     } else {
       body.source_pid = stablePid;

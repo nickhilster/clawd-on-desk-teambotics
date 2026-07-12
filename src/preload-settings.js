@@ -151,7 +151,7 @@ contextBridge.exposeInMainWorld("doctor", {
   runChecks: () => ipcRenderer.invoke("doctor:run-checks"),
   getReport: () => ipcRenderer.invoke("doctor:get-report"),
   testConnection: (durationMs) => ipcRenderer.invoke("doctor:test-connection", { durationMs }),
-  openClawdLog: () => ipcRenderer.invoke("doctor:open-clawd-log"),
+  openDeskBuddyLog: () => ipcRenderer.invoke("doctor:open-deskbuddy-log"),
   codexHookHealth: () => ipcRenderer.invoke("doctor:codex-hook-health"),
 });
 

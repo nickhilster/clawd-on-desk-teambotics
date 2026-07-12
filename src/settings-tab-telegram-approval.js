@@ -416,7 +416,7 @@
   }
 
   function buildHardwareBuddyChannelCard() {
-    return root.ClawdSettingsHardwareBuddyPanel.build(coreRef, {
+    return root.DeskBuddySettingsHardwareBuddyPanel.build(coreRef, {
       id: "remote-approval.hardware-buddy",
       activeTabId: "telegram-approval",
       className: "remote-approval-channel-card",
@@ -1009,5 +1009,5 @@
     core.tabs["telegram-approval"] = { render };
   }
 
-  root.ClawdSettingsTabTelegramApproval = { init };
+  root.DeskBuddySettingsTabTelegramApproval = { init };
 })(globalThis);

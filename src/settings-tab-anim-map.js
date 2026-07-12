@@ -153,5 +153,5 @@
 
   // The map is no longer a top-level tab — the Animation & Sound Overrides tab
   // renders it as its "on / off" subtab via these two entry points.
-  root.ClawdSettingsTabAnimMap = { init, renderMapSubtab, patchMapInPlace };
+  root.DeskBuddySettingsTabAnimMap = { init, renderMapSubtab, patchMapInPlace };
 })(globalThis);

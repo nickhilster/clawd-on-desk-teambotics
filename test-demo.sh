@@ -1,31 +1,31 @@
 #!/bin/bash
-# Clawd 动画全播放测试脚本
+# DeskBuddy 动画全播放测试脚本
 # 用法: bash test-demo.sh [每个动画秒数，默认8]
 
 DELAY=${1:-8}
 
 SVGS=(
-  "clawd-idle-living.svg"
-  "clawd-sleeping.svg"
-  "clawd-working-thinking.svg"
-  "clawd-working-typing.svg"
-  "clawd-working-juggling.svg"
-  "clawd-working-sweeping.svg"
-  "clawd-working-building.svg"
-  "clawd-working-debugger.svg"
-  "clawd-working-wizard.svg"
-  "clawd-working-carrying.svg"
-  "clawd-working-conducting.svg"
-  "clawd-working-confused.svg"
-  "clawd-working-overheated.svg"
-  "clawd-error.svg"
-  "clawd-working-ultrathink.svg"
-  "clawd-happy.svg"
-  "clawd-notification.svg"
-  "clawd-disconnected.svg"
+  "deskbuddy-idle-living.svg"
+  "deskbuddy-sleeping.svg"
+  "deskbuddy-working-thinking.svg"
+  "deskbuddy-working-typing.svg"
+  "deskbuddy-working-juggling.svg"
+  "deskbuddy-working-sweeping.svg"
+  "deskbuddy-working-building.svg"
+  "deskbuddy-working-debugger.svg"
+  "deskbuddy-working-wizard.svg"
+  "deskbuddy-working-carrying.svg"
+  "deskbuddy-working-conducting.svg"
+  "deskbuddy-working-confused.svg"
+  "deskbuddy-working-overheated.svg"
+  "deskbuddy-error.svg"
+  "deskbuddy-working-ultrathink.svg"
+  "deskbuddy-happy.svg"
+  "deskbuddy-notification.svg"
+  "deskbuddy-disconnected.svg"
 )
 
-echo "=== Clawd Demo: ${#SVGS[@]} animations, ${DELAY}s each ==="
+echo "=== DeskBuddy Demo: ${#SVGS[@]} animations, ${DELAY}s each ==="
 for i in "${!SVGS[@]}"; do
   svg="${SVGS[$i]}"
   echo "[$((i+1))/${#SVGS[@]}] $svg"

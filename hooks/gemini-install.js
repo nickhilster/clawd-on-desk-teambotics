@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Merge Clawd Gemini CLI hooks into ~/.gemini/settings.json (append-only, idempotent)
+// Merge DeskBuddy Gemini CLI hooks into ~/.gemini/settings.json (append-only, idempotent)
 
 const fs = require("fs");
 const path = require("path");
@@ -30,14 +30,14 @@ const GEMINI_HOOK_EVENTS = [
   "PreCompress",
 ];
 
-function isClawdHookCommand(command) {
+function isDeskBuddyHookCommand(command) {
   return typeof command === "string" && command.includes(MARKER);
 }
 
 function buildGeminiHookEntry(command) {
   return {
     matcher: "*",
-    hooks: [{ name: "clawd", type: "command", command }],
+    hooks: [{ name: "deskbuddy", type: "command", command }],
   };
 }
 
@@ -58,7 +58,7 @@ function isDesiredGeminiHookEntry(entry, desiredCommand) {
     && Array.isArray(entry.hooks)
     && entry.hooks.length === 1
     && entry.hooks[0]
-    && entry.hooks[0].name === "clawd"
+    && entry.hooks[0].name === "deskbuddy"
     && entry.hooks[0].type === "command"
     && entry.hooks[0].command === desiredCommand
   );
@@ -75,7 +75,7 @@ function normalizeGeminiHookEntries(entries, desiredCommand) {
     const entry = entries[index];
     if (!entry || typeof entry !== "object") continue;
 
-    if (isClawdHookCommand(entry.command)) {
+    if (isDeskBuddyHookCommand(entry.command)) {
       matched = true;
       if (dedicatedIndex === -1) {
         replaceEntry(entry, buildGeminiHookEntry(desiredCommand));
@@ -91,15 +91,15 @@ function normalizeGeminiHookEntries(entries, desiredCommand) {
 
     if (!Array.isArray(entry.hooks)) continue;
     const otherHooks = [];
-    let clawdHookCount = 0;
+    let deskbuddyHookCount = 0;
     for (const hook of entry.hooks) {
-      if (hook && isClawdHookCommand(hook.command)) {
-        clawdHookCount++;
+      if (hook && isDeskBuddyHookCommand(hook.command)) {
+        deskbuddyHookCount++;
       } else {
         otherHooks.push(hook);
       }
     }
-    if (clawdHookCount === 0) continue;
+    if (deskbuddyHookCount === 0) continue;
 
     matched = true;
     if (otherHooks.length > 0) {
@@ -142,24 +142,24 @@ function normalizeGeminiDisabledHooks(settings) {
   if (!hooksConfig || typeof hooksConfig !== "object" || !Array.isArray(hooksConfig.disabled)) return false;
 
   let changed = false;
-  let sawClawd = false;
+  let sawDeskBuddy = false;
   const nextDisabled = [];
 
   for (const entry of hooksConfig.disabled) {
-    if (entry === "clawd") {
-      if (sawClawd) {
+    if (entry === "deskbuddy") {
+      if (sawDeskBuddy) {
         changed = true;
         continue;
       }
-      sawClawd = true;
+      sawDeskBuddy = true;
       nextDisabled.push(entry);
       continue;
     }
 
-    if (isClawdHookCommand(entry)) {
-      if (!sawClawd) {
-        nextDisabled.push("clawd");
-        sawClawd = true;
+    if (isDeskBuddyHookCommand(entry)) {
+      if (!sawDeskBuddy) {
+        nextDisabled.push("deskbuddy");
+        sawDeskBuddy = true;
       }
       changed = true;
       continue;
@@ -173,7 +173,7 @@ function normalizeGeminiDisabledHooks(settings) {
 }
 
 /**
- * Register Clawd hooks into ~/.gemini/settings.json
+ * Register DeskBuddy hooks into ~/.gemini/settings.json
  * @param {object} [options]
  * @param {boolean} [options.silent]
  * @param {string} [options.settingsPath]
@@ -187,7 +187,7 @@ function registerGeminiHooks(options = {}) {
   // Skip if ~/.gemini/ doesn't exist (Gemini CLI not installed)
   const geminiDir = path.dirname(settingsPath);
   if (!options.settingsPath && !fs.existsSync(geminiDir)) {
-    if (!options.silent) console.log("Clawd: ~/.gemini/ not found — skipping Gemini hook registration");
+    if (!options.silent) console.log("DeskBuddy: ~/.gemini/ not found — skipping Gemini hook registration");
     return { added: 0, skipped: 0, updated: 0 };
   }
 
@@ -248,7 +248,7 @@ function registerGeminiHooks(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Gemini hooks → ${settingsPath}`);
+    console.log(`DeskBuddy Gemini hooks → ${settingsPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
   }
 
@@ -286,7 +286,7 @@ function unregisterGeminiHooks(options = {}) {
 
   let backupPath = null;
   if (changed) backupPath = writeJsonAtomicWithBackup(settingsPath, settings, options);
-  if (!options.silent) console.log(`Clawd Gemini hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Gemini hooks removed: ${removed}`);
   const result = { removed, changed, settingsPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;

@@ -3,12 +3,12 @@
 const fs = require("fs");
 const path = require("path");
 
-const LEGACY_DIR_NAME = "clawd-on-desk";
-const LEGACY_PREFS_FILENAME = "clawd-prefs.json";
+const LEGACY_DIR_NAME = "deskbuddy";
+const LEGACY_PREFS_FILENAME = "deskbuddy-prefs.json";
 const NEW_PREFS_FILENAME = "deskbuddy-prefs.json";
 
 /**
- * One-time migration from the pre-rebrand "clawd-on-desk" userData folder to
+ * One-time migration from the pre-rebrand "deskbuddy" userData folder to
  * the new "deskbuddy" one. Copies (never moves) so the legacy folder is
  * always left intact as a fallback. Forces the migrated theme to "spark"
  * regardless of the user's prior selection, per the approved rebrand spec.

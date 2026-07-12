@@ -24,7 +24,7 @@ function createQueueRuntime(overrides = {}) {
     },
     shell: {},
     settingsController: {
-      get: () => "clawd",
+      get: () => "deskbuddy",
       async applyCommand() {
         return { status: "ok" };
       },
@@ -37,7 +37,7 @@ function createQueueRuntime(overrides = {}) {
       ...(overrides.codexPetAdapter || {}),
     },
     codexPetImporter: {
-      parseClawdImportUrl(rawUrl) {
+      parseDeskBuddyImportUrl(rawUrl) {
         parseCalls.push(rawUrl);
         return {
           asciiHostname: "example.test",
@@ -85,9 +85,9 @@ test("Codex Pet main helpers merge sync summaries without dropping diagnostics",
 });
 
 test("Codex Pet main helpers detect deskbuddy protocol args case-insensitively", () => {
-  const { extractClawdProtocolUrls } = createCodexPetMain.__test;
+  const { extractDeskBuddyProtocolUrls } = createCodexPetMain.__test;
   assert.deepStrictEqual(
-    extractClawdProtocolUrls([
+    extractDeskBuddyProtocolUrls([
       "Deskbuddy://import-pet?url=https%3A%2F%2Fexample.test%2Fpet.json",
       "--flag",
       "https://example.test",
@@ -112,7 +112,7 @@ test("Codex Pet main runtime records sync summaries and normalizes adapter failu
     dialog: {},
     shell: {},
     settingsController: {
-      get: () => "clawd",
+      get: () => "deskbuddy",
     },
     themeLoader: {},
     codexPetAdapter: {
@@ -139,7 +139,7 @@ test("Codex Pet main runtime records sync summaries and normalizes adapter failu
     dialog: {},
     shell: {},
     settingsController: {
-      get: () => "clawd",
+      get: () => "deskbuddy",
     },
     themeLoader: {},
     codexPetAdapter: {
@@ -150,7 +150,7 @@ test("Codex Pet main runtime records sync summaries and normalizes adapter failu
     codexPetImporter: {},
   });
 
-  const failed = failingRuntime.syncThemes("clawd");
+  const failed = failingRuntime.syncThemes("deskbuddy");
   assert.strictEqual(failed.error, "boom");
   assert.match(failed.diagnostics[0].errors[0], /failed to sync Codex Pet themes: boom/);
   assert.strictEqual(failingRuntime.getLastSyncSummary(), failed);
@@ -269,7 +269,7 @@ test("Codex Pet import dialog uses zh-TW strings", async () => {
 });
 
 test("Codex Pet removal confirmation uses zh-TW strings", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codex-pet-main-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codex-pet-main-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   const petsRoot = path.join(root, "pets");
@@ -293,7 +293,7 @@ test("Codex Pet removal confirmation uses zh-TW strings", async (t) => {
     },
     shell: {},
     settingsController: {
-      get: () => "clawd",
+      get: () => "deskbuddy",
     },
     themeLoader: {
       ensureUserThemesDir: () => themesRoot,

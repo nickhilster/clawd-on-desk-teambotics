@@ -1,5 +1,5 @@
 #!/bin/bash
-# Clawd ONESHOT gate 测试脚本
+# DeskBuddy ONESHOT gate 测试脚本
 # 用法:
 #   bash test-oneshot-gate.sh               # 全测 5 个状态，间隔 6s
 #   bash test-oneshot-gate.sh error         # 只测 error
@@ -41,12 +41,12 @@ send_state() {
 
 # 健康检查
 if ! curl -s "$URL" | grep -q '"ok":true'; then
-  echo "✗ Clawd 服务未运行（预期 127.0.0.1:23333）。先 npm start"
+  echo "✗ DeskBuddy 服务未运行（预期 127.0.0.1:23333）。先 npm start"
   exit 1
 fi
 
 if [ "$STATE" = "all" ]; then
-  echo "=== Clawd ONESHOT gate 全测：5 个状态，间隔 ${DELAY}s ==="
+  echo "=== DeskBuddy ONESHOT gate 全测：5 个状态，间隔 ${DELAY}s ==="
   for s in error notification sweeping attention carrying; do
     send_state "$s"
     sleep "$DELAY"

@@ -220,24 +220,24 @@ describe("package build config", () => {
       assert.match(pkg.scripts.start, /node scripts\/ensure-sidecar-binaries\.js && node launch\.js/);
     });
 
-    it("copies cc-connect-clawd sidecars into packaged resources", () => {
+    it("copies deskbuddy-connect sidecars into packaged resources", () => {
       const extra = pkg.build.extraResources || [];
       const copied = extra.some(
-        (e) => e && e.from === "bin/cc-connect-clawd" && e.to === "sidecars/cc-connect-clawd"
+        (e) => e && e.from === "bin/deskbuddy-connect" && e.to === "sidecars/deskbuddy-connect"
       );
       assert.ok(
         copied,
-        "build.extraResources must copy bin/cc-connect-clawd -> sidecars/cc-connect-clawd"
+        "build.extraResources must copy bin/deskbuddy-connect -> sidecars/deskbuddy-connect"
       );
     });
 
     it("documents the expected sidecar binary names in the README", () => {
-      const readme = path.join(ROOT, "bin", "cc-connect-clawd", "README.md");
-      assert.ok(fs.existsSync(readme), "bin/cc-connect-clawd/README.md should document release binary names");
+      const readme = path.join(ROOT, "bin", "deskbuddy-connect", "README.md");
+      assert.ok(fs.existsSync(readme), "bin/deskbuddy-connect/README.md should document release binary names");
       const text = fs.readFileSync(readme, "utf8");
-      assert.match(text, /windows-x64\/cc-connect-clawd\.exe/);
-      assert.match(text, /darwin-arm64\/cc-connect-clawd/);
-      assert.match(text, /linux-x64\/cc-connect-clawd/);
+      assert.match(text, /windows-x64\/deskbuddy-connect\.exe/);
+      assert.match(text, /darwin-arm64\/deskbuddy-connect/);
+      assert.match(text, /linux-x64\/deskbuddy-connect/);
     });
 
     it("fetches and verifies pinned sidecars before release builds", () => {

@@ -1,7 +1,7 @@
 // Qoder agent configuration
 // Hook-only integration via ~/.qoder/settings.json (Phase 1: state-only).
 //
-// Clawd observes Qoder's permission events (PermissionRequest / PermissionDenied)
+// DeskBuddy observes Qoder's permission events (PermissionRequest / PermissionDenied)
 // as passive notifications but NEVER answers Qoder permission decisions — the
 // hook always returns `{}` so Qoder's native permission flow stays in control.
 // See docs/project/agent-runtime-architecture.md.

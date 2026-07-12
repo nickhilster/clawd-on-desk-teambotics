@@ -53,18 +53,18 @@ function createForegroundFullscreenProbe(options = {}) {
     const koffi = options.koffi || require("koffi");
     const user32 = koffi.load("user32.dll");
     // LONG is 32-bit even on Win64 (LLP64); use int32 to be unambiguous.
-    koffi.struct("ClawdRECT", { left: "int32", top: "int32", right: "int32", bottom: "int32" });
-    koffi.struct("ClawdMONITORINFO", {
+    koffi.struct("DeskBuddyRECT", { left: "int32", top: "int32", right: "int32", bottom: "int32" });
+    koffi.struct("DeskBuddyMONITORINFO", {
       cbSize: "uint32",
-      rcMonitor: "ClawdRECT",
-      rcWork: "ClawdRECT",
+      rcMonitor: "DeskBuddyRECT",
+      rcWork: "DeskBuddyRECT",
       dwFlags: "uint32",
     });
-    monitorInfoSize = koffi.sizeof("ClawdMONITORINFO");
+    monitorInfoSize = koffi.sizeof("DeskBuddyMONITORINFO");
     GetForegroundWindow = user32.func("void* __stdcall GetForegroundWindow()");
-    GetWindowRect = user32.func("bool __stdcall GetWindowRect(void* hWnd, _Out_ ClawdRECT* lpRect)");
+    GetWindowRect = user32.func("bool __stdcall GetWindowRect(void* hWnd, _Out_ DeskBuddyRECT* lpRect)");
     MonitorFromWindow = user32.func("void* __stdcall MonitorFromWindow(void* hWnd, uint32 dwFlags)");
-    GetMonitorInfoW = user32.func("bool __stdcall GetMonitorInfoW(void* hMonitor, _Inout_ ClawdMONITORINFO* lpmi)");
+    GetMonitorInfoW = user32.func("bool __stdcall GetMonitorInfoW(void* hMonitor, _Inout_ DeskBuddyMONITORINFO* lpmi)");
   } catch (err) {
     if (typeof options.onError === "function") options.onError(err);
     return noop;

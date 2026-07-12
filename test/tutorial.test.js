@@ -101,7 +101,7 @@ function createHarness(ctxOverrides = {}) {
   };
   const ctx = {
     t: (key) => key,
-    getI18n: () => ({ tutorialWelcomeTitle: "Welcome to Clawd on Desk" }),
+    getI18n: () => ({ tutorialWelcomeTitle: "Welcome to DeskBuddy" }),
     getLang: () => "en",
     getLangs: () => ["en", "zh", "ja"],
     getHeroSrc: () => "data:image/png;base64,hero",
@@ -197,7 +197,7 @@ describe("tutorial window shell", () => {
     const h = createHarness();
     h.tutorial.open();
     const state = h.handlers.get("tutorial:get-state")();
-    assert.strictEqual(state.i18n.tutorialWelcomeTitle, "Welcome to Clawd on Desk");
+    assert.strictEqual(state.i18n.tutorialWelcomeTitle, "Welcome to DeskBuddy");
   });
 
   it("install-agent routes to ctx.installAgent and re-pushes state", async () => {

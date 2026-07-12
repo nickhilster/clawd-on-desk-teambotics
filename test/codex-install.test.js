@@ -17,7 +17,7 @@ const DEBUG_MARKER = "codex-debug-hook.js";
 const tempDirs = [];
 
 function makeTempCodexDir(initialHooks = null, configText = null) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codex-install-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codex-install-"));
   const codexDir = path.join(tmpDir, ".codex");
   fs.mkdirSync(codexDir, { recursive: true });
   if (initialHooks !== null) {
@@ -166,7 +166,7 @@ describe("Codex official hook installer", () => {
     assert.strictEqual(command, '& "C:\\Program Files\\nodejs\\node.exe" "D:/animation/hooks/codex-hook.js"');
   });
 
-  it("registers remote hooks with CLAWD_REMOTE in the command environment", () => {
+  it("registers remote hooks with DESKBUDDY_REMOTE in the command environment", () => {
     const codexDir = makeTempCodexDir({});
     const result = registerCodexHooks({
       silent: true,
@@ -181,7 +181,7 @@ describe("Codex official hook installer", () => {
     const command = settings.hooks.SessionStart[0].hooks[0].command;
     assert.strictEqual(
       command,
-      "CLAWD_REMOTE='1' \"/usr/local/bin/node\" \"" + path.resolve(__dirname, "..", "hooks", "codex-hook.js").replace(/\\/g, "/") + "\""
+      "DESKBUDDY_REMOTE='1' \"/usr/local/bin/node\" \"" + path.resolve(__dirname, "..", "hooks", "codex-hook.js").replace(/\\/g, "/") + "\""
     );
   });
 
@@ -202,7 +202,7 @@ describe("Codex official hook installer", () => {
     // PowerShell env prefix lives on commandWindows (what Windows codex runs).
     assert.strictEqual(
       hook.commandWindows,
-      `$env:CLAWD_REMOTE='1'; & "C:\\node.exe" "${hookScript}"`
+      `$env:DESKBUDDY_REMOTE='1'; & "C:\\node.exe" "${hookScript}"`
     );
     // The POSIX command must NOT carry an env prefix: env vars don't cross
     // the WSL interop boundary, so a prefix would only mislead readers.
@@ -272,7 +272,7 @@ describe("Codex official hook installer", () => {
   it("does NOT emit the reminder line on no-op re-install (summary lines still emit)", () => {
     // Semantics being asserted: "no-op re-install does not print the
     // /hooks-review reminder line". This is intentionally narrower than
-    // "no-op re-install is fully silent on stdout" — `Clawd Codex hooks ->`
+    // "no-op re-install is fully silent on stdout" — `DeskBuddy Codex hooks ->`
     // and `Added: 0, updated: 0, skipped: N` summary lines are useful for
     // CLI users who re-run the installer (they confirm the install is
     // already in place). Only the reminder is gated on actual changes,
@@ -300,12 +300,12 @@ describe("Codex official hook installer", () => {
       "no-op re-install must NOT print the reminder line");
     // Confirm summary lines DO still emit (this is the contract — keep
     // CLI feedback for users who want to verify the install state).
-    assert.match(joined, /Clawd .* hooks/, "summary header should still print");
+    assert.match(joined, /DeskBuddy .* hooks/, "summary header should still print");
     assert.match(joined, /Added: 0/, "Added/updated/skipped count should still print");
   });
 });
 
-// #544: a hooks.json written by Windows Clawd may be shared with WSL codex
+// #544: a hooks.json written by Windows DeskBuddy may be shared with WSL codex
 // through CODEX_HOME. Codex resolves commandWindows on Windows and command on
 // POSIX, so Windows installs must write both fields: PowerShell syntax in
 // commandWindows, a WSL-interop (Windows node.exe) form in command.
@@ -321,7 +321,7 @@ describe("Codex hooks on a Windows host write dual command fields (#544)", () =>
       windowsPathToWslPath("C:\\Program Files\\nodejs\\node.exe"),
       "/mnt/c/Program Files/nodejs/node.exe"
     );
-    assert.strictEqual(windowsPathToWslPath("D:/Tool/Clawd on Desk/x.js"), "/mnt/d/Tool/Clawd on Desk/x.js");
+    assert.strictEqual(windowsPathToWslPath("D:/Tool/DeskBuddy/x.js"), "/mnt/d/Tool/DeskBuddy/x.js");
     assert.strictEqual(windowsPathToWslPath("node"), null);
     assert.strictEqual(windowsPathToWslPath("/usr/bin/node"), null);
   });
@@ -469,7 +469,7 @@ describe("Codex hooks on a Windows host write dual command fields (#544)", () =>
   });
 
   // codex review finding: a POSIX host must never claim an entry whose only
-  // Clawd trace is a leftover commandWindows — its command may be a
+  // DeskBuddy trace is a leftover commandWindows — its command may be a
   // third-party hook that reconciliation would silently overwrite.
   it("POSIX reconcile does not overwrite a third-party command with a leftover commandWindows", () => {
     const thirdParty = '"/usr/bin/some-other-tool" --flag';
@@ -495,7 +495,7 @@ describe("Codex hooks on a Windows host write dual command fields (#544)", () =>
 
     const settings = readJson(path.join(codexDir, "hooks.json"));
     const entries = settings.hooks.SessionStart;
-    // The third-party hook survives untouched; Clawd appends its own entry.
+    // The third-party hook survives untouched; DeskBuddy appends its own entry.
     assert.strictEqual(entries[0].hooks[0].command, thirdParty);
     assert.strictEqual(entries.length, 2);
     assert.ok(entries[1].hooks[0].command.includes(MARKER));

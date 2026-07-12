@@ -51,7 +51,7 @@ const HOOK_FILES = [
   "claude-rate-limits.js",
   "quota-bucket.js",
   "state-payload-size.js",
-  "clawd-hook.js",
+  "deskbuddy-hook.js",
   "install.js",
   "codex-hook.js",
   "codex-assistant-output.js",
@@ -259,7 +259,7 @@ async function deploy({ profile, runtime, deps = {} }) {
   if (typeof profile.hostPrefix === "string" && profile.hostPrefix.length > 0) {
     progress("host-prefix", "start");
     const args = buildSshArgs(profile).concat([
-      "cat > ~/.claude/hooks/clawd-host-prefix",
+      "cat > ~/.claude/hooks/deskbuddy-host-prefix",
     ]);
     // Write without a trailing newline — remote hooks/server-config.js reads
     // with .trim(), so it's robust to either, but no-newline avoids
@@ -322,7 +322,7 @@ async function deploy({ profile, runtime, deps = {} }) {
 
 // ── Codex remote monitor PID management ──
 //
-// `~/.clawd-codex-monitor.pid` on the remote is a fixed marker holding the
+// `~/.deskbuddy-codex-monitor.pid` on the remote is a fixed marker holding the
 // last-launched monitor PID. `startCodexMonitor` first kills any prior
 // monitor (avoiding orphan accumulation per v7) then launches a fresh one
 // and writes the new PID. `stopCodexMonitor` kills the PID and rms the file.
@@ -346,15 +346,15 @@ async function startCodexMonitor({ profile, runtime = null, deps = {} }) {
   // Pre-clean step: best-effort, never fatal. The trailing `; true` makes
   // the whole compound exit 0 even if no PID file exists or kill fails.
   const cleanCmd =
-    "[ -f ~/.clawd-codex-monitor.pid ] && kill $(cat ~/.clawd-codex-monitor.pid) 2>/dev/null; " +
-    "rm -f ~/.clawd-codex-monitor.pid; true";
+    "[ -f ~/.deskbuddy-codex-monitor.pid ] && kill $(cat ~/.deskbuddy-codex-monitor.pid) 2>/dev/null; " +
+    "rm -f ~/.deskbuddy-codex-monitor.pid; true";
   const cleanArgs = buildSshArgs(profile).concat([cleanCmd]);
   await spawnAndWait(spawn, "ssh", cleanArgs, { runtime });
 
   // Launch new monitor in background and capture its PID.
   const startCmd =
     `nohup ${buildRemoteHookNodeCommand(remoteNode, "codex-remote-monitor.js", ["--port", profile.remoteForwardPort])} ` +
-    "> /dev/null 2>&1 & echo $! > ~/.clawd-codex-monitor.pid";
+    "> /dev/null 2>&1 & echo $! > ~/.deskbuddy-codex-monitor.pid";
   const startArgs = buildSshArgs(profile).concat([startCmd]);
   const r = await spawnAndWait(spawn, "ssh", startArgs, { runtime });
   return { ok: r.code === 0, stderr: r.stderr };
@@ -363,8 +363,8 @@ async function startCodexMonitor({ profile, runtime = null, deps = {} }) {
 async function stopCodexMonitor({ profile, runtime = null, deps = {} }) {
   const spawn = deps.spawn || childProcess.spawn;
   const cmd =
-    "[ -f ~/.clawd-codex-monitor.pid ] && kill $(cat ~/.clawd-codex-monitor.pid) 2>/dev/null; " +
-    "rm -f ~/.clawd-codex-monitor.pid";
+    "[ -f ~/.deskbuddy-codex-monitor.pid ] && kill $(cat ~/.deskbuddy-codex-monitor.pid) 2>/dev/null; " +
+    "rm -f ~/.deskbuddy-codex-monitor.pid";
   const args = buildSshArgs(profile).concat([cmd]);
   const r = await spawnAndWait(spawn, "ssh", args, { runtime });
   // best-effort — don't surface failures. Caller decides whether to log.

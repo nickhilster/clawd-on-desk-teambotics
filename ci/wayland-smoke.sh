@@ -11,7 +11,7 @@
 #      exits 0, the relaunched browser process carries --ozone-platform=x11
 #      on its REAL cmdline, /state answers, the window exists on the X
 #      server, and the process set is stable (no relaunch loop).
-#   C. Negative control: CLAWD_OZONE_PLATFORM=wayland boots natively with NO
+#   C. Negative control: DESKBUDDY_OZONE_PLATFORM=wayland boots natively with NO
 #      relaunch and stays alive (the escape hatch works).
 #
 # What it can NOT prove: behavior on the reporter's exact Fedora/KDE box
@@ -88,7 +88,7 @@ poll() {
 
 # Electron BROWSER processes of our AppImage: cmdline runs through the squashfs
 # mountpoint (/tmp/.mount_<AppName><random>, where <AppName> is derived from
-# productName — this was ".mount_Clawd*" before the DeskBuddy rebrand, now
+# productName — this was ".mount_DeskBuddy*" before the DeskBuddy rebrand, now
 # ".mount_DeskBu*"). Match generically on ".mount_" instead of hardcoding the
 # app name, since this runner never mounts any AppImage but our own — this
 # way a future rename can't silently break process teardown again. Has no
@@ -113,7 +113,7 @@ has_x11_browser() { [ -n "$(browser_pids x11)" ]; }
 no_x11_browser() { [ -z "$(browser_pids x11)" ]; }
 state_ok() { curl -fsS --max-time 2 "$STATE_URL" >/dev/null; }
 state_gone() { ! curl -fsS --max-time 1 "$STATE_URL" >/dev/null 2>&1; }
-x_has_clawd() {
+x_has_deskbuddy() {
   xlsclients -display "$XDISPLAY" -l 2>/dev/null | grep -qi deskbuddy ||
     xwininfo -root -tree -display "$XDISPLAY" 2>/dev/null | grep -qi deskbuddy
 }
@@ -166,7 +166,7 @@ export LIBGL_ALWAYS_SOFTWARE=1 # headless runner: keep GL in software
 export ELECTRON_ENABLE_LOGGING=file
 export ELECTRON_LOG_FILE="$PWD/electron-child.log"
 
-# 10 Hz process sampler: catches even short-lived Clawd/relauncher processes.
+# 10 Hz process sampler: catches even short-lived DeskBuddy/relauncher processes.
 (
   while :; do
     t="$(date +%H:%M:%S.%2N)"
@@ -188,7 +188,7 @@ MANUAL_PID=$!
 
 poll 90 state_ok || fail "manual x11: state server $STATE_URL never answered"
 kill -0 "$MANUAL_PID" 2>/dev/null || fail "manual x11: process died"
-poll 60 x_has_clawd || fail "manual x11: no Clawd client/window on the X server"
+poll 60 x_has_deskbuddy || fail "manual x11: no DeskBuddy client/window on the X server"
 if grep -q "$RELAUNCH_MARK" manual.log; then
   fail "manual x11 triggered the auto-relaunch (argv guard broken)"
 fi
@@ -227,8 +227,8 @@ poll 30 grep -q "state server listening" first.log ||
   fail "child logs missing from the launching terminal (stdio inherit broken?)"
 ok "child logs flow back to the launching terminal (stdio inherit)"
 
-poll 60 x_has_clawd ||
-  fail "no Clawd client/window on the X server — not running as an XWayland client?"
+poll 60 x_has_deskbuddy ||
+  fail "no DeskBuddy client/window on the X server — not running as an XWayland client?"
 ok "app window present on the X server => really an XWayland client"
 
 sleep 5
@@ -244,14 +244,14 @@ note "phase B done — tearing down"
 kill_app
 
 # ── phase C: explicit native Wayland must NOT relaunch ──────────────────────
-note "phase C: launching with CLAWD_OZONE_PLATFORM=wayland (escape hatch)"
-CLAWD_OZONE_PLATFORM=wayland "$APPIMAGE" >negative.log 2>&1 &
+note "phase C: launching with DESKBUDDY_OZONE_PLATFORM=wayland (escape hatch)"
+DESKBUDDY_OZONE_PLATFORM=wayland "$APPIMAGE" >negative.log 2>&1 &
 NEG_PID=$!
 
 poll 90 state_ok || fail "negative control: state server never answered under native Wayland"
 kill -0 "$NEG_PID" 2>/dev/null || fail "negative control: process died"
 if grep -q "$RELAUNCH_MARK" negative.log; then
-  fail "negative control relaunched despite CLAWD_OZONE_PLATFORM=wayland"
+  fail "negative control relaunched despite DESKBUDDY_OZONE_PLATFORM=wayland"
 fi
 no_x11_browser || fail "negative control: found a browser process with --ozone-platform=x11"
 ok "escape hatch works: native Wayland boot, no relaunch, app healthy"

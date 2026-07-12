@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Clawd — Cursor Agent hook (stdin JSON, hook_event_name; stdout JSON for gating hooks)
+// DeskBuddy — Cursor Agent hook (stdin JSON, hook_event_name; stdout JSON for gating hooks)
 // Registered in ~/.cursor/hooks.json by hooks/cursor-install.js
 
 const { postStateToRunningServer, readHostPrefix } = require("./server-config");
@@ -35,10 +35,10 @@ function displaySvgFromToolHook(hookName, payload) {
   if (hookName !== "preToolUse" && hookName !== "postToolUse") return undefined;
   const name = payload && payload.tool_name;
   if (!name || typeof name !== "string") return undefined;
-  if (name === "Shell" || name.startsWith("MCP:")) return "clawd-working-building.svg";
-  if (name === "Task") return "clawd-headphones-groove.svg";
-  if (name === "Write" || name === "Delete") return "clawd-working-typing.svg";
-  if (name === "Read" || name === "Grep") return "clawd-idle-reading.svg";
+  if (name === "Shell" || name.startsWith("MCP:")) return "deskbuddy-working-building.svg";
+  if (name === "Task") return "deskbuddy-headphones-groove.svg";
+  if (name === "Write" || name === "Delete") return "deskbuddy-working-typing.svg";
+  if (name === "Read" || name === "Grep") return "deskbuddy-idle-reading.svg";
   return undefined;
 }
 
@@ -62,7 +62,7 @@ let safetyTimer = null;
 
 // Write the stdout response exactly once. Kept separate from process exit so the
 // hook can answer Cursor immediately yet still let the fire-and-forget POST to
-// Clawd leave the process before it exits.
+// DeskBuddy leave the process before it exits.
 function writeStdoutOnce(outLine) {
   if (_wrote) return;
   _wrote = true;
@@ -92,7 +92,7 @@ readStdinJson()
     }
 
     const { state, event } = mapped;
-    if (hookNameResolved === "sessionStart" && !process.env.CLAWD_REMOTE) resolve();
+    if (hookNameResolved === "sessionStart" && !process.env.DESKBUDDY_REMOTE) resolve();
 
     const sessionId =
       (payload && (payload.conversation_id || payload.session_id)) || "default";
@@ -108,7 +108,7 @@ readStdinJson()
     const hint = displaySvgFromToolHook(hookNameResolved, payload);
     if (hint !== undefined) body.display_svg = hint;
     if (cwd) body.cwd = cwd;
-    if (process.env.CLAWD_REMOTE) {
+    if (process.env.DESKBUDDY_REMOTE) {
       body.host = readHostPrefix();
     } else {
       body.source_pid = stablePid;

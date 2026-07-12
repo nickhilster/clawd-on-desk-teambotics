@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Install/remove Phase 0 Codex official-hooks debug sampler.
 //
-// This is deliberately not part of Clawd startup auto-sync. It only captures
-// real Codex hook payloads to ~/.clawd/codex-hook-debug.jsonl for verification.
+// This is deliberately not part of DeskBuddy startup auto-sync. It only captures
+// real Codex hook payloads to ~/.deskbuddy/codex-hook-debug.jsonl for verification.
 
 const {
   CODEX_HOOK_EVENTS,

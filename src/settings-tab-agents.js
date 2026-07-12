@@ -4,7 +4,7 @@
   const {
     getAgentEventSourceBadgeKey,
     sortAgentMetadataForSettings,
-  } = root.ClawdSettingsAgentOrder || {};
+  } = root.DeskBuddySettingsAgentOrder || {};
   let state = null;
   let runtime = null;
   let readers = null;
@@ -992,5 +992,5 @@
     };
   }
 
-  root.ClawdSettingsTabAgents = { init };
+  root.DeskBuddySettingsTabAgents = { init };
 })(globalThis);

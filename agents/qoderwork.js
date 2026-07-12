@@ -6,7 +6,7 @@
 // (both Qoder IDE and QoderWork spawn it), processNames only lists the IDE
 // process name `QoderWork` so startup recovery never confuses the two.
 //
-// Clawd observes QoderWork's permission events (PermissionRequest /
+// DeskBuddy observes QoderWork's permission events (PermissionRequest /
 // PermissionDenied) as passive `working` state (they fire 40+ times per task
 // as part of normal tool flow) but NEVER answers QoderWork permission
 // decisions — the hook always returns `{}` so QoderWork's native permission

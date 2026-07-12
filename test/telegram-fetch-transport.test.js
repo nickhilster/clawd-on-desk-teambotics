@@ -47,13 +47,13 @@ function makeLog() {
 
 // ---- pure helpers ----
 
-test("resolveProxyConfig: CLAWD_TG_PROXY precedence, default system", () => {
+test("resolveProxyConfig: DESKBUDDY_TG_PROXY precedence, default system", () => {
   assert.deepEqual(resolveProxyConfig({}), { mode: "system" });
-  assert.deepEqual(resolveProxyConfig({ CLAWD_TG_PROXY: "   " }), { mode: "system" });
-  assert.deepEqual(resolveProxyConfig({ CLAWD_TG_PROXY: "direct" }), { mode: "direct" });
-  assert.deepEqual(resolveProxyConfig({ CLAWD_TG_PROXY: "system" }), { mode: "system" });
+  assert.deepEqual(resolveProxyConfig({ DESKBUDDY_TG_PROXY: "   " }), { mode: "system" });
+  assert.deepEqual(resolveProxyConfig({ DESKBUDDY_TG_PROXY: "direct" }), { mode: "direct" });
+  assert.deepEqual(resolveProxyConfig({ DESKBUDDY_TG_PROXY: "system" }), { mode: "system" });
   assert.deepEqual(
-    resolveProxyConfig({ CLAWD_TG_PROXY: "http://127.0.0.1:8080" }),
+    resolveProxyConfig({ DESKBUDDY_TG_PROXY: "http://127.0.0.1:8080" }),
     { mode: "fixed_servers", proxyRules: "http://127.0.0.1:8080" },
   );
 });
@@ -106,7 +106,7 @@ test("default applies mode:system; fetch carries token; probe is tokenless; log 
   assert.ok(!JSON.stringify(proxyLog).includes("127.0.0.1"));
 });
 
-test("CLAWD_TG_PROXY escape hatch: direct / system / url", async () => {
+test("DESKBUDDY_TG_PROXY escape hatch: direct / system / url", async () => {
   const cases = [
     ["direct", { mode: "direct" }],
     ["system", { mode: "system" }],
@@ -115,7 +115,7 @@ test("CLAWD_TG_PROXY escape hatch: direct / system / url", async () => {
   for (const [val, expected] of cases) {
     const { ses, calls } = makeFakeSession();
     const transport = createTelegramFetchTransport({
-      tokenStore: fakeTokenStore(), sessionFactory: () => ses, env: { CLAWD_TG_PROXY: val },
+      tokenStore: fakeTokenStore(), sessionFactory: () => ses, env: { DESKBUDDY_TG_PROXY: val },
     });
     await transport({ method: "getMe", payload: {} });
     assert.deepEqual(calls.setProxy, [expected]);
@@ -179,7 +179,7 @@ test("config change: setProxy precedes closeAllConnections; first apply does not
   assert.equal(fake.calls.close, 0);
   assert.deepEqual(fake.calls.setProxy, [{ mode: "system" }]);
 
-  env.CLAWD_TG_PROXY = "direct";                              // change config
+  env.DESKBUDDY_TG_PROXY = "direct";                              // change config
   await transport({ method: "getMe", payload: {} });
   assert.equal(fake.calls.setProxy.length, 2);
   assert.deepEqual(fake.calls.setProxy[1], { mode: "direct" });

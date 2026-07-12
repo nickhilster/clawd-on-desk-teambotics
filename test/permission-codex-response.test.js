@@ -464,7 +464,7 @@ describe("Codex permission response sanitizer", () => {
     assert.strictEqual(api.pendingPermissions.length, 0);
   });
 
-  it("cleans up Qwen permissions as no-decision when Clawd quits", () => {
+  it("cleans up Qwen permissions as no-decision when DeskBuddy quits", () => {
     const { api } = createCodexDecisionHarness();
     const qwenRes = createFakeRes();
     const claudeRes = createFakeRes();

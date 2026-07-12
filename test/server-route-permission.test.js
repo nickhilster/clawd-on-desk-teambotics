@@ -5,8 +5,8 @@ const assert = require("node:assert");
 const { EventEmitter } = require("node:events");
 
 const {
-  CLAWD_SERVER_HEADER,
-  CLAWD_SERVER_ID,
+  DESKBUDDY_SERVER_HEADER,
+  DESKBUDDY_SERVER_ID,
 } = require("../hooks/server-config");
 const {
   MAX_PERMISSION_BODY_BYTES,
@@ -181,7 +181,7 @@ describe("server-route-permission POST", () => {
 
     assert.deepStrictEqual(res.ctx.calls.sendPermissionResponse, [{
       behavior: "deny",
-      message: "Permission request too large for Clawd bubble; answer in terminal",
+      message: "Permission request too large for DeskBuddy bubble; answer in terminal",
     }]);
   });
 
@@ -195,7 +195,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["dnd"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
   });
@@ -273,7 +273,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["accepted"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, []);
@@ -375,7 +375,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 200);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.strictEqual(JSON.parse(res.body).hookSpecificOutput.decision.behavior, "allow");
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["dnd"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
@@ -392,7 +392,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["dnd"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
   });
@@ -414,7 +414,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
   });
 
@@ -431,7 +431,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["disabled"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
   });
@@ -439,7 +439,7 @@ describe("server-route-permission POST", () => {
   it("hard-blocks a stray Antigravity PreToolUse: 204, no bubble, no entry", async () => {
     // D2 (post-codex-review-4): even if a user manually re-registers a
     // PreToolUse hook in their hooks.json (or auto-sync is skipped), the
-    // server-side antigravity branch never creates a Clawd bubble. The
+    // server-side antigravity branch never creates a DeskBuddy bubble. The
     // hook will print decision:"ask" and agy's own native menu owns the
     // permission decision.
     const res = await callPermissionPost(JSON.stringify({
@@ -457,7 +457,7 @@ describe("server-route-permission POST", () => {
     }));
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble || [], []);
     assert.deepStrictEqual(res.ctx.calls.addPendingPermission || [], []);
@@ -478,7 +478,7 @@ describe("server-route-permission POST", () => {
     }));
 
     assert.strictEqual(res.statusCode, 200);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.strictEqual(JSON.parse(res.body).hookSpecificOutput.decision.behavior, "allow");
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.updateSession, []);
@@ -501,7 +501,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 200);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.strictEqual(JSON.parse(res.body).hookSpecificOutput.decision.behavior, "allow");
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.recorder.map((item) => item.outcome).filter(Boolean), ["disabled"]);
@@ -650,7 +650,7 @@ describe("server-route-permission POST", () => {
 
   // ── Copilot CLI branch ──
   // Phase 0 locked: empty stdout + exit 0 means "no decision, native flow".
-  // Every Clawd fallback (DND / disabled / bubble bypass / bubble failure /
+  // Every DeskBuddy fallback (DND / disabled / bubble bypass / bubble failure /
   // abort) must end with 204 so the hook emits empty stdout and Copilot's
   // native menu owns the decision. v1 explicitly excludes Telegram remote
   // approval (plan §6, Phase 6 lifecycle table).
@@ -666,7 +666,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["dnd"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.maybeStartRemoteApproval, []);
@@ -685,7 +685,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["disabled"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
   });
@@ -701,7 +701,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["accepted"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, []);
@@ -720,7 +720,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, []);
   });
@@ -739,7 +739,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["accepted"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, []);
@@ -822,7 +822,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.removePendingPermission.map((item) => item.reason), ["copilot-bubble-failed"]);
     assert.deepStrictEqual(res.ctx.calls.maybeStartRemoteApproval, []);
@@ -862,7 +862,7 @@ describe("server-route-permission POST", () => {
   });
 
   // ── Hermes Agent branch ──
-  // Hermes permissions behave like Copilot: every Clawd fallback (DND /
+  // Hermes permissions behave like Copilot: every DeskBuddy fallback (DND /
   // disabled / subgate / bubble failure / abort) emits 204 so the Hermes
   // plugin falls back to its native clarify or terminal-based approval.
 
@@ -877,7 +877,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["dnd"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.maybeStartRemoteApproval, []);
@@ -896,7 +896,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["disabled"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
   });
@@ -912,7 +912,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["accepted"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, []);
@@ -931,7 +931,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, []);
   });
@@ -950,7 +950,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.recorder.map((entry) => entry.outcome).filter(Boolean), ["accepted"]);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.showPermissionBubble, []);
@@ -1053,7 +1053,7 @@ describe("server-route-permission POST", () => {
     });
 
     assert.strictEqual(res.statusCode, 204);
-    assert.strictEqual(res.headers[CLAWD_SERVER_HEADER], CLAWD_SERVER_ID);
+    assert.strictEqual(res.headers[DESKBUDDY_SERVER_HEADER], DESKBUDDY_SERVER_ID);
     assert.deepStrictEqual(res.ctx.pendingPermissions, []);
     assert.deepStrictEqual(res.ctx.calls.removePendingPermission.map((item) => item.reason), ["hermes-bubble-failed"]);
     assert.deepStrictEqual(res.ctx.calls.maybeStartRemoteApproval, []);

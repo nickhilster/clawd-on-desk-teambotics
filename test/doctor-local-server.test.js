@@ -55,8 +55,8 @@ describe("checkLocalServer", () => {
     assert.strictEqual(result.status, "fail");
     assert.strictEqual(result.level, "critical");
     // Critical fail can't be repaired by repairRuntimeStatus (httpServer is
-    // already non-null but not listening), so surface a restart-clawd action
+    // already non-null but not listening), so surface a restart-deskbuddy action
     // instead of a misleading Fix button.
-    assert.deepStrictEqual(result.fixAction, { type: "restart-clawd" });
+    assert.deepStrictEqual(result.fixAction, { type: "restart-deskbuddy" });
   });
 });

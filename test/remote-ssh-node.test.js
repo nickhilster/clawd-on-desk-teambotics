@@ -59,9 +59,9 @@ test("buildRemoteNodeProbeCommand uses a POSIX shell probe with manager fallback
 test("parseRemoteNodeProbeOutput extracts markers while ignoring shell noise", () => {
   const parsed = parseRemoteNodeProbeOutput([
     "oh-my-zsh banner",
-    "CLAWD_REMOTE_NODE_BIN=/Users/u/.nvm/versions/node/v20.10.0/bin/node",
-    "CLAWD_REMOTE_NODE_VERSION=v20.10.0",
-    "CLAWD_REMOTE_NODE_SOURCE=shell:/bin/zsh",
+    "DESKBUDDY_REMOTE_NODE_BIN=/Users/u/.nvm/versions/node/v20.10.0/bin/node",
+    "DESKBUDDY_REMOTE_NODE_VERSION=v20.10.0",
+    "DESKBUDDY_REMOTE_NODE_SOURCE=shell:/bin/zsh",
   ].join("\n"));
   assert.deepEqual(parsed, {
     nodeBin: "/Users/u/.nvm/versions/node/v20.10.0/bin/node",
@@ -71,9 +71,9 @@ test("parseRemoteNodeProbeOutput extracts markers while ignoring shell noise", (
 });
 
 test("parseRemoteNodeProbeOutput rejects bare node and invalid versions", () => {
-  assert.equal(parseRemoteNodeProbeOutput("CLAWD_REMOTE_NODE_BIN=node\nCLAWD_REMOTE_NODE_VERSION=v20\n"), null);
-  assert.equal(parseRemoteNodeProbeOutput("CLAWD_REMOTE_NODE_BIN=/usr/bin/node\nCLAWD_REMOTE_NODE_VERSION=20\n"), null);
-  assert.equal(parseRemoteNodeProbeOutput("CLAWD_REMOTE_NODE_BIN=/usr/bin/node\nCLAWD_REMOTE_NODE_VERSION=v12.22.12\n"), null);
+  assert.equal(parseRemoteNodeProbeOutput("DESKBUDDY_REMOTE_NODE_BIN=node\nDESKBUDDY_REMOTE_NODE_VERSION=v20\n"), null);
+  assert.equal(parseRemoteNodeProbeOutput("DESKBUDDY_REMOTE_NODE_BIN=/usr/bin/node\nDESKBUDDY_REMOTE_NODE_VERSION=20\n"), null);
+  assert.equal(parseRemoteNodeProbeOutput("DESKBUDDY_REMOTE_NODE_BIN=/usr/bin/node\nDESKBUDDY_REMOTE_NODE_VERSION=v12.22.12\n"), null);
 });
 
 test("isSupportedRemoteNodeVersion enforces the hook syntax floor", () => {
@@ -94,9 +94,9 @@ test("resolveRemoteNodeBin records ssh command and caches successful result", as
   const profile = { id: "p1", host: "pi", remoteForwardPort: 23333 };
   const { spawn, calls } = makeRecordingSpawn([{
     stdout: [
-      "CLAWD_REMOTE_NODE_BIN=/home/me/.nvm/versions/node/v22.1.0/bin/node",
-      "CLAWD_REMOTE_NODE_VERSION=v22.1.0",
-      "CLAWD_REMOTE_NODE_SOURCE=shell:/bin/bash",
+      "DESKBUDDY_REMOTE_NODE_BIN=/home/me/.nvm/versions/node/v22.1.0/bin/node",
+      "DESKBUDDY_REMOTE_NODE_VERSION=v22.1.0",
+      "DESKBUDDY_REMOTE_NODE_SOURCE=shell:/bin/bash",
     ].join("\n"),
   }]);
   const resolved = await resolveRemoteNodeBin({ profile, spawn, buildSshArgs });
@@ -156,9 +156,9 @@ test("resolveRemoteNodeBin can verify a cached path and fall back when stale", a
     { code: 127, stderr: "/stale/node: not found" },
     {
       stdout: [
-        "CLAWD_REMOTE_NODE_BIN=/usr/local/bin/node",
-        "CLAWD_REMOTE_NODE_VERSION=v22.1.0",
-        "CLAWD_REMOTE_NODE_SOURCE=path",
+        "DESKBUDDY_REMOTE_NODE_BIN=/usr/local/bin/node",
+        "DESKBUDDY_REMOTE_NODE_VERSION=v22.1.0",
+        "DESKBUDDY_REMOTE_NODE_SOURCE=path",
       ].join("\n"),
     },
   ]);

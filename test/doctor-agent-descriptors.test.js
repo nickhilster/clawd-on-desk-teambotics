@@ -89,7 +89,7 @@ describe("doctor agent descriptors", () => {
 
     assert.strictEqual(getAgentDescriptor("codewhale").parentDir, path.dirname(codewhale.resolveCodewhaleConfigPath()));
     assert.strictEqual(getAgentDescriptor("codewhale").configPath, codewhale.resolveCodewhaleConfigPath());
-    assert.strictEqual(getAgentDescriptor("codewhale").marker, "managed by clawd-on-desk");
+    assert.strictEqual(getAgentDescriptor("codewhale").marker, "managed by deskbuddy");
     assert.deepStrictEqual(getAgentDescriptor("codewhale").hookEvents, codewhale.HOOK_ENTRIES.map((entry) => entry[0]));
 
     assert.strictEqual(getAgentDescriptor("opencode").parentDir, opencode.DEFAULT_PARENT_DIR);
@@ -171,7 +171,7 @@ describe("doctor agent descriptors", () => {
     assert.strictEqual(descriptor.eventSource, "hook");
     assert.strictEqual(descriptor.configMode, "codewhale-hooks-toml");
     assert.strictEqual(descriptor.autoInstall, true);
-    assert.strictEqual(descriptor.marker, "managed by clawd-on-desk");
+    assert.strictEqual(descriptor.marker, "managed by deskbuddy");
     assert.strictEqual(descriptor.commandMarker, "codewhale-hook.js");
     assert.strictEqual(descriptor.nested, true);
     assert.deepStrictEqual(descriptor.hookEvents, codewhale.HOOK_ENTRIES.map((entry) => entry[0]));
@@ -212,7 +212,7 @@ describe("doctor agent descriptors", () => {
     const os = require("node:os");
     const fs = require("node:fs");
 
-    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-env-desc-"));
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-env-desc-"));
     const prevEnv = process.env.COPILOT_HOME;
     process.env.COPILOT_HOME = tempHome;
 

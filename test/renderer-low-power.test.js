@@ -81,7 +81,7 @@ class FakeElement {
   querySelectorAll() {
     return this.children.filter((child) => (
       child.tagName === "OBJECT"
-      || (child.tagName === "IMG" && String(child.className).split(/\s+/).includes("clawd-img"))
+      || (child.tagName === "IMG" && String(child.className).split(/\s+/).includes("deskbuddy-img"))
     ));
   }
 }
@@ -98,17 +98,17 @@ function createRendererHarness(options = {}) {
   motionLayer.id = "pet-motion";
   motionLayer.isConnected = true;
   container.appendChild(motionLayer);
-  const clawd = new FakeElement("object");
-  clawd.id = "clawd";
-  clawd.data = "../assets/svg/current.svg";
-  clawd.style.opacity = "0";
-  motionLayer.appendChild(clawd);
+  const deskbuddy = new FakeElement("object");
+  deskbuddy.id = "deskbuddy";
+  deskbuddy.data = "../assets/svg/current.svg";
+  deskbuddy.style.opacity = "0";
+  motionLayer.appendChild(deskbuddy);
 
   const document = {
     getElementById(id) {
       if (id === "pet-container") return container;
       if (id === "pet-motion") return motionLayer;
-      if (id === "clawd") return clawd;
+      if (id === "deskbuddy") return deskbuddy;
       return null;
     },
     createElement(tagName) {
@@ -176,14 +176,14 @@ globalThis.__rendererTest = {
   setCurrentState(value) { currentState = value; },
   setLayeredTrackingForTest(document) {
     _trackingLayers = { test: { wrappers: [], maxOffset: 1, ease: 1, x: 0, y: 0 } };
-    _layeredTrackingObj = clawdEl;
+    _layeredTrackingObj = deskbuddyEl;
     _layeredTrackingDocument = document;
   },
   getPetMediaElements,
   get pendingNext() { return pendingNext; },
   get pendingSvgFile() { return pendingSvgFile; },
   get activeSwapToken() { return activeSwapToken; },
-  get clawdEl() { return clawdEl; },
+  get deskbuddyEl() { return deskbuddyEl; },
   get lowPowerSvgPaused() { return lowPowerSvgPaused; },
   get eyeTarget() { return eyeTarget; },
 };`;
@@ -193,7 +193,7 @@ globalThis.__rendererTest = {
     context,
     container,
     motionLayer,
-    clawd,
+    deskbuddy,
     timers,
     audioInstances,
     electronCalls,
@@ -264,10 +264,10 @@ describe("renderer low-power idle mode", () => {
 
   it("resumes a low-power-paused eye target when the mouse moves", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
-    harness.api.attachEyeTracking(harness.clawd);
+    harness.api.attachEyeTracking(harness.deskbuddy);
     harness.api.pauseCurrentSvgForLowPower();
     assert.equal(harness.api.lowPowerSvgPaused, true);
 
@@ -310,7 +310,7 @@ describe("renderer low-power idle mode", () => {
     const source = readNormalized(RENDERER);
 
     assert.ok(source.includes("function setCurrentScriptedSvgLowPowerPaused(paused)"));
-    assert.ok(source.includes("target.contentWindow.__clawdSetLowPowerPaused"));
+    assert.ok(source.includes("target.contentWindow.__deskbuddySetLowPowerPaused"));
     assert.ok(source.includes("setCurrentScriptedSvgLowPowerPaused(true);"));
     assert.ok(source.includes("setCurrentScriptedSvgLowPowerPaused(false);"));
   });
@@ -327,15 +327,15 @@ describe("renderer low-power idle mode", () => {
 
   it("unpauses the current SVG and reattaches eye tracking after system wake", () => {
     const harness = createRendererHarness();
-    const svg = attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    const svg = attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     const scriptedPauseCalls = [];
-    harness.clawd.contentWindow.__clawdSetLowPowerPaused = (paused) => scriptedPauseCalls.push(paused);
+    harness.deskbuddy.contentWindow.__deskbuddySetLowPowerPaused = (paused) => scriptedPauseCalls.push(paused);
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
     harness.api.pauseCurrentSvgForLowPower();
 
     assert.equal(harness.api.lowPowerSvgPaused, true);
-    assert.ok(svg.svgDoc.getElementById("clawd-low-power-pause-svg"));
+    assert.ok(svg.svgDoc.getElementById("deskbuddy-low-power-pause-svg"));
 
     harness.electronHandlers.onSystemWake({ id: "wake-test-1", trigger: "resume", attempt: 0 });
     const replacementObject = harness.api.pendingNext;
@@ -344,7 +344,7 @@ describe("renderer low-power idle mode", () => {
     replacementObject.listeners.get("load")();
 
     assert.equal(harness.api.lowPowerSvgPaused, false);
-    assert.equal(svg.svgDoc.getElementById("clawd-low-power-pause-svg"), null);
+    assert.equal(svg.svgDoc.getElementById("deskbuddy-low-power-pause-svg"), null);
     assert.equal(svg.root.unpauseCalls, 1);
     assert.deepEqual(scriptedPauseCalls, [true, false]);
     assert.ok(harness.api.eyeTarget);
@@ -363,7 +363,7 @@ describe("renderer low-power idle mode", () => {
 
   it("waits for async eye attach before reporting wake recovery", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
 
@@ -396,15 +396,15 @@ describe("renderer low-power idle mode", () => {
 
   it("removes a residual pause style even when the renderer mirror is already false", () => {
     const harness = createRendererHarness();
-    const svg = attachFakeSvgDocument(harness.clawd);
+    const svg = attachFakeSvgDocument(harness.deskbuddy);
     const style = svg.svgDoc.createElementNS("http://www.w3.org/2000/svg", "style");
-    style.id = "clawd-low-power-pause-svg";
+    style.id = "deskbuddy-low-power-pause-svg";
     svg.root.appendChild(style);
 
     assert.equal(harness.api.lowPowerSvgPaused, false);
     harness.electronHandlers.onSystemWake({ id: "wake-test-2", trigger: "resume", attempt: 0 });
 
-    assert.equal(svg.svgDoc.getElementById("clawd-low-power-pause-svg"), null);
+    assert.equal(svg.svgDoc.getElementById("deskbuddy-low-power-pause-svg"), null);
     assert.equal(svg.root.unpauseCalls, 1);
     const report = harness.electronCalls.find((call) => call.name === "reportSystemWakeStatus");
     assert.equal(report.args[0].lowPowerWasPaused, true);
@@ -413,7 +413,7 @@ describe("renderer low-power idle mode", () => {
 
   it("replies to duplicate wake ids without running recovery twice", () => {
     const harness = createRendererHarness();
-    const svg = attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    const svg = attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     const payload = { id: "wake-test-3", trigger: "resume", attempt: 0 };
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
@@ -442,7 +442,7 @@ describe("renderer low-power idle mode", () => {
 
   it("replays only the latest wake id after an object reload finishes", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
 
@@ -475,7 +475,7 @@ describe("renderer low-power idle mode", () => {
 
   it("settles an in-flight wake when a state change supersedes its object reload", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
 
@@ -498,13 +498,13 @@ describe("renderer low-power idle mode", () => {
 
   it("rebuilds a stale eye-tracking object whose old document still looks alive", () => {
     const harness = createRendererHarness();
-    const originalSvg = attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    const originalSvg = attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
-    harness.api.attachEyeTracking(harness.clawd);
+    harness.api.attachEyeTracking(harness.deskbuddy);
     assert.strictEqual(harness.api.eyeTarget.ownerDocument, originalSvg.svgDoc);
 
-    const replacementDocument = attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    const replacementDocument = attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     assert.notStrictEqual(harness.api.eyeTarget.ownerDocument, replacementDocument.svgDoc);
     assert.ok(harness.api.eyeTarget.ownerDocument.defaultView, "old document still passes the legacy ready check");
 
@@ -517,7 +517,7 @@ describe("renderer low-power idle mode", () => {
     const freshSvg = attachFakeSvgDocument(replacementObject, { withEyes: true });
     replacementObject.listeners.get("load")();
 
-    assert.strictEqual(harness.api.clawdEl, replacementObject);
+    assert.strictEqual(harness.api.deskbuddyEl, replacementObject);
     assert.strictEqual(harness.api.eyeTarget.ownerDocument, freshSvg.svgDoc);
     const report = harness.electronCalls.find((call) => call.name === "reportSystemWakeStatus");
     assert.equal(report.args[0].eyeTargetWasCurrentDocument, false);
@@ -527,7 +527,7 @@ describe("renderer low-power idle mode", () => {
 
   it("retries a wake object reload once before reporting success", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
 
@@ -558,7 +558,7 @@ describe("renderer low-power idle mode", () => {
 
   it("keeps the old object and reports an error after the wake reload retry cannot load", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
     harness.api.setLowPowerIdleMode(true);
 
@@ -570,23 +570,23 @@ describe("renderer low-power idle mode", () => {
     assert.notStrictEqual(retryObject, failedObject);
     drainActiveTimers(harness, (timer) => timer.ms === 3000 && !timer.cleared, 1);
 
-    assert.strictEqual(harness.api.clawdEl, harness.clawd);
+    assert.strictEqual(harness.api.deskbuddyEl, harness.deskbuddy);
     assert.equal(harness.api.pendingNext, null);
     assert.equal(harness.container.children.some((element) => element.tagName === "IMG"), false);
     const report = harness.electronCalls.find((call) => call.name === "reportSystemWakeStatus");
     assert.equal(report.args[0].result, "error");
     assert.equal(report.args[0].objectReloaded, false);
     assert.equal(report.args[0].eyeTrackingReady, true);
-    assert.strictEqual(harness.api.eyeTarget.ownerDocument, harness.clawd.contentDocument);
+    assert.strictEqual(harness.api.eyeTarget.ownerDocument, harness.deskbuddy.contentDocument);
     assert.equal(failedObject.isConnected, false);
     assert.equal(retryObject.isConnected, false);
   });
 
   it("does not rebuild an eye object when low-power mode is disabled", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
     harness.api.setCurrentState("idle");
-    harness.api.attachEyeTracking(harness.clawd);
+    harness.api.attachEyeTracking(harness.deskbuddy);
 
     harness.electronHandlers.onSystemWake({ id: "wake-disabled-1", trigger: "resume", attempt: 0 });
 
@@ -598,7 +598,7 @@ describe("renderer low-power idle mode", () => {
 
   it("does not rebuild the object for a non-eye state", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd);
+    attachFakeSvgDocument(harness.deskbuddy);
     harness.api.setCurrentState("sleeping");
     harness.api.setLowPowerIdleMode(true);
 
@@ -612,20 +612,20 @@ describe("renderer low-power idle mode", () => {
 
   it("invalidates layered tracking when the object document changes", () => {
     const harness = createRendererHarness();
-    const originalSvg = attachFakeSvgDocument(harness.clawd);
+    const originalSvg = attachFakeSvgDocument(harness.deskbuddy);
     harness.api.setLayeredTrackingForTest(originalSvg.svgDoc);
     assert.equal(harness.api.isEyeTrackingReady(), true);
 
-    attachFakeSvgDocument(harness.clawd);
+    attachFakeSvgDocument(harness.deskbuddy);
 
     assert.equal(harness.api.isEyeTrackingReady(), false);
   });
 
   it("reattaches a stale single eye target before applying the next eye move", () => {
     const harness = createRendererHarness();
-    attachFakeSvgDocument(harness.clawd, { withEyes: true });
-    harness.api.attachEyeTracking(harness.clawd);
-    const replacementSvg = attachFakeSvgDocument(harness.clawd, { withEyes: true });
+    attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
+    harness.api.attachEyeTracking(harness.deskbuddy);
+    const replacementSvg = attachFakeSvgDocument(harness.deskbuddy, { withEyes: true });
 
     harness.electronHandlers.onEyeMove(2, -1);
 
@@ -730,7 +730,7 @@ describe("renderer object-channel selection", () => {
     assert.strictEqual(harness.api.pendingNext.tagName, "IMG");
     assert.strictEqual(harness.api.pendingSvgFile, "next.svg");
     assert.strictEqual(
-      harness.motionLayer.querySelectorAll().some((el) => el.tagName === "OBJECT" && el !== harness.clawd),
+      harness.motionLayer.querySelectorAll().some((el) => el.tagName === "OBJECT" && el !== harness.deskbuddy),
       false
     );
   });
@@ -749,7 +749,7 @@ describe("renderer object-channel selection", () => {
 
   it("does not rescue over an already visible pet element", () => {
     const harness = createRendererHarness();
-    harness.clawd.style.opacity = "1";
+    harness.deskbuddy.style.opacity = "1";
 
     harness.api.swapToFile("next.svg", "idle", true);
     const rescue = harness.activeTimers().find((timer) => timer.ms === 3750);
@@ -817,8 +817,8 @@ describe("renderer glyph flip compensation", () => {
   it("notifies object-channel SVGs when mini-left glyph compensation changes", () => {
     const source = fs.readFileSync(RENDERER, "utf8");
 
-    assert.ok(source.includes("typeof svgWindow.__clawdSetGlyphFlipCompensation === \"function\""));
-    assert.ok(source.includes("svgWindow.__clawdSetGlyphFlipCompensation(true);"));
-    assert.ok(source.includes("svgWindow.__clawdSetGlyphFlipCompensation(false);"));
+    assert.ok(source.includes("typeof svgWindow.__deskbuddySetGlyphFlipCompensation === \"function\""));
+    assert.ok(source.includes("svgWindow.__deskbuddySetGlyphFlipCompensation(true);"));
+    assert.ok(source.includes("svgWindow.__deskbuddySetGlyphFlipCompensation(false);"));
   });
 });

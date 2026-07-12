@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Register Clawd's CodeWhale hooks in the user's codewhale config.
+// Register DeskBuddy's CodeWhale hooks in the user's codewhale config.
 //
 // Strategy: append [[hooks.hooks]] entries into ~/.codewhale/config.toml.
-// Idempotent — existing clawd-managed entries are updated, others preserved.
+// Idempotent — existing deskbuddy-managed entries are updated, others preserved.
 //
 // CodeWhale hook config format ([[hooks.hooks]] TOML array of tables):
 //
@@ -98,7 +98,7 @@ function buildHookEntry(event, background, hookScriptPath, options = {}) {
   const nodePath = normalizePath(nodeBin);
   const hookPath = normalizePath(hookScriptPath);
 
-  // Use the same node binary that runs Clawd, so the hook can require() our
+  // Use the same node binary that runs DeskBuddy, so the hook can require() our
   // shared modules (server-config, shared-process). Windows node.exe must be
   // quoted in TOML when the path contains spaces.
   const command = formatNodeHookCommand(nodePath, hookPath, {
@@ -187,7 +187,7 @@ function sectionHasMarker(section) {
   return section.lines.some((line) => line.includes(MANAGED_MARKER));
 }
 
-function sectionHasClawdHookCommand(section) {
+function sectionHasDeskBuddyHookCommand(section) {
   return section.lines.some((line) => (
     /^\s*command\s*=/.test(String(line || "")) &&
     String(line || "").includes(HOOK_SCRIPT_MARKER)
@@ -196,7 +196,7 @@ function sectionHasClawdHookCommand(section) {
 
 function sectionIsManagedHook(section) {
   if (!section || section.header !== "hooks.hooks") return false;
-  return sectionHasMarker(section) || sectionHasClawdHookCommand(section);
+  return sectionHasMarker(section) || sectionHasDeskBuddyHookCommand(section);
 }
 
 function ensureHooksEnabled(section) {
@@ -213,7 +213,7 @@ function ensureHooksEnabled(section) {
   return true;
 }
 
-function buildClawdHookSections(hookScriptPath, options = {}) {
+function buildDeskBuddyHookSections(hookScriptPath, options = {}) {
   const sections = [];
   for (const [event, background] of HOOK_ENTRIES) {
     sections.push(buildHookEntry(event, background, hookScriptPath, options));
@@ -234,7 +234,7 @@ function registerCodewhaleHooks(options = {}) {
   } catch {}
   if (!configDirExists && !explicitConfigPath) {
     if (!options.silent) {
-      console.log("Clawd: ~/.codewhale/ not found — skipping CodeWhale hook registration");
+      console.log("DeskBuddy: ~/.codewhale/ not found — skipping CodeWhale hook registration");
     }
     return { added: 0, removed: 0, updated: 0, skipped: true };
   }
@@ -252,7 +252,7 @@ function registerCodewhaleHooks(options = {}) {
 
   // If config doesn't exist or is empty → bootstrap with [hooks] + entries
   if (!content.trim()) {
-    const hookSections = buildClawdHookSections(hookScriptPath, options);
+    const hookSections = buildDeskBuddyHookSections(hookScriptPath, options);
     const newContent = [
       "# codewhale Configuration",
       "",
@@ -267,7 +267,7 @@ function registerCodewhaleHooks(options = {}) {
     fs.writeFileSync(configPath, newContent, "utf8");
 
     if (!options.silent) {
-      console.log(`Clawd CodeWhale hooks → ${configPath}`);
+      console.log(`DeskBuddy CodeWhale hooks → ${configPath}`);
       console.log(`  Created config with ${HOOK_ENTRIES.length} hooks`);
     }
     return { added: HOOK_ENTRIES.length, removed: 0, updated: 0, skipped: false };
@@ -280,7 +280,7 @@ function registerCodewhaleHooks(options = {}) {
     ? { ...options, existingNodeBin }
     : options;
 
-  // Find existing clawd-managed hook entries
+  // Find existing deskbuddy-managed hook entries
   const managedHookIndices = [];
   for (let i = 0; i < sections.length; i++) {
     if (sectionIsManagedHook(sections[i])) {
@@ -289,7 +289,7 @@ function registerCodewhaleHooks(options = {}) {
   }
 
   // Build new managed entries
-  const newEntries = buildClawdHookSections(hookScriptPath, entryOptions);
+  const newEntries = buildDeskBuddyHookSections(hookScriptPath, entryOptions);
 
   // Remove old managed entries
   const matchedManagedHooks = managedHookIndices.length;
@@ -343,7 +343,7 @@ function registerCodewhaleHooks(options = {}) {
 
   const added = updated ? HOOK_ENTRIES.length : 0;
   if (!options.silent) {
-    console.log(`Clawd CodeWhale hooks → ${configPath}`);
+    console.log(`DeskBuddy CodeWhale hooks → ${configPath}`);
     if (updated) {
       console.log(`  Registered ${added} hooks (removed ${removed} old entries)`);
     } else {
@@ -362,7 +362,7 @@ function unregisterCodewhaleHooks(options = {}) {
     content = fs.readFileSync(configPath, "utf8");
   } catch (err) {
     if (err.code === "ENOENT") {
-      if (!options.silent) console.log("Clawd: CodeWhale config not found");
+      if (!options.silent) console.log("DeskBuddy: CodeWhale config not found");
       return { removed: 0, skipped: true };
     }
     throw err;
@@ -379,7 +379,7 @@ function unregisterCodewhaleHooks(options = {}) {
   }
 
   if (removed === 0) {
-    if (!options.silent) console.log("Clawd: no managed CodeWhale hooks found");
+    if (!options.silent) console.log("DeskBuddy: no managed CodeWhale hooks found");
     return { removed: 0, skipped: true };
   }
 
@@ -399,7 +399,7 @@ function unregisterCodewhaleHooks(options = {}) {
   fs.renameSync(tmpPath, configPath);
 
   if (!options.silent) {
-    console.log(`Clawd CodeWhale hooks removed: ${removed}`);
+    console.log(`DeskBuddy CodeWhale hooks removed: ${removed}`);
   }
 
   return { removed, skipped: false };
@@ -417,10 +417,10 @@ module.exports = {
     buildHookEntry,
     parseTomlSections,
     sectionHasMarker,
-    sectionHasClawdHookCommand,
+    sectionHasDeskBuddyHookCommand,
     sectionIsManagedHook,
     ensureHooksEnabled,
-    buildClawdHookSections,
+    buildDeskBuddyHookSections,
     extractExistingCodewhaleNodeBin,
     envConfigPath,
     hasExplicitConfigPath,

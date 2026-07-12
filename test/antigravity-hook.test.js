@@ -10,7 +10,7 @@ function runAntigravityHook(argvEvent, payload = {}) {
   const scriptPath = path.resolve(__dirname, "..", "hooks", "antigravity-hook.js");
   const httpBlockerPath = path.resolve(__dirname, "hook-http-blocker.js");
   return spawnSync(process.execPath, ["--require", httpBlockerPath, scriptPath, argvEvent], {
-    env: { ...process.env, CLAWD_REMOTE: "1" },
+    env: { ...process.env, DESKBUDDY_REMOTE: "1" },
     input: JSON.stringify(payload),
     encoding: "utf8",
     windowsHide: true,
@@ -101,7 +101,7 @@ describe("Antigravity hook script", () => {
     });
   });
 
-  it("falls back to ask when Clawd server returns 204 for a stray PreToolUse", async () => {
+  it("falls back to ask when DeskBuddy server returns 204 for a stray PreToolUse", async () => {
     // D2: server hard-blocks antigravity PreToolUse with 204. Hook script
     // should then emit decision:"ask" so agy's native menu takes over.
     // This mirrors the production state-only contract.
@@ -134,7 +134,7 @@ describe("Antigravity hook script", () => {
   });
 
   it("writes gated debug logs to a file without changing hook stdout", async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-hook-debug-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-hook-debug-"));
     const debugFile = path.join(tmpDir, "hook-debug.log");
     const result = await __test.sendHookEvent({
       conversationId: "c1",
@@ -149,8 +149,8 @@ describe("Antigravity hook script", () => {
       },
     }, "PreToolUse", {
       env: {
-        CLAWD_ANTIGRAVITY_HOOK_DEBUG: "1",
-        CLAWD_ANTIGRAVITY_HOOK_DEBUG_FILE: debugFile,
+        DESKBUDDY_ANTIGRAVITY_HOOK_DEBUG: "1",
+        DESKBUDDY_ANTIGRAVITY_HOOK_DEBUG_FILE: debugFile,
       },
       postState: (_body, _options, callback) => callback(true, 23333),
       postPermission: (_body, _options, callback) => callback(true, 23333, JSON.stringify({
@@ -178,7 +178,7 @@ describe("Antigravity hook script", () => {
     assert.strictEqual(entries[1].stdout, result.stdout);
   });
 
-  it("falls back to ask when Clawd returns no Antigravity decision", async () => {
+  it("falls back to ask when DeskBuddy returns no Antigravity decision", async () => {
     const result = await __test.sendHookEvent({
       conversationId: "c1",
       toolCall: { name: "write_to_file", args: { TargetFile: "/tmp/a.txt" } },
@@ -292,7 +292,7 @@ describe("Antigravity hook script", () => {
 
   it("fails open when local hook setup throws", () => {
     const scriptPath = path.resolve(__dirname, "..", "hooks", "antigravity-hook.js");
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-hook-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-hook-"));
     const preloadPath = path.join(tmpDir, "preload.js");
     const preload = `
       const Module = require("module");

@@ -1,7 +1,7 @@
 "use strict";
 
 (function initSettingsUiCore(root) {
-  const sizeApi = root.ClawdSettingsSizeSlider || {};
+  const sizeApi = root.DeskBuddySettingsSizeSlider || {};
   const {
     SIZE_UI_MIN,
     SIZE_UI_MAX,
@@ -17,7 +17,7 @@
     throw new Error("settings-size-slider.js failed to load before settings-ui-core.js");
   }
 
-  const i18nApi = root.ClawdSettingsI18n || {};
+  const i18nApi = root.DeskBuddySettingsI18n || {};
   const STRINGS = i18nApi.STRINGS;
   const CONTRIBUTORS = i18nApi.CONTRIBUTORS;
   const MAINTAINERS = i18nApi.MAINTAINERS;
@@ -25,13 +25,13 @@
     throw new Error("settings-i18n.js failed to load before settings-ui-core.js");
   }
 
-  const animMergeApi = root.ClawdSettingsAnimOverridesMerge || {};
+  const animMergeApi = root.DeskBuddySettingsAnimOverridesMerge || {};
   const mergePosterCacheIntoAnimationData = animMergeApi.mergePosterCacheIntoAnimationData
     || ((data) => data);
   const applyAnimationPosterPayloadToRuntime = animMergeApi.applyAnimationPosterPayload
     || (() => ({ valid: false, stored: false, applied: false }));
 
-  const shortcutApi = root.ClawdShortcutActions || {};
+  const shortcutApi = root.DeskBuddyShortcutActions || {};
   const SHORTCUT_ACTIONS = shortcutApi.SHORTCUT_ACTIONS || {};
   const SHORTCUT_ACTION_IDS = shortcutApi.SHORTCUT_ACTION_IDS || Object.keys(SHORTCUT_ACTIONS);
   const buildAcceleratorFromEvent = shortcutApi.buildAcceleratorFromEvent
@@ -43,7 +43,7 @@
 
   // startsWith("Mac") not /\bMac\b/ — "MacIntel" has \w after "c", fails \b (regression #135).
   const IS_MAC = (navigator.platform || "").startsWith("Mac");
-  const COLLAPSED_GROUPS_STORAGE_KEY = "clawd.settings.collapsedGroups.v1";
+  const COLLAPSED_GROUPS_STORAGE_KEY = "deskbuddy.settings.collapsedGroups.v1";
 
   const state = {
     snapshot: null,
@@ -1379,5 +1379,5 @@
     translateShortcutError,
   };
 
-  root.ClawdSettingsCore = core;
+  root.DeskBuddySettingsCore = core;
 })(globalThis);

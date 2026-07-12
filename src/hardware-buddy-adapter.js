@@ -14,10 +14,10 @@ function truthy(value) {
 }
 
 function isEnabledFromEnv(env = process.env) {
-  if (truthy(env.CLAWD_HARDWARE_BUDDY_DISABLED)) return false;
-  if (truthy(env.CLAWD_HARDWARE_BUDDY)) return true;
-  if (env.CLAWD_HARDWARE_BUDDY_BACKEND) return true;
-  if (env.CLAWD_HARDWARE_BUDDY_ADDRESS) return true;
+  if (truthy(env.DESKBUDDY_HARDWARE_BUDDY_DISABLED)) return false;
+  if (truthy(env.DESKBUDDY_HARDWARE_BUDDY)) return true;
+  if (env.DESKBUDDY_HARDWARE_BUDDY_BACKEND) return true;
+  if (env.DESKBUDDY_HARDWARE_BUDDY_ADDRESS) return true;
   return false;
 }
 
@@ -141,10 +141,10 @@ function sanitizeHardwareBuddyPayload(value, seen = new WeakMap()) {
 }
 
 function wrapHardwareBuddyTransport(transport) {
-  if (!transport || typeof transport.send !== "function" || transport.__clawdSanitizedSend === true) return transport;
+  if (!transport || typeof transport.send !== "function" || transport.__deskbuddySanitizedSend === true) return transport;
   const rawSend = transport.send.bind(transport);
   transport.send = (snapshot, meta) => rawSend(sanitizeHardwareBuddyPayload(snapshot), meta);
-  Object.defineProperty(transport, "__clawdSanitizedSend", {
+  Object.defineProperty(transport, "__deskbuddySanitizedSend", {
     value: true,
     enumerable: false,
   });
@@ -222,7 +222,7 @@ function numberFromEnv(value, fallback) {
 }
 
 function defaultCoreRoot(env = process.env) {
-  return env.CLAWD_HARDWARE_BUDDY_ROOT
+  return env.DESKBUDDY_HARDWARE_BUDDY_ROOT
     || path.resolve(__dirname, "..", "..", "clawstick");
 }
 
@@ -232,7 +232,7 @@ function loadCoreModules(coreRoot) {
   const missingPaths = [controllerPath, sidecarPath].filter((p) => !fs.existsSync(p));
   if (missingPaths.length) {
     const err = new Error(
-      "Hardware Buddy core modules are missing. Clone https://github.com/rullerzhou-afk/clawstick next to this repo or set CLAWD_HARDWARE_BUDDY_ROOT."
+      "Hardware Buddy core modules are missing. Clone https://github.com/rullerzhou-afk/clawstick next to this repo or set DESKBUDDY_HARDWARE_BUDDY_ROOT."
     );
     err.code = "CORE_MISSING";
     err.coreRoot = coreRoot;
@@ -262,7 +262,7 @@ function loadQuickCommandModules(coreRoot) {
 }
 
 function defaultSidecarScript(coreRoot, env = process.env) {
-  return env.CLAWD_HARDWARE_BUDDY_SIDECAR
+  return env.DESKBUDDY_HARDWARE_BUDDY_SIDECAR
     || path.join(coreRoot, "tools", "hardware_buddy_bridge.py");
 }
 
@@ -278,29 +278,29 @@ function readRuntimeConfig(options, env = process.env) {
   const config = normalizeHardwareBuddySettings(settings || {});
   if (!hasSettings) config.enabled = isEnabledFromEnv(env);
 
-  if (truthy(env.CLAWD_HARDWARE_BUDDY_DISABLED)) config.enabled = false;
+  if (truthy(env.DESKBUDDY_HARDWARE_BUDDY_DISABLED)) config.enabled = false;
   else if (options.enabled != null) config.enabled = !!options.enabled;
-  else if (truthy(env.CLAWD_HARDWARE_BUDDY)) config.enabled = true;
+  else if (truthy(env.DESKBUDDY_HARDWARE_BUDDY)) config.enabled = true;
 
   if (options.permissionsEnabled != null) config.permissionsEnabled = !!options.permissionsEnabled;
-  else if (truthy(env.CLAWD_HARDWARE_BUDDY_PERMISSIONS)) config.permissionsEnabled = true;
+  else if (truthy(env.DESKBUDDY_HARDWARE_BUDDY_PERMISSIONS)) config.permissionsEnabled = true;
 
   if (options.quickCommandsEnabled != null) config.quickCommandsEnabled = !!options.quickCommandsEnabled;
-  else if (truthy(env.CLAWD_HARDWARE_BUDDY_QUICK_COMMANDS) || truthy(env.CLAWD_QUICK_COMMANDS)) {
+  else if (truthy(env.DESKBUDDY_HARDWARE_BUDDY_QUICK_COMMANDS) || truthy(env.DESKBUDDY_QUICK_COMMANDS)) {
     config.quickCommandsEnabled = true;
   }
-  if (truthy(env.CLAWD_HARDWARE_BUDDY_QUICK_COMMANDS_DISABLED) || truthy(env.CLAWD_QUICK_COMMANDS_DISABLED)) {
+  if (truthy(env.DESKBUDDY_HARDWARE_BUDDY_QUICK_COMMANDS_DISABLED) || truthy(env.DESKBUDDY_QUICK_COMMANDS_DISABLED)) {
     config.quickCommandsEnabled = false;
   }
 
-  if (env.CLAWD_HARDWARE_BUDDY_BACKEND) config.backend = env.CLAWD_HARDWARE_BUDDY_BACKEND;
-  if (env.CLAWD_HARDWARE_BUDDY_ADDRESS) config.address = String(env.CLAWD_HARDWARE_BUDDY_ADDRESS).trim();
-  if (env.CLAWD_HARDWARE_BUDDY_NAME_PREFIX) config.namePrefix = String(env.CLAWD_HARDWARE_BUDDY_NAME_PREFIX).trim();
+  if (env.DESKBUDDY_HARDWARE_BUDDY_BACKEND) config.backend = env.DESKBUDDY_HARDWARE_BUDDY_BACKEND;
+  if (env.DESKBUDDY_HARDWARE_BUDDY_ADDRESS) config.address = String(env.DESKBUDDY_HARDWARE_BUDDY_ADDRESS).trim();
+  if (env.DESKBUDDY_HARDWARE_BUDDY_NAME_PREFIX) config.namePrefix = String(env.DESKBUDDY_HARDWARE_BUDDY_NAME_PREFIX).trim();
   if (options.autoConnectAddress) config.address = String(options.autoConnectAddress).trim();
 
   config.backend = config.backend === "fake" ? "fake" : "bleak";
   if (!config.namePrefix) config.namePrefix = "Clawstick";
-  config.autoConnectByNamePrefix = !config.address && (hasSettings || !!env.CLAWD_HARDWARE_BUDDY_NAME_PREFIX);
+  config.autoConnectByNamePrefix = !config.address && (hasSettings || !!env.DESKBUDDY_HARDWARE_BUDDY_NAME_PREFIX);
   return config;
 }
 
@@ -310,24 +310,24 @@ function buildSidecarArgs(options) {
     coreRoot,
     config,
   } = options;
-  const backend = config.backend || env.CLAWD_HARDWARE_BUDDY_BACKEND || "bleak";
+  const backend = config.backend || env.DESKBUDDY_HARDWARE_BUDDY_BACKEND || "bleak";
   const args = [
     defaultSidecarScript(coreRoot, env),
     "--backend",
     backend,
   ];
-  if (env.CLAWD_HARDWARE_BUDDY_SCAN_TIMEOUT) {
-    args.push("--scan-timeout", String(env.CLAWD_HARDWARE_BUDDY_SCAN_TIMEOUT));
+  if (env.DESKBUDDY_HARDWARE_BUDDY_SCAN_TIMEOUT) {
+    args.push("--scan-timeout", String(env.DESKBUDDY_HARDWARE_BUDDY_SCAN_TIMEOUT));
   }
-  if (env.CLAWD_HARDWARE_BUDDY_CONNECT_TIMEOUT) {
-    args.push("--connect-timeout", String(env.CLAWD_HARDWARE_BUDDY_CONNECT_TIMEOUT));
+  if (env.DESKBUDDY_HARDWARE_BUDDY_CONNECT_TIMEOUT) {
+    args.push("--connect-timeout", String(env.DESKBUDDY_HARDWARE_BUDDY_CONNECT_TIMEOUT));
   }
   if (config.namePrefix) {
     args.push("--name-prefix", config.namePrefix);
   }
   if (backend === "fake"
-    && /^(true|false)$/i.test(String(env.CLAWD_HARDWARE_BUDDY_FAKE_SECURE || "").trim())) {
-    args.push("--fake-secure", String(env.CLAWD_HARDWARE_BUDDY_FAKE_SECURE).trim().toLowerCase());
+    && /^(true|false)$/i.test(String(env.DESKBUDDY_HARDWARE_BUDDY_FAKE_SECURE || "").trim())) {
+    args.push("--fake-secure", String(env.DESKBUDDY_HARDWARE_BUDDY_FAKE_SECURE).trim().toLowerCase());
   }
   return args;
 }
@@ -403,7 +403,7 @@ function classifyHardwareBuddyIssue(err) {
       category: "python_missing",
       retryable: false,
       message: message || "Python executable was not found",
-      hint: "Install Python or configure CLAWD_HARDWARE_BUDDY_PYTHON.",
+      hint: "Install Python or configure DESKBUDDY_HARDWARE_BUDDY_PYTHON.",
     };
   }
   if (code === "BAD_CONTROL" || code === "BAD_MESSAGE" || code === "BAD_SNAPSHOT") {
@@ -421,7 +421,7 @@ function classifyHardwareBuddyIssue(err) {
       category: "core_missing",
       retryable: false,
       message: message || "Hardware Buddy core modules are missing",
-      hint: "Clone https://github.com/rullerzhou-afk/clawstick next to this repo or set CLAWD_HARDWARE_BUDDY_ROOT.",
+      hint: "Clone https://github.com/rullerzhou-afk/clawstick next to this repo or set DESKBUDDY_HARDWARE_BUDDY_ROOT.",
     };
   }
   if (code === "SIDECAR_EXIT") {
@@ -456,16 +456,16 @@ function createHardwareBuddyAdapter(options = {}) {
   const env = options.env || process.env;
   const log = typeof options.log === "function" ? options.log : () => {};
   const coreRoot = options.coreRoot || defaultCoreRoot(env);
-  const keepaliveMs = numberFromEnv(env.CLAWD_HARDWARE_BUDDY_KEEPALIVE_MS, 10000);
-  const autoConnectDelayMs = numberFromEnv(env.CLAWD_HARDWARE_BUDDY_CONNECT_DELAY_MS, 1000);
-  const autoConnectRetryMs = numberFromEnv(env.CLAWD_HARDWARE_BUDDY_CONNECT_RETRY_MS, 15000);
-  const autoConnectRetryMaxMs = numberFromEnv(env.CLAWD_HARDWARE_BUDDY_CONNECT_RETRY_MAX_MS, 120000);
-  const quickCommandBufferSize = numberFromEnv(env.CLAWD_HARDWARE_BUDDY_QUICK_COMMAND_BUFFER_SIZE, 100);
-  const quickCommandDedupeMs = numberFromEnv(env.CLAWD_HARDWARE_BUDDY_QUICK_COMMAND_DEDUPE_MS, 30000);
+  const keepaliveMs = numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_KEEPALIVE_MS, 10000);
+  const autoConnectDelayMs = numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_CONNECT_DELAY_MS, 1000);
+  const autoConnectRetryMs = numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_CONNECT_RETRY_MS, 15000);
+  const autoConnectRetryMaxMs = numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_CONNECT_RETRY_MAX_MS, 120000);
+  const quickCommandBufferSize = numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_QUICK_COMMAND_BUFFER_SIZE, 100);
+  const quickCommandDedupeMs = numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_QUICK_COMMAND_DEDUPE_MS, 30000);
   const notifyDebounceMs = options.notifyDebounceMs != null
     ? numberFromEnv(options.notifyDebounceMs, 50)
-    : numberFromEnv(env.CLAWD_HARDWARE_BUDDY_NOTIFY_DEBOUNCE_MS, 50);
-  const logThrottleMs = numberFromEnv(env.CLAWD_HARDWARE_BUDDY_LOG_THROTTLE_MS, 60000);
+    : numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_NOTIFY_DEBOUNCE_MS, 50);
+  const logThrottleMs = numberFromEnv(env.DESKBUDDY_HARDWARE_BUDDY_LOG_THROTTLE_MS, 60000);
   const setTimer = typeof options.setTimeout === "function" ? options.setTimeout : setTimeout;
   const clearTimer = typeof options.clearTimeout === "function" ? options.clearTimeout : clearTimeout;
   const now = typeof options.now === "function" ? options.now : () => Date.now();
@@ -792,7 +792,7 @@ function createHardwareBuddyAdapter(options = {}) {
 
   function createSidecar(SidecarClient) {
     return new SidecarClient({
-      command: options.command || env.CLAWD_HARDWARE_BUDDY_PYTHON || "python",
+      command: options.command || env.DESKBUDDY_HARDWARE_BUDDY_PYTHON || "python",
       args: options.args || buildSidecarArgs({ env, coreRoot, config: activeConfig }),
       spawnOptions: buildSidecarSpawnOptions(options, env),
       log: (level, message, meta) => {

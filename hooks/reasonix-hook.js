@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Clawd — Reasonix state-only hook.
+// DeskBuddy — Reasonix state-only hook.
 // Registered in <Reasonix home>/settings.json by hooks/reasonix-install.js
 //
 // All events: POST /state, fire-and-forget, exit immediately.
 // Reasonix owns its own permission flow natively (Gate + terminal prompt);
-// Clawd only observes state for the desktop pet animation.
+// DeskBuddy only observes state for the desktop pet animation.
 
 const { postStateToRunningServer, readHostPrefix } = require("./server-config");
 const { createPidResolver, readStdinJson, getPlatformConfig } = require("./shared-process");
@@ -69,7 +69,7 @@ readStdinJson()
       return;
     }
 
-    const remote = !!process.env.CLAWD_REMOTE;
+    const remote = !!process.env.DESKBUDDY_REMOTE;
     const host = remote ? readHostPrefix() : undefined;
 
     if (hookName === "SessionStart" && !remote) resolve();

@@ -3,14 +3,14 @@ const http = require("http");
 const os = require("os");
 const path = require("path");
 
-const CLAWD_SERVER_ID = "deskbuddy";
-const CLAWD_SERVER_HEADER = "x-deskbuddy-server";
+const DESKBUDDY_SERVER_ID = "deskbuddy";
+const DESKBUDDY_SERVER_HEADER = "x-deskbuddy-server";
 const DEFAULT_SERVER_PORT = 23333;
 const SERVER_PORT_COUNT = 5;
 const SERVER_PORTS = Array.from({ length: SERVER_PORT_COUNT }, (_, i) => DEFAULT_SERVER_PORT + i);
 const STATE_PATH = "/state";
 const PERMISSION_PATH = "/permission";
-const RUNTIME_CONFIG_PATH = path.join(os.homedir(), ".clawd", "runtime.json");
+const RUNTIME_CONFIG_PATH = path.join(os.homedir(), ".deskbuddy", "runtime.json");
 const DEFAULT_HOOK_HTTP_TIMEOUT_MS = 100;
 const REMOTE_HOOK_HTTP_TIMEOUT_MS = 5000;
 
@@ -19,7 +19,7 @@ function normalizePort(value) {
   return Number.isInteger(port) && SERVER_PORTS.includes(port) ? port : null;
 }
 
-const HOST_PREFIX_PATH = path.join(os.homedir(), ".claude", "hooks", "clawd-host-prefix");
+const HOST_PREFIX_PATH = path.join(os.homedir(), ".claude", "hooks", "deskbuddy-host-prefix");
 
 function readHostPrefix() {
   let prefix = null;
@@ -49,7 +49,7 @@ function writeRuntimeConfig(port) {
 
   const dir = path.dirname(RUNTIME_CONFIG_PATH);
   const tmpPath = path.join(dir, `.runtime.${process.pid}.${Date.now()}.tmp`);
-  const body = JSON.stringify({ app: CLAWD_SERVER_ID, port: safePort }, null, 2);
+  const body = JSON.stringify({ app: DESKBUDDY_SERVER_ID, port: safePort }, null, 2);
   fs.mkdirSync(dir, { recursive: true });
   try {
     fs.writeFileSync(tmpPath, body, "utf8");
@@ -131,12 +131,12 @@ function readHeader(res, headerName) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function isClawdResponse(res, body) {
-  if (readHeader(res, CLAWD_SERVER_HEADER) === CLAWD_SERVER_ID) return true;
+function isDeskBuddyResponse(res, body) {
+  if (readHeader(res, DESKBUDDY_SERVER_HEADER) === DESKBUDDY_SERVER_ID) return true;
   if (!body) return false;
   try {
     const data = JSON.parse(body);
-    return data && data.app === CLAWD_SERVER_ID;
+    return data && data.app === DESKBUDDY_SERVER_ID;
   } catch {
     return false;
   }
@@ -146,7 +146,7 @@ function isRemoteHookMode(options = {}) {
   if (options.remote === true) return true;
   if (options.remote === false) return false;
   const env = options.env || process.env;
-  const value = env && env.CLAWD_REMOTE;
+  const value = env && env.DESKBUDDY_REMOTE;
   if (!value) return false;
   return !/^(0|false)$/i.test(String(value));
 }
@@ -170,7 +170,7 @@ function getStatePostTimeoutMs(options = {}) {
 function getPermissionProbeTimeoutMs(options = {}) {
   // Permission discovery also crosses the reverse tunnel in remote mode.
   // This can make the all-ports-dead path slower, but avoids missing a
-  // healthy local Clawd behind a high-latency tunnel.
+  // healthy local DeskBuddy behind a high-latency tunnel.
   return normalizeHookHttpTimeout(
     options.probeTimeoutMs,
     DEFAULT_HOOK_HTTP_TIMEOUT_MS,
@@ -188,7 +188,7 @@ function probePort(port, timeoutMs, callback, options = {}) {
       res.on("data", (chunk) => {
         if (body.length < 256) body += chunk;
       });
-      res.on("end", () => callback(isClawdResponse(res, body)));
+      res.on("end", () => callback(isDeskBuddyResponse(res, body)));
     }
   );
 
@@ -214,7 +214,7 @@ function postStateToPort(port, payload, timeoutMs, callback, options = {}) {
       timeout: timeoutMs,
     },
     (res) => {
-      if (readHeader(res, CLAWD_SERVER_HEADER) === CLAWD_SERVER_ID) {
+      if (readHeader(res, DESKBUDDY_SERVER_HEADER) === DESKBUDDY_SERVER_ID) {
         res.resume();
         callback(true, port);
         return;
@@ -225,7 +225,7 @@ function postStateToPort(port, payload, timeoutMs, callback, options = {}) {
       res.on("data", (chunk) => {
         if (responseBody.length < 256) responseBody += chunk;
       });
-      res.on("end", () => callback(isClawdResponse(res, responseBody), port));
+      res.on("end", () => callback(isDeskBuddyResponse(res, responseBody), port));
     }
   );
 
@@ -237,7 +237,7 @@ function postStateToPort(port, payload, timeoutMs, callback, options = {}) {
   req.end(payload);
 }
 
-function discoverClawdPort(options, callback) {
+function discoverDeskBuddyPort(options, callback) {
   const timeoutMs = options && options.timeoutMs ? options.timeoutMs : DEFAULT_HOOK_HTTP_TIMEOUT_MS;
   const ports = getPortCandidates(options && options.preferredPort, options);
   const probe = options && options.probePort ? options.probePort : probePort;
@@ -340,7 +340,7 @@ function postPermissionToPort(port, payload, timeoutMs, callback, options = {}) 
         if (responseBody.length < 262144) responseBody += chunk;
       });
       res.on("end", () => {
-        finish(readHeader(res, CLAWD_SERVER_HEADER) === CLAWD_SERVER_ID, responseBody, res.statusCode || 0);
+        finish(readHeader(res, DESKBUDDY_SERVER_HEADER) === DESKBUDDY_SERVER_ID, responseBody, res.statusCode || 0);
       });
     }
   );
@@ -357,7 +357,7 @@ function postPermissionToRunningServer(body, options, callback) {
   const timeoutMs = options && options.timeoutMs ? options.timeoutMs : 590000;
   const probeTimeoutMs = getPermissionProbeTimeoutMs(options || {});
   const payload = typeof body === "string" ? body : JSON.stringify(body);
-  const discover = options && options.discoverClawdPort ? options.discoverClawdPort : discoverClawdPort;
+  const discover = options && options.discoverDeskBuddyPort ? options.discoverDeskBuddyPort : discoverDeskBuddyPort;
   const post = options && options.postPermissionToPort ? options.postPermissionToPort : postPermissionToPort;
 
   discover({ ...options, timeoutMs: probeTimeoutMs }, (port) => {
@@ -560,7 +560,7 @@ function isScoopShimPath(value) {
   return normalizeWindowsPathForMatch(value).includes("\\scoop\\shims\\");
 }
 
-function isClawdOrElectronPath(value) {
+function isDeskBuddyOrElectronPath(value) {
   const norm = normalizeWindowsPathForMatch(value);
   if (!norm) return false;
   // Reject the packaged Electron host. Match by basename so we don't false-flag
@@ -582,7 +582,7 @@ function validateWindowsNodeCandidate(value) {
   }
   if (!isWindowsNodeBasename(trimmed)) return null;
   if (isScoopShimPath(trimmed)) return null;
-  if (isClawdOrElectronPath(trimmed)) return null;
+  if (isDeskBuddyOrElectronPath(trimmed)) return null;
   return trimmed;
 }
 
@@ -828,8 +828,8 @@ async function resolveNodeBinAsync(options = {}) {
 }
 
 module.exports = {
-  CLAWD_SERVER_HEADER,
-  CLAWD_SERVER_ID,
+  DESKBUDDY_SERVER_HEADER,
+  DESKBUDDY_SERVER_ID,
   DEFAULT_HOOK_HTTP_TIMEOUT_MS,
   DEFAULT_SERVER_PORT,
   PERMISSION_PATH,
@@ -839,7 +839,7 @@ module.exports = {
   STATE_PATH,
   buildPermissionUrl,
   clearRuntimeConfig,
-  discoverClawdPort,
+  discoverDeskBuddyPort,
   getPortCandidates,
   getPermissionProbeTimeoutMs,
   getStatePostTimeoutMs,

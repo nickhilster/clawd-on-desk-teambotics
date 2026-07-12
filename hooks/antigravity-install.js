@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Merge Clawd Antigravity hooks into ~/.gemini/config/hooks.json.
+// Merge DeskBuddy Antigravity hooks into ~/.gemini/config/hooks.json.
 
 const fs = require("fs");
 const path = require("path");
@@ -17,7 +17,7 @@ const {
   windowsPowerShellBin,
 } = require("./json-utils");
 
-const HOOK_GROUP_ID = "clawd";
+const HOOK_GROUP_ID = "deskbuddy";
 const MARKER = "antigravity-hook.js";
 const DEFAULT_PARENT_DIR = path.join(os.homedir(), ".gemini", "config");
 const DEFAULT_CONFIG_PATH = path.join(DEFAULT_PARENT_DIR, "hooks.json");
@@ -28,7 +28,7 @@ const DEFAULT_STATUSLINE_SETTINGS_PATH = path.join(DEFAULT_STATUSLINE_SETTINGS_D
 // PreToolUse intentionally NOT registered. Antigravity 1.0.1 LLMs proactively
 // call the built-in `ask_permission` tool before sensitive actions, which then
 // triggers agy's native 5-option menu — there's no way for a hook to suppress
-// that menu. Layering a Clawd bubble on top of (or in front of) the native
+// that menu. Layering a DeskBuddy bubble on top of (or in front of) the native
 // menu yields 8-10 confirmations for a single user task.
 // Antigravity stays a state-only integration; agy native menu owns permission.
 const ANTIGRAVITY_HOOK_EVENTS = [
@@ -102,8 +102,8 @@ function withFailOpenShellFallback(command, event, nodeBin, options = {}) {
   ].map(quoteShellSingleArg).join(" ");
   return [
     "tmp_dir=${TMPDIR:-/tmp}",
-    "in_file=$(mktemp \"$tmp_dir/clawd-agy-in.XXXXXX\" 2>/dev/null || printf '%s/clawd-agy-in-%s' \"$tmp_dir\" \"$$\")",
-    "out_file=$(mktemp \"$tmp_dir/clawd-agy-out.XXXXXX\" 2>/dev/null || printf '%s/clawd-agy-out-%s' \"$tmp_dir\" \"$$\")",
+    "in_file=$(mktemp \"$tmp_dir/deskbuddy-agy-in.XXXXXX\" 2>/dev/null || printf '%s/deskbuddy-agy-in-%s' \"$tmp_dir\" \"$$\")",
+    "out_file=$(mktemp \"$tmp_dir/deskbuddy-agy-out.XXXXXX\" 2>/dev/null || printf '%s/deskbuddy-agy-out-%s' \"$tmp_dir\" \"$$\")",
     "pid=",
     "watchdog=",
     // Do not trap TERM: macOS bash 3.2 may print run_pending_traps warnings when the watchdog is killed.
@@ -283,7 +283,7 @@ function buildHookHandler(command, timeout = DEFAULT_HOOK_TIMEOUT_SECONDS) {
 
 function buildAntigravityHooks(commandForEvent) {
   return {
-    clawd: {
+    deskbuddy: {
       PreInvocation: [buildHookHandler(commandForEvent("PreInvocation"))],
       PostToolUse: [{
         matcher: "*",
@@ -318,7 +318,7 @@ function registerAntigravityHooks(options = {}) {
   const configPath = options.configPath || path.join(homeDir, ".gemini", "config", "hooks.json");
 
   if (!options.configPath && !hasAntigravityConfig(homeDir)) {
-    if (!options.silent) console.log("Clawd: Antigravity config not found - skipping Antigravity hook registration");
+    if (!options.silent) console.log("DeskBuddy: Antigravity config not found - skipping Antigravity hook registration");
     return { installed: false, added: 0, updated: 0, skipped: 0, configPath };
   }
 
@@ -359,14 +359,14 @@ function registerAntigravityHooks(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Antigravity hooks -> ${configPath}`);
+    console.log(`DeskBuddy Antigravity hooks -> ${configPath}`);
     console.log(`  Added: ${added}, updated: ${updated}, skipped: ${skipped}`);
   }
 
   return { installed: true, added, updated, skipped, configPath };
 }
 
-function groupHasClawdMarker(group) {
+function groupHasDeskBuddyMarker(group) {
   if (!group || typeof group !== "object" || Array.isArray(group)) return false;
   return ANTIGRAVITY_HOOK_EVENTS.some((event) =>
     collectHookCommandsFromEntries(group[event]).length > 0
@@ -379,13 +379,13 @@ function unregisterAntigravityHooks(options = {}) {
   const settings = normalizeSettings(readJsonIfExists(configPath));
   const group = settings[HOOK_GROUP_ID];
 
-  if (!groupHasClawdMarker(group)) {
+  if (!groupHasDeskBuddyMarker(group)) {
     return { installed: !!group, removed: 0, changed: false, configPath };
   }
 
   delete settings[HOOK_GROUP_ID];
   const backupPath = writeJsonAtomicWithBackup(configPath, settings, options);
-  if (!options.silent) console.log(`Clawd Antigravity hook group removed -> ${configPath}`);
+  if (!options.silent) console.log(`DeskBuddy Antigravity hook group removed -> ${configPath}`);
   const result = { installed: true, removed: 1, changed: true, configPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;
@@ -416,7 +416,7 @@ function registerAntigravityStatusline(options = {}) {
   const settingsPath = options.settingsPath || path.join(homeDir, ".gemini", "antigravity-cli", "settings.json");
 
   if (!options.settingsPath && !hasAntigravityStatuslineSettings(homeDir)) {
-    if (!options.silent) console.log("Clawd: Antigravity CLI settings not found - skipping statusline registration");
+    if (!options.silent) console.log("DeskBuddy: Antigravity CLI settings not found - skipping statusline registration");
     return { installed: false, changed: false, skippedExisting: false, settingsPath };
   }
 
@@ -425,7 +425,7 @@ function registerAntigravityStatusline(options = {}) {
   const existingIsOurs = !!(existing && typeof existing.command === "string" && existing.command.includes(STATUSLINE_MARKER));
 
   if (existing && !existingIsOurs) {
-    if (!options.silent) console.log(`Clawd: existing Antigravity statusline detected at ${settingsPath} - leaving it in place`);
+    if (!options.silent) console.log(`DeskBuddy: existing Antigravity statusline detected at ${settingsPath} - leaving it in place`);
     return { installed: true, changed: false, skippedExisting: true, settingsPath };
   }
 
@@ -444,7 +444,7 @@ function registerAntigravityStatusline(options = {}) {
   }
 
   if (!options.silent) {
-    console.log(`Clawd Antigravity statusline -> ${settingsPath}${changed ? " (updated)" : " (already up to date)"}`);
+    console.log(`DeskBuddy Antigravity statusline -> ${settingsPath}${changed ? " (updated)" : " (already up to date)"}`);
   }
 
   return { installed: true, changed, skippedExisting: false, settingsPath };
@@ -463,7 +463,7 @@ function unregisterAntigravityStatusline(options = {}) {
 
   delete settings.statusLine;
   const backupPath = writeJsonAtomicWithBackup(settingsPath, settings, options);
-  if (!options.silent) console.log(`Clawd Antigravity statusline removed -> ${settingsPath}`);
+  if (!options.silent) console.log(`DeskBuddy Antigravity statusline removed -> ${settingsPath}`);
   const result = { installed: true, removed: 1, changed: true, settingsPath };
   if (options.backup === true) result.backupPath = backupPath;
   return result;
@@ -492,7 +492,7 @@ module.exports = {
     fallbackStdoutForEvent,
     normalizeFailOpenTimeoutSeconds,
     quoteWindowsProcessArg,
-    groupHasClawdMarker,
+    groupHasDeskBuddyMarker,
     hasAntigravityConfig,
     normalizeSettings,
     resolveAntigravityNodeBin,

@@ -15,8 +15,8 @@ const {
   buildProbeCommand,
   backoffMsForAttempt,
   createRemoteSshRuntime: createRemoteSshRuntimeBase,
-  CLAWD_SERVER_HEADER,
-  CLAWD_SERVER_ID,
+  DESKBUDDY_SERVER_HEADER,
+  DESKBUDDY_SERVER_ID,
   PROBE_MIN_GAP_MS,
   PROBE_CHILD_TIMEOUT_MS,
   BACKOFF_SCHEDULE_MS,
@@ -307,13 +307,13 @@ test("buildProbeCommand requires integer port", () => {
   assert.throws(() => buildProbeCommand("23333"), /must be an integer/);
 });
 
-test("buildProbeCommand embeds remoteForwardPort + clawd header check", () => {
+test("buildProbeCommand embeds remoteForwardPort + deskbuddy header check", () => {
   const cmd = buildProbeCommand(23335);
   assert.ok(cmd.startsWith("node -e "));
   // The JSON-quoted JS body should reference the port.
   assert.ok(cmd.includes("23335"));
-  assert.ok(cmd.includes(CLAWD_SERVER_HEADER));
-  assert.ok(cmd.includes(CLAWD_SERVER_ID));
+  assert.ok(cmd.includes(DESKBUDDY_SERVER_HEADER));
+  assert.ok(cmd.includes(DESKBUDDY_SERVER_ID));
   // Must contain the v7-required exit codes.
   assert.ok(cmd.includes("process.exit(3)"), "header mismatch exit");
   assert.ok(cmd.includes("process.exit(2)"), "http error event exit");

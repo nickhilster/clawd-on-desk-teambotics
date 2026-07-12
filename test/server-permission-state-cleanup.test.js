@@ -62,7 +62,7 @@ function makeCtx(overrides = {}) {
     writeRuntimeConfig: () => true,
     clearRuntimeConfig: () => true,
     readRuntimePort: () => null,
-    syncClawdHooksImpl: () => {},
+    syncDeskBuddyHooksImpl: () => {},
     syncGeminiHooksImpl: () => {},
     syncCursorHooksImpl: () => {},
     syncCodeBuddyHooksImpl: () => {},
@@ -354,7 +354,7 @@ describe("/state permission cleanup", () => {
       event: "PostToolUseFailure",
       tool_name: "Bash",
       tool_use_id: "toolu_other",
-      tool_input_fingerprint: buildToolInputFingerprint({ command: "find /tmp -name '*clawd*'" }),
+      tool_input_fingerprint: buildToolInputFingerprint({ command: "find /tmp -name '*deskbuddy*'" }),
     })));
 
     assert.strictEqual(res.statusCode, 200);

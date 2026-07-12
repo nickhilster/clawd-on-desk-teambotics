@@ -19,46 +19,46 @@ describe("resolveLinuxOzonePlatform()", () => {
     assert.strictEqual(resolve("win32", waylandEnv), null);
   });
 
-  describe("explicit CLAWD_OZONE_PLATFORM override (highest priority)", () => {
+  describe("explicit DESKBUDDY_OZONE_PLATFORM override (highest priority)", () => {
     it("=x11 forces XWayland", () => {
-      assert.strictEqual(resolve("linux", { CLAWD_OZONE_PLATFORM: "x11" }), "x11");
+      assert.strictEqual(resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "x11" }), "x11");
     });
 
     it("=x11 wins even with no DISPLAY (user asked for it explicitly)", () => {
       assert.strictEqual(
-        resolve("linux", { CLAWD_OZONE_PLATFORM: "x11", XDG_SESSION_TYPE: "wayland" }),
+        resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "x11", XDG_SESSION_TYPE: "wayland" }),
         "x11"
       );
     });
 
     it("=wayland forces native Wayland", () => {
-      assert.strictEqual(resolve("linux", { CLAWD_OZONE_PLATFORM: "wayland" }), "wayland");
+      assert.strictEqual(resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "wayland" }), "wayland");
     });
 
     it("=wayland overrides a differing --ozone-platform the user passed on argv", () => {
       assert.strictEqual(
-        resolve("linux", { CLAWD_OZONE_PLATFORM: "wayland", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }, "x11"),
+        resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "wayland", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }, "x11"),
         "wayland"
       );
     });
 
     it("=auto leaves things untouched, even with a user argv switch", () => {
       assert.strictEqual(
-        resolve("linux", { CLAWD_OZONE_PLATFORM: "auto", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }),
+        resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "auto", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }),
         null
       );
       // auto must NOT erase a user's explicit argv choice
-      assert.strictEqual(resolve("linux", { CLAWD_OZONE_PLATFORM: "auto" }, "wayland"), null);
+      assert.strictEqual(resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "auto" }, "wayland"), null);
     });
 
     it("is case-insensitive and trims surrounding whitespace", () => {
-      assert.strictEqual(resolve("linux", { CLAWD_OZONE_PLATFORM: "  X11 " }), "x11");
-      assert.strictEqual(resolve("linux", { CLAWD_OZONE_PLATFORM: " WAYLAND " }), "wayland");
+      assert.strictEqual(resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "  X11 " }), "x11");
+      assert.strictEqual(resolve("linux", { DESKBUDDY_OZONE_PLATFORM: " WAYLAND " }), "wayland");
     });
 
     it("ignores an unrecognized override value and falls back to detection", () => {
       assert.strictEqual(
-        resolve("linux", { CLAWD_OZONE_PLATFORM: "garbage", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }),
+        resolve("linux", { DESKBUDDY_OZONE_PLATFORM: "garbage", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }),
         "x11"
       );
     });
@@ -89,7 +89,7 @@ describe("resolveLinuxOzonePlatform()", () => {
 
     it("does NOT force x11 on Wayland when no DISPLAY (no XWayland) — would crash startup", () => {
       // Deliberate: the DISPLAY guard is kept so we never turn "pet can't drag"
-      // into "app won't launch" on a Wayland-only box. CLAWD_OZONE_PLATFORM=x11
+      // into "app won't launch" on a Wayland-only box. DESKBUDDY_OZONE_PLATFORM=x11
       // is the escape hatch for users who know XWayland is reachable.
       assert.strictEqual(resolve("linux", { XDG_SESSION_TYPE: "wayland" }), null);
       assert.strictEqual(resolve("linux", { WAYLAND_DISPLAY: "wayland-0" }), null);
@@ -113,10 +113,10 @@ describe("resolveLinuxOzonePlatform()", () => {
   it("respects a user --ozone-platform parsed from a real argv array", () => {
     const env = { XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" };
     // user explicitly asked for wayland → we must NOT auto-force x11
-    const user = parseOzonePlatformFromArgv(["/app/Clawd", "--ozone-platform=wayland"]);
+    const user = parseOzonePlatformFromArgv(["/app/DeskBuddy", "--ozone-platform=wayland"]);
     assert.strictEqual(resolve("linux", env, user), null);
     // no user switch → auto-detection forces x11
-    const none = parseOzonePlatformFromArgv(["/app/Clawd", "--some-other-flag"]);
+    const none = parseOzonePlatformFromArgv(["/app/DeskBuddy", "--some-other-flag"]);
     assert.strictEqual(resolve("linux", env, none), "x11");
   });
 });
@@ -164,7 +164,7 @@ describe("parseOzonePlatformFromArgv()", () => {
 });
 
 describe("planXWaylandRelaunch()", () => {
-  const ARGV0 = "/opt/Clawd/clawd"; // process.argv[0]
+  const ARGV0 = "/opt/DeskBuddy/deskbuddy"; // process.argv[0]
   const plan = (platform, env, argv) => planXWaylandRelaunch({ platform, env, argv });
 
   it("relaunches with --ozone-platform=x11 on a Wayland session with DISPLAY", () => {
@@ -196,22 +196,22 @@ describe("planXWaylandRelaunch()", () => {
     );
   });
 
-  it("relaunches when CLAWD_OZONE_PLATFORM=x11, even off a Wayland session", () => {
+  it("relaunches when DESKBUDDY_OZONE_PLATFORM=x11, even off a Wayland session", () => {
     assert.deepStrictEqual(
-      plan("linux", { CLAWD_OZONE_PLATFORM: "x11" }, [ARGV0]),
+      plan("linux", { DESKBUDDY_OZONE_PLATFORM: "x11" }, [ARGV0]),
       { args: ["--ozone-platform=x11"] }
     );
   });
 
   // ── loop guards ──
-  it("guard 1: does NOT relaunch once CLAWD_OZONE_RELAUNCHED=1 is set", () => {
+  it("guard 1: does NOT relaunch once DESKBUDDY_OZONE_RELAUNCHED=1 is set", () => {
     assert.strictEqual(
-      plan("linux", { XDG_SESSION_TYPE: "wayland", DISPLAY: ":0", CLAWD_OZONE_RELAUNCHED: "1" }, [ARGV0]),
+      plan("linux", { XDG_SESSION_TYPE: "wayland", DISPLAY: ":0", DESKBUDDY_OZONE_RELAUNCHED: "1" }, [ARGV0]),
       null
     );
-    // backstop: even CLAWD_OZONE_PLATFORM=x11 can't loop once the sentinel is set
+    // backstop: even DESKBUDDY_OZONE_PLATFORM=x11 can't loop once the sentinel is set
     assert.strictEqual(
-      plan("linux", { CLAWD_OZONE_PLATFORM: "x11", CLAWD_OZONE_RELAUNCHED: "1" }, [ARGV0]),
+      plan("linux", { DESKBUDDY_OZONE_PLATFORM: "x11", DESKBUDDY_OZONE_RELAUNCHED: "1" }, [ARGV0]),
       null
     );
   });
@@ -228,9 +228,9 @@ describe("planXWaylandRelaunch()", () => {
     assert.strictEqual(plan("linux", { XDG_SESSION_TYPE: "x11", DISPLAY: ":0" }, [ARGV0]), null);
     // Wayland but no DISPLAY (no XWayland) — relaunching to x11 would crash
     assert.strictEqual(plan("linux", { XDG_SESSION_TYPE: "wayland" }, [ARGV0]), null);
-    // CLAWD_OZONE_PLATFORM=wayland — native Wayland is already the default
+    // DESKBUDDY_OZONE_PLATFORM=wayland — native Wayland is already the default
     assert.strictEqual(
-      plan("linux", { CLAWD_OZONE_PLATFORM: "wayland", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }, [ARGV0]),
+      plan("linux", { DESKBUDDY_OZONE_PLATFORM: "wayland", XDG_SESSION_TYPE: "wayland", DISPLAY: ":0" }, [ARGV0]),
       null
     );
   });

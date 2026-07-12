@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Clawd - Antigravity CLI statusline adapter.
+// DeskBuddy - Antigravity CLI statusline adapter.
 // Registered as `statusLine.command` in ~/.gemini/antigravity-cli/settings.json
 // by hooks/antigravity-install.js. Antigravity pipes a JSON telemetry payload
 // (agent state, context window usage, model, cwd, etc.) to stdin on every
@@ -7,7 +7,7 @@
 // status line.
 //
 // Unlike the PreInvocation/PostToolUse/PostInvocation/Stop hooks in
-// antigravity-hook.js (which only drive Clawd's own session state), this
+// antigravity-hook.js (which only drive DeskBuddy's own session state), this
 // script also owns rendering visible terminal text, so it must always print
 // *something* fast and never throw - a stuck or crashed statusline script
 // would blank out the user's real Antigravity CLI status line.
@@ -95,7 +95,7 @@ async function main(deps = {}) {
   }
 
   try {
-    const remote = !!env.CLAWD_REMOTE;
+    const remote = !!env.DESKBUDDY_REMOTE;
     const body = buildStateBody(payload, contextUsage, quota, {
       remote,
       host: remote && deps.readHostPrefix ? deps.readHostPrefix() : undefined,

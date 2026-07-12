@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Clawd Desktop Pet — Auto-Start Script
-// Registered as a SessionStart hook BEFORE clawd-hook.js.
+// DeskBuddy Desktop Pet — Auto-Start Script
+// Registered as a SessionStart hook BEFORE deskbuddy-hook.js.
 // Checks if the Electron app is running; if not, launches it detached.
 // Uses shared server discovery helpers and should exit quickly in normal cases.
 
 const { spawn } = require("child_process");
 const path = require("path");
-const { discoverClawdPort } = require("./server-config");
+const { discoverDeskBuddyPort } = require("./server-config");
 const { buildElectronLaunchConfig } = require("./shared-process");
 
 const INITIAL_DISCOVER_TIMEOUT_MS = 300;
@@ -14,8 +14,8 @@ const STARTUP_READY_TIMEOUT_MS = 6000;
 const STARTUP_DISCOVER_TIMEOUT_MS = 100;
 const STARTUP_POLL_INTERVAL_MS = 100;
 
-function waitForClawdPort(options, callback) {
-  const discover = options.discoverClawdPort || discoverClawdPort;
+function waitForDeskBuddyPort(options, callback) {
+  const discover = options.discoverDeskBuddyPort || discoverDeskBuddyPort;
   const setTimeoutFn = options.setTimeout || setTimeout;
   const nowFn = options.now || Date.now;
   const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : STARTUP_READY_TIMEOUT_MS;
@@ -39,7 +39,7 @@ function waitForClawdPort(options, callback) {
 }
 
 function main(deps = {}) {
-  const discover = deps.discoverClawdPort || discoverClawdPort;
+  const discover = deps.discoverDeskBuddyPort || discoverDeskBuddyPort;
   const launch = deps.launchApp || launchApp;
   const exit = deps.exit || ((code) => process.exit(code));
 
@@ -49,8 +49,8 @@ function main(deps = {}) {
       return;
     }
     launch();
-    waitForClawdPort({
-      discoverClawdPort: discover,
+    waitForDeskBuddyPort({
+      discoverDeskBuddyPort: discover,
       setTimeout: deps.setTimeout,
       now: deps.now,
       timeoutMs: deps.startupReadyTimeoutMs,
@@ -111,7 +111,7 @@ function launchApp() {
       }).unref();
     }
   } catch (err) {
-    process.stderr.write(`clawd auto-start: ${err.message}\n`);
+    process.stderr.write(`deskbuddy auto-start: ${err.message}\n`);
   }
 }
 
@@ -122,7 +122,7 @@ module.exports = {
   STARTUP_READY_TIMEOUT_MS,
   STARTUP_DISCOVER_TIMEOUT_MS,
   STARTUP_POLL_INTERVAL_MS,
-  waitForClawdPort,
+  waitForDeskBuddyPort,
   launchApp,
   main,
 };

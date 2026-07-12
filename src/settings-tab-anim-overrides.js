@@ -1,7 +1,7 @@
 "use strict";
 
 (function initSettingsTabAnimOverrides(root) {
-  const animMergeApi = root.ClawdSettingsAnimOverridesMerge || {};
+  const animMergeApi = root.DeskBuddySettingsAnimOverridesMerge || {};
   const getAssetPreviewUrl = animMergeApi.getAssetPreviewUrl || ((asset) => {
     if (!asset) return null;
     if (asset.previewImageUrl) return asset.previewImageUrl;
@@ -744,7 +744,7 @@
     // The "on / off" subtab owns its own theme-override patching (it re-syncs
     // the mounted switches in place, or rebuilds on a theme switch).
     if (runtime.animOverridesSubtab === "map") {
-      const handled = root.ClawdSettingsTabAnimMap.patchMapInPlace(changes);
+      const handled = root.DeskBuddySettingsTabAnimMap.patchMapInPlace(changes);
       // patchMapInPlace only returns true for a themeOverrides (and possibly
       // theme) broadcast — which also makes the cached animation & sound cards
       // stale (e.g. "reset all" wipes the whole theme's overrides). Drop the
@@ -929,7 +929,7 @@
     // the anim-map module. Its own subtitle carries the explanatory copy.
     if (runtime.animOverridesSubtab === "map") {
       parent.appendChild(buildSubtabSwitcher());
-      root.ClawdSettingsTabAnimMap.renderMapSubtab(parent);
+      root.DeskBuddySettingsTabAnimMap.renderMapSubtab(parent);
       return;
     }
 
@@ -2087,5 +2087,5 @@
     };
   }
 
-  root.ClawdSettingsTabAnimOverrides = { init };
+  root.DeskBuddySettingsTabAnimOverrides = { init };
 })(globalThis);

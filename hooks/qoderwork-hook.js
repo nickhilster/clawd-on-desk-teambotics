@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Clawd — QoderWork hook (Phase 1: state-only).
+// DeskBuddy — QoderWork hook (Phase 1: state-only).
 //
 // Registered in ~/.qoderwork/settings.json by hooks/qoderwork-install.js.
 // Reads the hook payload from stdin (JSON with hook_event_name), POSTs a
-// state event to the running Clawd server, and ALWAYS writes `{}` to stdout.
-// Clawd never answers a QoderWork permission decision in Phase 1, so
+// state event to the running DeskBuddy server, and ALWAYS writes `{}` to stdout.
+// DeskBuddy never answers a QoderWork permission decision in Phase 1, so
 // PermissionRequest / PermissionDenied are observed as passive `working`
 // state only and QoderWork's native permission flow stays in control.
 
@@ -17,7 +17,7 @@ const TOOL_MATCH_ARRAY_MAX = 16;
 const TOOL_MATCH_OBJECT_KEYS_MAX = 32;
 const TOOL_MATCH_DEPTH_MAX = 6;
 
-// QoderWork hook event → { state, event } for the Clawd state machine. Every
+// QoderWork hook event → { state, event } for the DeskBuddy state machine. Every
 // event returns `{}` (no gating) in Phase 1.
 const HOOK_MAP = {
   SessionStart:       { state: "idle",         event: "SessionStart" },
@@ -31,7 +31,7 @@ const HOOK_MAP = {
   // flow (file reads, command execution, etc.), NOT user-facing notifications.
   // Map to "working" so the pet stays in its working animation instead of
   // flashing notification repeatedly (40+ events per task). The hook still
-  // returns `{}` — Clawd never answers the permission decision in Phase 1.
+  // returns `{}` — DeskBuddy never answers the permission decision in Phase 1.
   PermissionRequest:  { state: "working",      event: "PreToolUse" },
   PermissionDenied:   { state: "working",      event: "PreToolUse" },
   SessionEnd:         { state: "sleeping",     event: "SessionEnd" },
@@ -123,7 +123,7 @@ const PID_RESOLUTION_SKIP_EVENTS = new Set(["PermissionRequest", "PermissionDeni
 function shouldResolvePid(hookName, env = process.env) {
   return !!HOOK_MAP[hookName]
     && !PID_RESOLUTION_SKIP_EVENTS.has(hookName)
-    && !env.CLAWD_REMOTE;
+    && !env.DESKBUDDY_REMOTE;
 }
 
 function applyLocalProcessFields(body, pidMeta) {
@@ -186,7 +186,7 @@ function buildStateBody(hookName, payload, options = {}) {
     body.session_title = rawTitle;
   } else if (hookName === "UserPromptSubmit" && payload && typeof payload.prompt === "string") {
     // On UserPromptSubmit, use the first non-blank line of the user prompt
-    // as the session title (matches clawd-hook.js behaviour).
+    // as the session title (matches deskbuddy-hook.js behaviour).
     for (const line of payload.prompt.split(/\r?\n/)) {
       const candidate = line.trim();
       if (candidate) {
@@ -218,7 +218,7 @@ function buildStateBody(hookName, payload, options = {}) {
 function sendHookEvent(payload, argvEvent, deps = {}) {
   const env = deps.env || process.env;
   const hookName = resolveHookName(payload, argvEvent);
-  const remote = !!env.CLAWD_REMOTE;
+  const remote = !!env.DESKBUDDY_REMOTE;
   const body = buildStateBody(hookName, payload, {
     remote,
     host: remote && deps.readHostPrefix ? deps.readHostPrefix() : undefined,

@@ -1783,5 +1783,5 @@
     };
   }
 
-  root.ClawdSettingsTabGeneral = { init };
+  root.DeskBuddySettingsTabGeneral = { init };
 })(globalThis);

@@ -18,7 +18,7 @@ const { QODER_HOOK_EVENTS, buildQoderHookCommand } = require("../hooks/qoder-ins
 const tempDirs = [];
 
 function makeTempDir() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-doctor-agent-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-doctor-agent-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -80,7 +80,7 @@ function geminiHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/gem
   for (const event of GEMINI_HOOK_EVENTS) {
     hooks[event] = [{
       matcher: "*",
-      hooks: [{ name: "clawd", type: "command", command: commandForEvent(event) }],
+      hooks: [{ name: "deskbuddy", type: "command", command: commandForEvent(event) }],
     }];
   }
   return hooks;
@@ -103,7 +103,7 @@ function antigravityDescriptor() {
 function antigravityHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/antigravity-hook.js" ${event}`) {
   // D2: state-only — no PreToolUse.
   return {
-    clawd: {
+    deskbuddy: {
       PreInvocation: [{ type: "command", command: commandForEvent("PreInvocation") }],
       PostToolUse: [{
         matcher: "*",
@@ -154,7 +154,7 @@ function qoderHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/qode
   for (const event of QODER_HOOK_EVENTS) {
     hooks[event] = [{
       matcher: "*",
-      hooks: [{ name: "clawd", type: "command", command: commandForEvent(event) }],
+      hooks: [{ name: "deskbuddy", type: "command", command: commandForEvent(event) }],
     }];
   }
   return hooks;
@@ -169,7 +169,7 @@ function codewhaleDescriptor() {
     parentDir,
     configPath: path.join(parentDir, "config.toml"),
     commandMarker: "codewhale-hook.js",
-    marker: "managed by clawd-on-desk",
+    marker: "managed by deskbuddy",
     configMode: "codewhale-hooks-toml",
     hookEvents: CODEWHALE_HOOK_ENTRIES.map((entry) => entry[0]),
   });
@@ -182,7 +182,7 @@ function codewhaleToml(events = CODEWHALE_HOOK_ENTRIES.map((entry) => entry[0]),
     "",
     ...events.flatMap((event) => [
       "[[hooks.hooks]]",
-      "# managed by clawd-on-desk",
+      "# managed by deskbuddy",
       `event = "${event}"`,
       `command = '''${commandForEvent(event)}'''`,
       "background = true",
@@ -196,7 +196,7 @@ function qwenHooksConfig(commandForEvent = (event) => `"/node" "/app/hooks/qwen-
   for (const event of QWEN_CODE_HOOK_EVENTS) {
     hooks[event] = [{
       matcher: "*",
-      hooks: [{ name: "clawd", type: "command", command: commandForEvent(event) }],
+      hooks: [{ name: "deskbuddy", type: "command", command: commandForEvent(event) }],
     }];
   }
   return { hooks };
@@ -282,7 +282,7 @@ describe("checkAgentIntegrations", () => {
     });
     const hermesDescriptor = baseDescriptor({
       agentId: "hermes",
-      marker: "clawd-on-desk",
+      marker: "deskbuddy",
       configMode: "plugin-dir",
     });
 
@@ -318,7 +318,7 @@ describe("checkAgentIntegrations", () => {
     const descriptor = baseDescriptor({
       agentId: "claude-code",
       agentName: "Claude Code",
-      marker: "clawd-hook.js",
+      marker: "deskbuddy-hook.js",
       nested: true,
     });
     writeJson(descriptor.configPath, { hooks: {} });
@@ -351,14 +351,14 @@ describe("checkAgentIntegrations", () => {
     const descriptor = baseDescriptor({
       agentId: "claude-code",
       agentName: "Claude Code",
-      marker: "clawd-hook.js",
+      marker: "deskbuddy-hook.js",
       nested: true,
     });
     writeJson(descriptor.configPath, {
       hooks: {
         Stop: [{
           matcher: "",
-          hooks: [{ command: '"/node" "/app/hooks/clawd-hook.js" Stop' }],
+          hooks: [{ command: '"/node" "/app/hooks/deskbuddy-hook.js" Stop' }],
         }],
       },
     });
@@ -376,7 +376,7 @@ describe("checkAgentIntegrations", () => {
     const descriptor = baseDescriptor({
       agentId: "claude-code",
       agentName: "Claude Code",
-      marker: "clawd-hook.js",
+      marker: "deskbuddy-hook.js",
       nested: true,
     });
     writeJson(descriptor.configPath, { hooks: {} });
@@ -386,7 +386,7 @@ describe("checkAgentIntegrations", () => {
     });
 
     assert.strictEqual(detail.status, "not-connected");
-    assert.match(detail.detail, /has no clawd-hook\.js command/);
+    assert.match(detail.detail, /has no deskbuddy-hook\.js command/);
     assert.doesNotMatch(detail.detail, /paused automatic Claude hook repair/);
     assert.strictEqual(detail.claudeHookGuard, undefined);
   });
@@ -457,7 +457,7 @@ describe("checkAgentIntegrations", () => {
     assert.deepStrictEqual(detail.supplementary, {
       key: "gemini_hooks",
       value: "enabled",
-      detail: "hooksConfig allows Clawd Gemini hooks",
+      detail: "hooksConfig allows DeskBuddy Gemini hooks",
     });
   });
 
@@ -471,7 +471,7 @@ describe("checkAgentIntegrations", () => {
       hooks: {
         BeforeTool: [{
           matcher: "*",
-          hooks: [{ name: "clawd", type: "command", command: '"/node" "/app/hooks/gemini-hook.js" BeforeTool' }],
+          hooks: [{ name: "deskbuddy", type: "command", command: '"/node" "/app/hooks/gemini-hook.js" BeforeTool' }],
         }],
       },
     });
@@ -500,7 +500,7 @@ describe("checkAgentIntegrations", () => {
     const detail = runOne(descriptor);
     assert.strictEqual(detail.status, "not-connected");
     assert.strictEqual(detail.level, "warning");
-    assert.strictEqual(detail.detail, "Gemini hooks are disabled in settings.json; Clawd preserves this user setting and will not receive hook events");
+    assert.strictEqual(detail.detail, "Gemini hooks are disabled in settings.json; DeskBuddy preserves this user setting and will not receive hook events");
     assert.deepStrictEqual(detail.supplementary, {
       key: "gemini_hooks",
       value: "disabled-global",
@@ -519,7 +519,7 @@ describe("checkAgentIntegrations", () => {
       hooks: {
         BeforeTool: [{
           matcher: "*",
-          hooks: [{ name: "clawd", type: "command", command: '"/node" "/app/hooks/gemini-hook.js" BeforeTool' }],
+          hooks: [{ name: "deskbuddy", type: "command", command: '"/node" "/app/hooks/gemini-hook.js" BeforeTool' }],
         }],
       },
       hooksConfig: {
@@ -529,7 +529,7 @@ describe("checkAgentIntegrations", () => {
 
     const detail = runOne(descriptor);
     assert.strictEqual(detail.status, "not-connected");
-    assert.strictEqual(detail.detail, "Gemini hooks are disabled in settings.json; Clawd preserves this user setting and will not receive hook events");
+    assert.strictEqual(detail.detail, "Gemini hooks are disabled in settings.json; DeskBuddy preserves this user setting and will not receive hook events");
     assert.deepStrictEqual(detail.supplementary, {
       key: "gemini_hooks",
       value: "disabled-global",
@@ -538,7 +538,7 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.fixAction, undefined);
   });
 
-  it("turns Gemini ok into warning when hooksConfig.disabled includes clawd", () => {
+  it("turns Gemini ok into warning when hooksConfig.disabled includes deskbuddy", () => {
     const descriptor = baseDescriptor({
       agentId: "gemini-cli",
       marker: "gemini-hook.js",
@@ -547,7 +547,7 @@ describe("checkAgentIntegrations", () => {
     writeJson(descriptor.configPath, {
       hooks: geminiHooksConfig(),
       hooksConfig: {
-        disabled: ["clawd"],
+        disabled: ["deskbuddy"],
       },
     });
 
@@ -556,8 +556,8 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.level, "warning");
     assert.deepStrictEqual(detail.supplementary, {
       key: "gemini_hooks",
-      value: "disabled-clawd",
-      detail: 'hooksConfig.disabled includes "clawd"',
+      value: "disabled-deskbuddy",
+      detail: 'hooksConfig.disabled includes "deskbuddy"',
     });
     assert.strictEqual(detail.fixAction, undefined);
   });
@@ -581,7 +581,7 @@ describe("checkAgentIntegrations", () => {
     assert.deepStrictEqual(detail.supplementary, {
       key: "gemini_hooks",
       value: "enabled",
-      detail: "hooksConfig allows Clawd Gemini hooks",
+      detail: "hooksConfig allows DeskBuddy Gemini hooks",
     });
     assert.strictEqual(detail.fixAction, undefined);
   });
@@ -657,7 +657,7 @@ describe("checkAgentIntegrations", () => {
   it("warns when Antigravity hooks are missing any required event", () => {
     const descriptor = antigravityDescriptor();
     writeAntigravityHooks(descriptor, {
-      clawd: {
+      deskbuddy: {
         PreToolUse: [{
           matcher: "*",
           hooks: [{ type: "command", command: '"/node" "/app/hooks/antigravity-hook.js" PreToolUse' }],
@@ -716,7 +716,7 @@ describe("checkAgentIntegrations", () => {
     assert.deepStrictEqual(detail.supplementary, {
       key: "qwen_hooks",
       value: "enabled",
-      detail: "settings.json allows Clawd Qwen hooks",
+      detail: "settings.json allows DeskBuddy Qwen hooks",
     });
   });
 
@@ -761,7 +761,7 @@ describe("checkAgentIntegrations", () => {
       hooks: {
         PreToolUse: [{
           matcher: "*",
-          hooks: [{ name: "clawd", type: "command", command: '"/node" "/app/hooks/qwen-code-hook.js" PreToolUse' }],
+          hooks: [{ name: "deskbuddy", type: "command", command: '"/node" "/app/hooks/qwen-code-hook.js" PreToolUse' }],
         }],
       },
     });
@@ -786,7 +786,7 @@ describe("checkAgentIntegrations", () => {
 
     assert.strictEqual(detail.status, "not-connected");
     assert.strictEqual(detail.level, "warning");
-    assert.strictEqual(detail.detail, "Qwen Code hooks are disabled in settings.json; Clawd preserves this user setting and will not receive hook events");
+    assert.strictEqual(detail.detail, "Qwen Code hooks are disabled in settings.json; DeskBuddy preserves this user setting and will not receive hook events");
     assert.deepStrictEqual(detail.supplementary, {
       key: "qwen_hooks",
       value: "disabled-global",
@@ -837,7 +837,7 @@ describe("checkAgentIntegrations", () => {
     assert.strictEqual(detail.commandCount, QODER_HOOK_EVENTS.length);
   });
 
-  it("warns and offers repair when Qoder has no Clawd hook", () => {
+  it("warns and offers repair when Qoder has no DeskBuddy hook", () => {
     const descriptor = qoderDescriptor();
     writeJson(descriptor.configPath, { hooks: {} });
 
@@ -908,23 +908,23 @@ describe("checkAgentIntegrations", () => {
     assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "codewhale" });
   });
 
-  it("does not offer automatic repair when Antigravity Clawd hooks are disabled", () => {
+  it("does not offer automatic repair when Antigravity DeskBuddy hooks are disabled", () => {
     const descriptor = antigravityDescriptor();
     writeAntigravityHooks(descriptor, {
-      clawd: {
+      deskbuddy: {
         enabled: false,
-        ...antigravityHooksConfig().clawd,
+        ...antigravityHooksConfig().deskbuddy,
       },
     });
 
     const detail = runOne(descriptor);
 
     assert.strictEqual(detail.status, "not-connected");
-    assert.strictEqual(detail.detail, "Antigravity Clawd hooks are disabled in hooks.json; Clawd preserves this user setting and will not receive hook events");
+    assert.strictEqual(detail.detail, "Antigravity DeskBuddy hooks are disabled in hooks.json; DeskBuddy preserves this user setting and will not receive hook events");
     assert.deepStrictEqual(detail.supplementary, {
       key: "antigravity_hooks",
-      value: "disabled-clawd",
-      detail: "clawd.enabled is false",
+      value: "disabled-deskbuddy",
+      detail: "deskbuddy.enabled is false",
     });
     assert.strictEqual(detail.fixAction, undefined);
   });
@@ -1077,7 +1077,7 @@ describe("checkAgentIntegrations", () => {
   });
 
 
-  // #544: Windows Clawd writes dual-field entries — commandWindows carries
+  // #544: Windows DeskBuddy writes dual-field entries — commandWindows carries
   // the PowerShell form codex actually runs on Windows, command carries a
   // WSL-interop form only executable inside WSL. The doctor must validate
   // the field THIS platform's codex resolves; blanket-validating `command`
@@ -1207,7 +1207,7 @@ describe("checkAgentIntegrations", () => {
       configMode: "dir",
       nested: true,
     });
-    writeJson(path.join(agentsDir, "clawd.json"), {
+    writeJson(path.join(agentsDir, "deskbuddy.json"), {
       hooks: {
         stop: [{ hooks: [{ command: '"/node" "/app/hooks/kiro-hook.js"' }] }],
       },
@@ -1215,7 +1215,7 @@ describe("checkAgentIntegrations", () => {
 
     const detail = runOne(descriptor);
     assert.strictEqual(detail.status, "ok");
-    assert.deepStrictEqual(detail.kiroScan.fullyValidFiles, ["clawd.json"]);
+    assert.deepStrictEqual(detail.kiroScan.fullyValidFiles, ["deskbuddy.json"]);
   });
 
   it("does not offer automatic repair when Kiro agent configs are corrupt", () => {
@@ -1245,11 +1245,11 @@ describe("checkAgentIntegrations", () => {
       agentName: "Pi",
       eventSource: "extension",
       parentDir,
-      configPath: path.join(parentDir, "extensions", "clawd-on-desk"),
+      configPath: path.join(parentDir, "extensions", "deskbuddy"),
       configMode: "pi-extension",
       marker: "index.ts",
       coreFile: "pi-extension-core.js",
-      markerFile: ".clawd-managed.json",
+      markerFile: ".deskbuddy-managed.json",
     });
   }
 
@@ -1278,8 +1278,8 @@ describe("checkAgentIntegrations", () => {
 
   it("reports managed Pi extension as ok", () => {
     const descriptor = piDescriptor();
-    writeJson(path.join(descriptor.configPath, ".clawd-managed.json"), {
-      app: "clawd-on-desk",
+    writeJson(path.join(descriptor.configPath, ".deskbuddy-managed.json"), {
+      app: "deskbuddy",
       integration: "pi",
       managed: true,
     });
@@ -1295,8 +1295,8 @@ describe("checkAgentIntegrations", () => {
 
   it("reports managed Pi extension with missing copied files as repairable broken-path", () => {
     const descriptor = piDescriptor();
-    writeJson(path.join(descriptor.configPath, ".clawd-managed.json"), {
-      app: "clawd-on-desk",
+    writeJson(path.join(descriptor.configPath, ".deskbuddy-managed.json"), {
+      app: "deskbuddy",
       integration: "pi",
       managed: true,
     });
@@ -1339,17 +1339,17 @@ describe("checkAgentIntegrations", () => {
       configPath: path.join(parentDir, "openclaw.json"),
       configMode: "openclaw-plugin",
       marker: "openclaw-plugin",
-      pluginId: "clawd-on-desk",
+      pluginId: "deskbuddy",
     });
   }
 
   function makeOpenClawPluginDir(root) {
     const pluginDir = path.join(root, "hooks", "openclaw-plugin");
     fs.mkdirSync(pluginDir, { recursive: true });
-    fs.writeFileSync(path.join(pluginDir, "index.js"), "export default { id: 'clawd-on-desk', register() {} };\n", "utf8");
+    fs.writeFileSync(path.join(pluginDir, "index.js"), "export default { id: 'deskbuddy', register() {} };\n", "utf8");
     writeJson(path.join(pluginDir, "openclaw.plugin.json"), {
-      id: "clawd-on-desk",
-      name: "Clawd on Desk",
+      id: "deskbuddy",
+      name: "DeskBuddy",
       description: "test",
       activation: { onStartup: true },
       configSchema: { type: "object", additionalProperties: false, properties: {} },
@@ -1387,7 +1387,7 @@ describe("checkAgentIntegrations", () => {
       plugins: {
         load: { paths: [pluginDir] },
         entries: {
-          "clawd-on-desk": {
+          "deskbuddy": {
             enabled: true,
             hooks: { allowConversationAccess: false },
           },
@@ -1407,7 +1407,7 @@ describe("checkAgentIntegrations", () => {
     writeJson(descriptor.configPath, {
       plugins: {
         load: { paths: [pluginDir] },
-        entries: { "clawd-on-desk": { enabled: true } },
+        entries: { "deskbuddy": { enabled: true } },
       },
     });
 
@@ -1421,10 +1421,10 @@ describe("checkAgentIntegrations", () => {
   it("checks Hermes plugin directory files and enabled marker", () => {
     const root = makeTempDir();
     const parentDir = path.join(root, ".hermes");
-    const pluginDir = path.join(parentDir, "plugins", "clawd-on-desk");
+    const pluginDir = path.join(parentDir, "plugins", "deskbuddy");
     const descriptor = baseDescriptor({
       agentId: "hermes",
-      marker: "clawd-on-desk",
+      marker: "deskbuddy",
       parentDir,
       configPath: pluginDir,
       configMode: "plugin-dir",
@@ -1432,9 +1432,9 @@ describe("checkAgentIntegrations", () => {
       configFilePath: path.join(parentDir, "config.yaml"),
     });
     fs.mkdirSync(pluginDir, { recursive: true });
-    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: clawd-on-desk\n", "utf8");
+    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: deskbuddy\n", "utf8");
     fs.writeFileSync(path.join(pluginDir, "__init__.py"), "# plugin\n", "utf8");
-    fs.writeFileSync(descriptor.configFilePath, "plugins:\n  enabled:\n    - clawd-on-desk\n", "utf8");
+    fs.writeFileSync(descriptor.configFilePath, "plugins:\n  enabled:\n    - deskbuddy\n", "utf8");
 
     const detail = runOne(descriptor, {
       prefs: { agents: { hermes: { enabled: true } } },
@@ -1447,10 +1447,10 @@ describe("checkAgentIntegrations", () => {
   it("reports Hermes plugin directory missing managed files as repairable", () => {
     const root = makeTempDir();
     const parentDir = path.join(root, ".hermes");
-    const pluginDir = path.join(parentDir, "plugins", "clawd-on-desk");
+    const pluginDir = path.join(parentDir, "plugins", "deskbuddy");
     const descriptor = baseDescriptor({
       agentId: "hermes",
-      marker: "clawd-on-desk",
+      marker: "deskbuddy",
       parentDir,
       configPath: pluginDir,
       configMode: "plugin-dir",
@@ -1458,7 +1458,7 @@ describe("checkAgentIntegrations", () => {
       configFilePath: path.join(parentDir, "config.yaml"),
     });
     fs.mkdirSync(pluginDir, { recursive: true });
-    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: clawd-on-desk\n", "utf8");
+    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: deskbuddy\n", "utf8");
 
     const detail = runOne(descriptor, {
       prefs: { agents: { hermes: { enabled: true } } },
@@ -1469,13 +1469,13 @@ describe("checkAgentIntegrations", () => {
     assert.deepStrictEqual(detail.fixAction, { type: "agent-integration", agentId: "hermes" });
   });
 
-  it("does not report Hermes ok when clawd-on-desk appears only in disabled plugins", () => {
+  it("does not report Hermes ok when deskbuddy appears only in disabled plugins", () => {
     const root = makeTempDir();
     const parentDir = path.join(root, ".hermes");
-    const pluginDir = path.join(parentDir, "plugins", "clawd-on-desk");
+    const pluginDir = path.join(parentDir, "plugins", "deskbuddy");
     const descriptor = baseDescriptor({
       agentId: "hermes",
-      marker: "clawd-on-desk",
+      marker: "deskbuddy",
       parentDir,
       configPath: pluginDir,
       configMode: "plugin-dir",
@@ -1483,11 +1483,11 @@ describe("checkAgentIntegrations", () => {
       configFilePath: path.join(parentDir, "config.yaml"),
     });
     fs.mkdirSync(pluginDir, { recursive: true });
-    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: clawd-on-desk\n", "utf8");
+    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: deskbuddy\n", "utf8");
     fs.writeFileSync(path.join(pluginDir, "__init__.py"), "# plugin\n", "utf8");
     fs.writeFileSync(
       descriptor.configFilePath,
-      "plugins:\n  enabled: []\n  disabled:\n    - clawd-on-desk\n",
+      "plugins:\n  enabled: []\n  disabled:\n    - deskbuddy\n",
       "utf8"
     );
 
@@ -1503,10 +1503,10 @@ describe("checkAgentIntegrations", () => {
   it("accepts Hermes inline enabled plugin lists", () => {
     const root = makeTempDir();
     const parentDir = path.join(root, ".hermes");
-    const pluginDir = path.join(parentDir, "plugins", "clawd-on-desk");
+    const pluginDir = path.join(parentDir, "plugins", "deskbuddy");
     const descriptor = baseDescriptor({
       agentId: "hermes",
-      marker: "clawd-on-desk",
+      marker: "deskbuddy",
       parentDir,
       configPath: pluginDir,
       configMode: "plugin-dir",
@@ -1514,11 +1514,11 @@ describe("checkAgentIntegrations", () => {
       configFilePath: path.join(parentDir, "config.yaml"),
     });
     fs.mkdirSync(pluginDir, { recursive: true });
-    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: clawd-on-desk\n", "utf8");
+    fs.writeFileSync(path.join(pluginDir, "plugin.yaml"), "name: deskbuddy\n", "utf8");
     fs.writeFileSync(path.join(pluginDir, "__init__.py"), "# plugin\n", "utf8");
     fs.writeFileSync(
       descriptor.configFilePath,
-      "plugins:\n  enabled: [\"clawd-on-desk\"]\n  disabled: []\n",
+      "plugins:\n  enabled: [\"deskbuddy\"]\n  disabled: []\n",
       "utf8"
     );
 
@@ -1533,7 +1533,7 @@ describe("checkAgentIntegrations", () => {
   it("keeps Hermes disabled as info-only by default", () => {
     const descriptor = baseDescriptor({
       agentId: "hermes",
-      marker: "clawd-on-desk",
+      marker: "deskbuddy",
       configMode: "plugin-dir",
     });
 
@@ -1627,7 +1627,7 @@ describe("checkAgentIntegrations", () => {
 
 describe("findOpencodePluginEntry", () => {
   it("matches only absolute plugin entries by basename", () => {
-    const absEntry = "C:\\clawd\\hooks\\opencode-plugin";
+    const absEntry = "C:\\deskbuddy\\hooks\\opencode-plugin";
     assert.strictEqual(
       findOpencodePluginEntry(["vendor/opencode-plugin", absEntry], "opencode-plugin"),
       absEntry
@@ -1637,7 +1637,7 @@ describe("findOpencodePluginEntry", () => {
 
 describe("findOpenClawPluginEntry", () => {
   it("matches only absolute plugin entries by basename", () => {
-    const absEntry = "C:\\clawd\\hooks\\openclaw-plugin";
+    const absEntry = "C:\\deskbuddy\\hooks\\openclaw-plugin";
     assert.strictEqual(
       findOpenClawPluginEntry(["vendor/openclaw-plugin", absEntry], "openclaw-plugin"),
       absEntry

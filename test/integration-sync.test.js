@@ -24,7 +24,7 @@ function makeRuntime(overrides = {}) {
   const repairOptions = [];
   const ctx = {
     autoStartWithClaude: true,
-    syncClawdHooksImpl: (options) => {
+    syncDeskBuddyHooksImpl: (options) => {
       calls.push({ name: "claude", options });
       return { status: "ok", source: "claude" };
     },
@@ -70,10 +70,10 @@ function makeRuntime(overrides = {}) {
 }
 
 describe("integration sync runtime", () => {
-  it("syncClawdHooks passes auto-start and the current server port", () => {
+  it("syncDeskBuddyHooks passes auto-start and the current server port", () => {
     const { runtime, calls } = makeRuntime();
 
-    const result = runtime.syncClawdHooks();
+    const result = runtime.syncDeskBuddyHooks();
 
     assert.deepStrictEqual(result, { status: "ok", source: "claude" });
     assert.deepStrictEqual(calls, [
@@ -429,7 +429,7 @@ describe("integration sync runtime", () => {
   });
 
   it("uninstallIntegrationForAgent passes Codex cleanup markers on the real fallback path", () => {
-    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codex-cleanup-"));
+    const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codex-cleanup-"));
     try {
       const hooksPath = path.join(homeDir, ".codex", "hooks.json");
       fs.mkdirSync(path.dirname(hooksPath), { recursive: true });
@@ -504,7 +504,7 @@ describe("integration sync runtime", () => {
       installed: true,
       skipped: false,
       updated: false,
-      extensionDir: "C:/Users/Tester/.pi/agent/extensions/clawd-on-desk",
+      extensionDir: "C:/Users/Tester/.pi/agent/extensions/deskbuddy",
     });
     console.log = (message) => logs.push(message);
 

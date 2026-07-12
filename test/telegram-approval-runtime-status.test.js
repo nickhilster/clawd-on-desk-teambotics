@@ -247,7 +247,7 @@ test("R2 diagnostic reports native active healthy without exposing recipient ids
   assert.equal(text.includes("telegram:123456789"), false);
 });
 
-test("R3 diagnostic formatter follows the Clawd language setting", () => {
+test("R3 diagnostic formatter follows the DeskBuddy language setting", () => {
   const approvalStatus = buildTelegramApprovalStatus({
     config: COMPLETE_CONFIG_OUTPUT_FULL,
     token: TOKEN_STORED,
@@ -275,7 +275,7 @@ test("R3 diagnostic formatter follows the Clawd language setting", () => {
   });
 
   const text = formatTelegramStatusDiagnostic(diagnostic, { lang: "zh" });
-  assert.match(text, /Clawd Telegram 状态/);
+  assert.match(text, /DeskBuddy Telegram 状态/);
   assert.match(text, /传输: 原生/);
   assert.match(text, /健康状态: 正常/);
   assert.match(text, /原生轮询: 运行中/);
@@ -301,7 +301,7 @@ test("R3 diagnostic formatter localizes status all and falls back to English", (
   };
 
   const ja = formatTelegramStatusDiagnostic(diagnostic, { all: true, lang: "ja" });
-  assert.match(ja, /Clawd Telegram ステータス/);
+  assert.match(ja, /DeskBuddy Telegram ステータス/);
   assert.match(ja, /送信方式: オフ/);
   assert.match(ja, /セッション:\n- なし/);
 

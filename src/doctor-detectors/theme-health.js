@@ -19,7 +19,7 @@ function checkThemeHealth(options = {}) {
       status: "fail",
       level: "warning",
       detail: result.errors.join("; "),
-      textHint: "Open Settings -> Theme and switch to the default 'clawd' theme.",
+      textHint: "Open Settings -> Theme and switch to the default 'deskbuddy' theme.",
       themeId,
       variant,
       result,

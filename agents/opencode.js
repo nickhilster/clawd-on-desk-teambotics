@@ -1,5 +1,5 @@
 // opencode agent configuration
-// Perception via opencode Plugin SDK: event hook → HTTP POST to Clawd
+// Perception via opencode Plugin SDK: event hook → HTTP POST to DeskBuddy
 // Plugin registered in ~/.config/opencode/opencode.json "plugin" array (global scope)
 
 module.exports = {
@@ -7,7 +7,7 @@ module.exports = {
   name: "OpenCode",
   processNames: { win: ["opencode.exe"], mac: ["opencode"], linux: ["opencode"] },
   eventSource: "plugin-event",
-  // Clawd-internal event names (PascalCase) — opencode-plugin/index.mjs translates
+  // DeskBuddy-internal event names (PascalCase) — opencode-plugin/index.mjs translates
   // opencode native events (session.status, message.part.updated, etc) into these.
   // Reusing Claude Code event names lets state.js reuse existing transition logic
   // (e.g. SubagentStop → working whitelist).
@@ -28,7 +28,7 @@ module.exports = {
   },
   capabilities: {
     httpHook: false,         // opencode permission goes via plugin event forward, not HTTP blocking
-    permissionApproval: true, // Phase 2: Clawd bubble → opencode REST reply
+    permissionApproval: true, // Phase 2: DeskBuddy bubble → opencode REST reply
     sessionEnd: true,
     subagent: false,         // Phase 3 will flip to true once subtask lifecycle verified
   },

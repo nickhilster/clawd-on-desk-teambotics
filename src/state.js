@@ -42,7 +42,7 @@ const { CLAUDE_QUOTA_FIELDS } = require("../hooks/claude-rate-limits");
 const {
   readTranscriptTailEntries: readClaudeTranscriptTailEntries,
   extractLastAssistantTextFromEntries: extractLastClaudeAssistantTextFromEntries,
-} = require("../hooks/clawd-hook");
+} = require("../hooks/deskbuddy-hook");
 
 module.exports = function initState(ctx) {
 
@@ -118,7 +118,7 @@ const CLAUDE_ELICITATION_COMPLETION_PROBE_INTERVAL_MS = 3000;
 const CLAUDE_ELICITATION_COMPLETION_PROBE_MAX_MS = 5 * 60 * 1000;
 const CLAUDE_ELICITATION_COMPLETION_TOOLS = new Set(["AskUserQuestion"]);
 function getCompletionDebounceMs(headless) {
-  const raw = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+  const raw = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
   const n = Number.parseInt(raw, 10);
   // Explicit env override wins for every session kind (0 = fully off).
   if (Number.isFinite(n) && n >= 0 && n <= 10000) return n;
@@ -130,7 +130,7 @@ function getCompletionDebounceMs(headless) {
   return headless ? HEADLESS_COMPLETION_DEBOUNCE_MS : 0;
 }
 function getBackgroundTasksCompletionDebounceMs(headless) {
-  const raw = process.env.CLAWD_COMPLETION_DEBOUNCE_MS;
+  const raw = process.env.DESKBUDDY_COMPLETION_DEBOUNCE_MS;
   const n = Number.parseInt(raw, 10);
   if (Number.isFinite(n) && n >= 0 && n <= 10000) return n;
   return Math.max(getCompletionDebounceMs(headless), BACKGROUND_TASKS_COMPLETION_DEBOUNCE_MS);
@@ -223,9 +223,9 @@ const kimiPermissionHolds = new Map();
 // TUI for tens of seconds (phone, lunch, deciding) so we keep this very
 // generous — the precise number isn't load bearing, the per-session cleanup
 // path (cleanStaleSessions / SessionEnd / Kimi event remap) is what should
-// release the hold in practice. Override with CLAWD_KIMI_PERMISSION_MAX_MS.
+// release the hold in practice. Override with DESKBUDDY_KIMI_PERMISSION_MAX_MS.
 function parseKimiHoldMaxMs() {
-  const raw = process.env.CLAWD_KIMI_PERMISSION_MAX_MS;
+  const raw = process.env.DESKBUDDY_KIMI_PERMISSION_MAX_MS;
   const n = Number.parseInt(raw, 10);
   // 0 disables the timer entirely (hold stays until an event or stale-cleanup).
   if (Number.isFinite(n) && n >= 0 && n <= 24 * 60 * 60 * 1000) return n;
@@ -249,7 +249,7 @@ let _lastKimiPulseAt = 0;
 //      for the user — promote to a real permission hold (notification state)
 const kimiPermissionSuspectTimers = new Map();
 function parseSuspectDelay() {
-  const raw = process.env.CLAWD_KIMI_PERMISSION_SUSPECT_MS;
+  const raw = process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT_MS;
   const n = Number.parseInt(raw, 10);
   if (Number.isFinite(n) && n >= 0 && n <= 10000) return n;
   return 800;
@@ -328,7 +328,7 @@ function shouldDropAntigravityPostStopToolUse(existing, state, event, agentId) {
 const QWEN_SELF_SUBMIT_WINDOW_DEFAULT_MS = 2000;
 const QWEN_SELF_SUBMIT_WINDOW_MAX_MS = 10000;
 function getQwenSelfSubmitWindowMs() {
-  const raw = process.env.CLAWD_QWEN_SELF_SUBMIT_WINDOW_MS;
+  const raw = process.env.DESKBUDDY_QWEN_SELF_SUBMIT_WINDOW_MS;
   if (typeof raw !== "string" || !raw.trim()) return QWEN_SELF_SUBMIT_WINDOW_DEFAULT_MS;
   const n = Number.parseInt(raw.trim(), 10);
   if (!Number.isFinite(n) || n < 0 || n > QWEN_SELF_SUBMIT_WINDOW_MAX_MS) {
@@ -339,7 +339,7 @@ function getQwenSelfSubmitWindowMs() {
 function isQwenSelfSubmitFilterEnabled() {
   // Default on. Kill switch for users to disable if qwen ≥0.17 changes the
   // self-submit behavior in a way that breaks this filter.
-  return process.env.CLAWD_QWEN_SELF_SUBMIT_FILTER !== "0";
+  return process.env.DESKBUDDY_QWEN_SELF_SUBMIT_FILTER !== "0";
 }
 
 // ── Stale cleanup ──
@@ -1530,7 +1530,7 @@ function updateSession(sessionId, state, event, opts = {}) {
   //   - Outside the window (real human input)
   //   - Stop has fired AFTER the most recent tool boundary (end-of-turn
   //     reached — any UserPromptSubmit now is real user input)
-  //   - Kill switch CLAWD_QWEN_SELF_SUBMIT_FILTER="0"
+  //   - Kill switch DESKBUDDY_QWEN_SELF_SUBMIT_FILTER="0"
   if (
     event === "UserPromptSubmit"
     && srcAgentId === "qwen-code"

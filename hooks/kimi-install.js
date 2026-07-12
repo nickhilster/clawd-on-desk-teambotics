@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Merge Clawd Kimi hooks into the Kimi CLI config (append-only, idempotent).
+// Merge DeskBuddy Kimi hooks into the Kimi CLI config (append-only, idempotent).
 //
 // Two hook targets exist since the upstream generation change (#563):
 //   - legacy Kimi CLI (Python):    ~/.kimi/config.toml
@@ -25,7 +25,7 @@ const DEFAULT_CONFIG_PATH = path.join(DEFAULT_PARENT_DIR, "config.toml");
 // Kimi Code home. Honors KIMI_CODE_HOME the same way the CLI does
 // (apps/kimi-code/src/utils/paths.ts) so hooks land in the config the CLI
 // actually reads. Resolved at module load; changing the env var requires a
-// Clawd restart, matching how the CLI itself picks it up per process.
+// DeskBuddy restart, matching how the CLI itself picks it up per process.
 const KIMI_CODE_PARENT_DIR =
   typeof process.env.KIMI_CODE_HOME === "string" && process.env.KIMI_CODE_HOME.trim()
     ? process.env.KIMI_CODE_HOME.trim()
@@ -88,7 +88,7 @@ function normalizePermissionMode(value) {
   return null;
 }
 
-// Extract any existing CLAWD_KIMI_PERMISSION_MODE=... prefix from Clawd-owned
+// Extract any existing DESKBUDDY_KIMI_PERMISSION_MODE=... prefix from DeskBuddy-owned
 // hook command lines in config.toml. Used as a fallback when the caller did
 // not pass an explicit mode AND no env var is set — without this, the startup
 // auto-sync would silently strip the prefix written by a previous install,
@@ -96,7 +96,7 @@ function normalizePermissionMode(value) {
 function extractExistingPermissionMode(content) {
   if (typeof content !== "string" || !content) return null;
   // Match both quoting styles. The double-quoted branch must allow `\"` inside
-  // because Clawd installer historically wrote `command = "...\"node\" \"...kimi-hook.js\""`.
+  // because DeskBuddy installer historically wrote `command = "...\"node\" \"...kimi-hook.js\""`.
   // A naive `[^"]*` truncates at the first `\"`, drops MARKER, and silently
   // returns null — which is exactly the regression that erased the user's
   // suspect-mode prefix on startup auto-sync.
@@ -107,7 +107,7 @@ function extractExistingPermissionMode(content) {
       ? unescapeTomlDoubleQuotedCommand(match[1])
       : (match[2] || "");
     if (!value.includes(MARKER)) continue;
-    const modeMatch = value.match(/CLAWD_KIMI_PERMISSION_MODE=([A-Za-z]+)/);
+    const modeMatch = value.match(/DESKBUDDY_KIMI_PERMISSION_MODE=([A-Za-z]+)/);
     if (modeMatch) {
       const normalized = normalizePermissionMode(modeMatch[1]);
       if (normalized) return normalized;
@@ -132,7 +132,7 @@ function findKimiHookCommands(content, marker = MARKER) {
   return commands;
 }
 
-// Remove every [[hooks]] block whose command references Clawd's kimi-hook.js.
+// Remove every [[hooks]] block whose command references DeskBuddy's kimi-hook.js.
 // A block ends at the next TOML section header (`[x]` or `[[x]]`) or EOF —
 // NOT only at the next `[[hooks]]`. Using the narrower lookahead would cause
 // a regex-based pass to greedily swallow any trailing `[server]`, `[mcp]`,
@@ -142,7 +142,7 @@ function findKimiHookCommands(content, marker = MARKER) {
 // legacy migration copied over verbatim (env-prefix commands that are dead on
 // Windows): they carry MARKER, get stripped here and rewritten in the new
 // format.
-function stripClawdKimiHookBlocks(content) {
+function stripDeskBuddyKimiHookBlocks(content) {
   if (typeof content !== "string" || !content) return { content: "", removed: 0 };
   const HEADER_RE = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
   const HOOKS_HEADER_RE = /^\s*\[\[hooks\]\]\s*(?:#.*)?$/;
@@ -270,7 +270,7 @@ function registerKimiHooksAtTarget(target, options = {}) {
   // CLI is not installed, or a custom path points to a non-existent home).
   const kimiDir = target.parentDir;
   if (!fs.existsSync(kimiDir)) {
-    if (!options.silent) console.log(`Clawd: ${kimiDir} not found — skipping Kimi hook registration`);
+    if (!options.silent) console.log(`DeskBuddy: ${kimiDir} not found — skipping Kimi hook registration`);
     return { added: 0, skipped: 0, updated: 0, flavor: target.flavor, settingsPath, present: false };
   }
 
@@ -298,8 +298,8 @@ function registerKimiHooksAtTarget(target, options = {}) {
 
   // Priority: explicit caller option → env var → mode already baked into the
   // existing config.toml hook command. The fallback is critical for the
-  // startup auto-sync path: Clawd launches without the env var, sees an
-  // existing install that was done with CLAWD_KIMI_PERMISSION_MODE=suspect,
+  // startup auto-sync path: DeskBuddy launches without the env var, sees an
+  // existing install that was done with DESKBUDDY_KIMI_PERMISSION_MODE=suspect,
   // and MUST preserve that prefix so the user's persistent choice survives.
   // (Legacy target only — see targetDefinition for why kimi-code never gets one.)
   let modePrefix = "";
@@ -307,10 +307,10 @@ function registerKimiHooksAtTarget(target, options = {}) {
     const providedMode = normalizePermissionMode(
       options.permissionMode !== undefined
         ? options.permissionMode
-        : process.env.CLAWD_KIMI_PERMISSION_MODE
+        : process.env.DESKBUDDY_KIMI_PERMISSION_MODE
     );
     const configuredMode = providedMode || extractExistingPermissionMode(content);
-    modePrefix = configuredMode ? `CLAWD_KIMI_PERMISSION_MODE=${configuredMode} ` : "";
+    modePrefix = configuredMode ? `DESKBUDDY_KIMI_PERMISSION_MODE=${configuredMode} ` : "";
   }
   const desiredCommand = `${modePrefix}"${nodeBin}" "${hookScript}"`;
 
@@ -322,11 +322,11 @@ function registerKimiHooksAtTarget(target, options = {}) {
   const existingMatches = [...content.matchAll(markerRegex)];
 
   if (existingMatches.length > 0) {
-    // Normalize + de-duplicate all Clawd-owned Kimi hook blocks. A stale extra
+    // Normalize + de-duplicate all DeskBuddy-owned Kimi hook blocks. A stale extra
     // block can fire duplicate PreToolUse events that cancel suspect timers and
     // suppress notification animation. On kimi-code this is also what upgrades
     // entries the upstream migration copied from ~/.kimi verbatim.
-    const stripped = stripClawdKimiHookBlocks(content);
+    const stripped = stripDeskBuddyKimiHookBlocks(content);
     let normalized = stripped.content;
     normalized = normalized.replace(/^hooks\s*=\s*\[\]\s*$/m, "");
     normalized = normalized.trimEnd() + "\n\n" + hookBlocks;
@@ -337,7 +337,7 @@ function registerKimiHooksAtTarget(target, options = {}) {
       fs.writeFileSync(settingsPath, content);
     }
     if (!options.silent) {
-      console.log(`Clawd Kimi hooks → ${settingsPath}`);
+      console.log(`DeskBuddy Kimi hooks → ${settingsPath}`);
       if (updated > 0) {
         console.log(`  Updated: normalized ${existingMatches.length} existing hook command(s)`);
         if (stripped.removed > target.events.length) {
@@ -360,7 +360,7 @@ function registerKimiHooksAtTarget(target, options = {}) {
   fs.writeFileSync(settingsPath, content);
 
   if (!options.silent) {
-    console.log(`Clawd Kimi hooks → ${settingsPath}`);
+    console.log(`DeskBuddy Kimi hooks → ${settingsPath}`);
     console.log(`  Added: ${target.events.length} hooks`);
   }
 
@@ -368,7 +368,7 @@ function registerKimiHooksAtTarget(target, options = {}) {
 }
 
 /**
- * Register Clawd hooks into the Kimi config(s).
+ * Register DeskBuddy hooks into the Kimi config(s).
  *
  * Default (no settingsPath): sync BOTH generations — legacy ~/.kimi and
  * kimi-code ~/.kimi-code — installing into whichever directories exist.
@@ -404,7 +404,7 @@ function registerKimiHooks(options = {}) {
         flavor: target.flavor, settingsPath: target.settingsPath, present: false,
         error: err && err.message ? err.message : String(err),
       });
-      if (!options.silent) console.warn(`Clawd: Kimi hook sync failed for ${target.settingsPath}: ${err.message}`);
+      if (!options.silent) console.warn(`DeskBuddy: Kimi hook sync failed for ${target.settingsPath}: ${err.message}`);
     }
   }
   return aggregateRegisterResults(results, errors);
@@ -444,7 +444,7 @@ function unregisterKimiHooksAtPath(settingsPath, options = {}) {
     throw new Error(`Failed to read config.toml: ${err.message}`);
   }
 
-  const stripped = stripClawdKimiHookBlocks(content);
+  const stripped = stripDeskBuddyKimiHookBlocks(content);
   const changed = stripped.content !== content;
   let backupPath = null;
   if (changed) backupPath = writeTextAtomicWithBackup(settingsPath, stripped.content, options);
@@ -454,7 +454,7 @@ function unregisterKimiHooksAtPath(settingsPath, options = {}) {
 }
 
 /**
- * Remove Clawd hooks from the Kimi config(s). Default: both generations.
+ * Remove DeskBuddy hooks from the Kimi config(s). Default: both generations.
  * options.settingsPaths (array) or options.settingsPath (string) narrows it.
  */
 function unregisterKimiHooks(options = {}) {
@@ -467,7 +467,7 @@ function unregisterKimiHooks(options = {}) {
   const results = paths.map((settingsPath) => unregisterKimiHooksAtPath(settingsPath, options));
   const removed = results.reduce((sum, r) => sum + (r.removed || 0), 0);
   const changed = results.some((r) => r.changed);
-  if (!options.silent) console.log(`Clawd Kimi hooks removed: ${removed}`);
+  if (!options.silent) console.log(`DeskBuddy Kimi hooks removed: ${removed}`);
   const primary = results.find((r) => r.changed) || results[0];
   const aggregate = {
     removed,
@@ -497,7 +497,7 @@ module.exports = {
   normalizePermissionMode,
   extractExistingPermissionMode,
   findKimiHookCommands,
-  stripClawdKimiHookBlocks,
+  stripDeskBuddyKimiHookBlocks,
   validateKimiCodeHookBlocks,
   aggregateRegisterResults,
   MODE_EXPLICIT,

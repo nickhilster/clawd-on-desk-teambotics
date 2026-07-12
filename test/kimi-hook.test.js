@@ -137,13 +137,13 @@ describe("Kimi hook script", () => {
   });
 
   it("defaults to explicit-only (no suspect) for permission tools without explicit signal", () => {
-    const oldDisable = process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-    const oldImmediate = process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
-    const oldSuspect = process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
+    const oldDisable = process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+    const oldImmediate = process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
+    const oldSuspect = process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
     try {
-      delete process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-      delete process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
-      delete process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
+      delete process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+      delete process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
+      delete process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
       const resolve = () => ({
         stablePid: 12345,
         agentPid: null,
@@ -165,19 +165,19 @@ describe("Kimi hook script", () => {
         "none"
       );
     } finally {
-      if (oldDisable == null) delete process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-      else process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION = oldDisable;
-      if (oldImmediate == null) delete process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
-      else process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE = oldImmediate;
-      if (oldSuspect == null) delete process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
-      else process.env.CLAWD_KIMI_PERMISSION_SUSPECT = oldSuspect;
+      if (oldDisable == null) delete process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+      else process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION = oldDisable;
+      if (oldImmediate == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE = oldImmediate;
+      if (oldSuspect == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT = oldSuspect;
     }
   });
 
-  it("CLAWD_KIMI_PERMISSION_SUSPECT=1 enables deferred suspect mode", () => {
-    const oldSuspect = process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
+  it("DESKBUDDY_KIMI_PERMISSION_SUSPECT=1 enables deferred suspect mode", () => {
+    const oldSuspect = process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
     try {
-      process.env.CLAWD_KIMI_PERMISSION_SUSPECT = "1";
+      process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT = "1";
       const resolve = () => ({
         stablePid: 12345,
         agentPid: null,
@@ -197,37 +197,37 @@ describe("Kimi hook script", () => {
         "suspect"
       );
     } finally {
-      if (oldSuspect == null) delete process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
-      else process.env.CLAWD_KIMI_PERMISSION_SUSPECT = oldSuspect;
+      if (oldSuspect == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT = oldSuspect;
     }
   });
 
-  it("CLAWD_KIMI_PERMISSION_MODE controls default classification persistently", () => {
-    const oldMode = process.env.CLAWD_KIMI_PERMISSION_MODE;
+  it("DESKBUDDY_KIMI_PERMISSION_MODE controls default classification persistently", () => {
+    const oldMode = process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
     try {
-      process.env.CLAWD_KIMI_PERMISSION_MODE = MODE_SUSPECT;
+      process.env.DESKBUDDY_KIMI_PERMISSION_MODE = MODE_SUSPECT;
       assert.strictEqual(readPermissionMode(), MODE_SUSPECT);
       assert.strictEqual(
         classifyPreTool("PreToolUse", { tool_name: "shell" }),
         "suspect"
       );
 
-      process.env.CLAWD_KIMI_PERMISSION_MODE = MODE_EXPLICIT;
+      process.env.DESKBUDDY_KIMI_PERMISSION_MODE = MODE_EXPLICIT;
       assert.strictEqual(readPermissionMode(), MODE_EXPLICIT);
       assert.strictEqual(
         classifyPreTool("PreToolUse", { tool_name: "shell" }),
         "none"
       );
     } finally {
-      if (oldMode == null) delete process.env.CLAWD_KIMI_PERMISSION_MODE;
-      else process.env.CLAWD_KIMI_PERMISSION_MODE = oldMode;
+      if (oldMode == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_MODE;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_MODE = oldMode;
     }
   });
 
-  it("CLAWD_KIMI_PERMISSION_IMMEDIATE=1 restores legacy instant notification mapping", () => {
-    const oldImmediate = process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
+  it("DESKBUDDY_KIMI_PERMISSION_IMMEDIATE=1 restores legacy instant notification mapping", () => {
+    const oldImmediate = process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
     try {
-      process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE = "1";
+      process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE = "1";
       const resolve = () => ({
         stablePid: 12345,
         agentPid: null,
@@ -247,15 +247,15 @@ describe("Kimi hook script", () => {
         "immediate"
       );
     } finally {
-      if (oldImmediate == null) delete process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
-      else process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE = oldImmediate;
+      if (oldImmediate == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE = oldImmediate;
     }
   });
 
   it("keeps PreToolUse as working without permission_suspect when disable env is set", () => {
-    const old = process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
+    const old = process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
     try {
-      process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION = "1";
+      process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION = "1";
       const resolve = () => ({
         stablePid: 12345,
         agentPid: null,
@@ -271,15 +271,15 @@ describe("Kimi hook script", () => {
       assert.strictEqual(body.event, "PreToolUse");
       assert.notStrictEqual(body.permission_suspect, true);
     } finally {
-      if (old == null) delete process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-      else process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION = old;
+      if (old == null) delete process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+      else process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION = old;
     }
   });
 
   it("still remaps to PermissionRequest when disable env is set but payload is explicit", () => {
-    const old = process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
+    const old = process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
     try {
-      process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION = "1";
+      process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION = "1";
       const resolve = () => ({
         stablePid: 12345,
         agentPid: null,
@@ -299,8 +299,8 @@ describe("Kimi hook script", () => {
       assert.strictEqual(body.state, "notification");
       assert.strictEqual(body.event, "PermissionRequest");
     } finally {
-      if (old == null) delete process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-      else process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION = old;
+      if (old == null) delete process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+      else process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION = old;
     }
   });
 
@@ -434,27 +434,27 @@ describe("Kimi hook script", () => {
   });
 
   it("allows overriding permission tools through env parser", () => {
-    const old = process.env.CLAWD_KIMI_PERMISSION_TOOLS;
+    const old = process.env.DESKBUDDY_KIMI_PERMISSION_TOOLS;
     try {
-      delete process.env.CLAWD_KIMI_PERMISSION_TOOLS;
+      delete process.env.DESKBUDDY_KIMI_PERMISSION_TOOLS;
       assert.deepStrictEqual([...resolvePermissionTools()], DEFAULT_PERMISSION_TOOLS);
 
-      process.env.CLAWD_KIMI_PERMISSION_TOOLS = "shell,ask_user_question";
+      process.env.DESKBUDDY_KIMI_PERMISSION_TOOLS = "shell,ask_user_question";
       assert.deepStrictEqual([...resolvePermissionTools()], ["shell", "askuserquestion"]);
     } finally {
-      if (old == null) delete process.env.CLAWD_KIMI_PERMISSION_TOOLS;
-      else process.env.CLAWD_KIMI_PERMISSION_TOOLS = old;
+      if (old == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_TOOLS;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_TOOLS = old;
     }
   });
 
   it("classifyPreTool: default / immediate / disable / explicit matrix", () => {
-    const oldDisable = process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-    const oldImmediate = process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
-    const oldSuspect = process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
+    const oldDisable = process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+    const oldImmediate = process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
+    const oldSuspect = process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
     try {
-      delete process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-      delete process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
-      delete process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
+      delete process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+      delete process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
+      delete process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
 
       // Non-permission tools are classified as "none" (no signal at all).
       assert.strictEqual(
@@ -475,7 +475,7 @@ describe("Kimi hook script", () => {
 
       // Disable remains compatible: no animation at all unless payload
       // explicitly says so).
-      process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION = "1";
+      process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION = "1";
       assert.strictEqual(
         classifyPreTool("PreToolUse", { tool_name: "shell" }),
         "none"
@@ -488,18 +488,18 @@ describe("Kimi hook script", () => {
         }),
         "immediate"
       );
-      delete process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
+      delete process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
 
       // Suspect mode is opt-in.
-      process.env.CLAWD_KIMI_PERMISSION_SUSPECT = "1";
+      process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT = "1";
       assert.strictEqual(
         classifyPreTool("PreToolUse", { tool_name: "shell" }),
         "suspect"
       );
-      delete process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
+      delete process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
 
       // Immediate legacy switch: gated tools → immediate unconditionally.
-      process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE = "1";
+      process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE = "1";
       assert.strictEqual(
         classifyPreTool("PreToolUse", { tool_name: "shell" }),
         "immediate"
@@ -509,39 +509,39 @@ describe("Kimi hook script", () => {
         true
       );
     } finally {
-      if (oldDisable == null) delete process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION;
-      else process.env.CLAWD_KIMI_DISABLE_PRETOOL_PERMISSION = oldDisable;
-      if (oldImmediate == null) delete process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE;
-      else process.env.CLAWD_KIMI_PERMISSION_IMMEDIATE = oldImmediate;
-      if (oldSuspect == null) delete process.env.CLAWD_KIMI_PERMISSION_SUSPECT;
-      else process.env.CLAWD_KIMI_PERMISSION_SUSPECT = oldSuspect;
+      if (oldDisable == null) delete process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION;
+      else process.env.DESKBUDDY_KIMI_DISABLE_PRETOOL_PERMISSION = oldDisable;
+      if (oldImmediate == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_IMMEDIATE = oldImmediate;
+      if (oldSuspect == null) delete process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT;
+      else process.env.DESKBUDDY_KIMI_PERMISSION_SUSPECT = oldSuspect;
     }
   });
 
   it("uses default debug log size cap when env is unset/invalid", () => {
-    const old = process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES;
+    const old = process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES;
     try {
-      delete process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES;
+      delete process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES;
       assert.strictEqual(readHookDebugMaxBytes(), DEFAULT_HOOK_DEBUG_MAX_BYTES);
 
-      process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES = "not-a-number";
+      process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES = "not-a-number";
       assert.strictEqual(readHookDebugMaxBytes(), DEFAULT_HOOK_DEBUG_MAX_BYTES);
     } finally {
-      if (old == null) delete process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES;
-      else process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES = old;
+      if (old == null) delete process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES;
+      else process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES = old;
     }
   });
 
   it("stops writing debug log when file reaches max bytes cap", () => {
-    const oldDebug = process.env.CLAWD_KIMI_HOOK_DEBUG;
-    const oldPath = process.env.CLAWD_KIMI_HOOK_DEBUG_PATH;
-    const oldMax = process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES;
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-kimi-hook-"));
+    const oldDebug = process.env.DESKBUDDY_KIMI_HOOK_DEBUG;
+    const oldPath = process.env.DESKBUDDY_KIMI_HOOK_DEBUG_PATH;
+    const oldMax = process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES;
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-kimi-hook-"));
     const debugFile = path.join(tmpDir, "kimi-hook-debug.jsonl");
     try {
-      process.env.CLAWD_KIMI_HOOK_DEBUG = "1";
-      process.env.CLAWD_KIMI_HOOK_DEBUG_PATH = debugFile;
-      process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES = "30";
+      process.env.DESKBUDDY_KIMI_HOOK_DEBUG = "1";
+      process.env.DESKBUDDY_KIMI_HOOK_DEBUG_PATH = debugFile;
+      process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES = "30";
 
       appendHookDebug({ a: "1234567890" });
       const first = fs.readFileSync(debugFile, "utf8");
@@ -552,12 +552,12 @@ describe("Kimi hook script", () => {
       assert.strictEqual(second, first);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
-      if (oldDebug == null) delete process.env.CLAWD_KIMI_HOOK_DEBUG;
-      else process.env.CLAWD_KIMI_HOOK_DEBUG = oldDebug;
-      if (oldPath == null) delete process.env.CLAWD_KIMI_HOOK_DEBUG_PATH;
-      else process.env.CLAWD_KIMI_HOOK_DEBUG_PATH = oldPath;
-      if (oldMax == null) delete process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES;
-      else process.env.CLAWD_KIMI_HOOK_DEBUG_MAX_BYTES = oldMax;
+      if (oldDebug == null) delete process.env.DESKBUDDY_KIMI_HOOK_DEBUG;
+      else process.env.DESKBUDDY_KIMI_HOOK_DEBUG = oldDebug;
+      if (oldPath == null) delete process.env.DESKBUDDY_KIMI_HOOK_DEBUG_PATH;
+      else process.env.DESKBUDDY_KIMI_HOOK_DEBUG_PATH = oldPath;
+      if (oldMax == null) delete process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES;
+      else process.env.DESKBUDDY_KIMI_HOOK_DEBUG_MAX_BYTES = oldMax;
     }
   });
 });

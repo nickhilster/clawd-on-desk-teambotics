@@ -41,7 +41,7 @@ function loadSettingsI18nStrings() {
   const context = {};
   context.globalThis = context;
   vm.runInNewContext(source, context);
-  return context.ClawdSettingsI18n.STRINGS;
+  return context.DeskBuddySettingsI18n.STRINGS;
 }
 
 function loadBubbleStrings() {

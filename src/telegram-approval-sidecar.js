@@ -12,14 +12,14 @@ const DEFAULT_RESTART_WINDOW_MS = 60000;
 const DEFAULT_RESTART_LIMIT = 3;
 const DEFAULT_RESTART_BACKOFF_MS = 1000;
 const MAX_HANDSHAKE_BUFFER = 8192;
-const SIDECAR_ENV_CONFIG = "CLAWD_BRIDGE_CONFIG";
-const SIDECAR_ENV_TOKEN_FILE = "CLAWD_TG_BOT_TOKEN_FILE";
-const SIDECAR_PATH_ENV = "CLAWD_CC_CONNECT_CLAWD_PATH";
-const SIDECAR_BINARY_BASENAME = "cc-connect-clawd";
-const SIDECAR_RESOURCE_ROOT = path.join("sidecars", "cc-connect-clawd");
+const SIDECAR_ENV_CONFIG = "DESKBUDDY_BRIDGE_CONFIG";
+const SIDECAR_ENV_TOKEN_FILE = "DESKBUDDY_TG_BOT_TOKEN_FILE";
+const SIDECAR_PATH_ENV = "DESKBUDDY_DESKBUDDY_CONNECT_PATH";
+const SIDECAR_BINARY_BASENAME = "deskbuddy-connect";
+const SIDECAR_RESOURCE_ROOT = path.join("sidecars", "deskbuddy-connect");
 const DEV_FETCH_TARGETS = new Set(["windows-x64", "windows-arm64", "darwin-x64", "darwin-arm64", "linux-x64"]);
 // Note: the sidecar reads the token from the env-file at SIDECAR_ENV_TOKEN_FILE
-// (which itself contains a line like `CLAWD_TG_BOT_TOKEN=<token>`). Clawd's
+// (which itself contains a line like `DESKBUDDY_TG_BOT_TOKEN=<token>`). DeskBuddy's
 // main process MUST NOT pipe a token into the child env directly — that path
 // was removed so the token can only live on disk at the userData env-file.
 
@@ -175,7 +175,7 @@ function resolveSidecarBinary(options = {}) {
   }
 
   return {
-    path: path.join(__dirname, "..", "bin", "cc-connect-clawd", sidecarPlatformArchDir({ platform, arch }), sidecarExecutableName(platform)),
+    path: path.join(__dirname, "..", "bin", "deskbuddy-connect", sidecarPlatformArchDir({ platform, arch }), sidecarExecutableName(platform)),
     source: "dev",
   };
 }
@@ -185,7 +185,7 @@ function resolveSidecarBinaryPath(options = {}) {
 }
 
 function defaultConfigPath(userDataDir) {
-  return userDataDir ? path.join(userDataDir, "cc-connect-clawd", "clawd-bridge.toml") : "";
+  return userDataDir ? path.join(userDataDir, "deskbuddy-connect", "deskbuddy-bridge.toml") : "";
 }
 
 function defaultTokenEnvFilePath(userDataDir) {
@@ -438,7 +438,7 @@ class TelegramApprovalSidecar extends EventEmitter {
   _handleStderr(chunk) {
     this.stderrBuffer += String(chunk || "");
     // Cap the buffer so a sidecar emitting megabytes of unterminated output
-    // can't blow up Clawd memory. Once the cap trips we flush what we have as
+    // can't blow up DeskBuddy memory. Once the cap trips we flush what we have as
     // a single (redacted) line — better to log a slightly-truncated message
     // than to retain unbounded raw bytes that might contain a half-token.
     if (this.stderrBuffer.length > MAX_HANDSHAKE_BUFFER) {

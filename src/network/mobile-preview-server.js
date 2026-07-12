@@ -30,7 +30,7 @@ const GRACE_PERIOD_MS = 5 * 60 * 1000;          // 5 minutes
 const ROTATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const PWA_DIR = path.resolve(__dirname, "../../pwa");
-const TOKEN_PATH = path.join(os.homedir(), ".clawd", "mobile-token.json");
+const TOKEN_PATH = path.join(os.homedir(), ".deskbuddy", "mobile-token.json");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -103,7 +103,7 @@ function initMobilePreviewServer(ctx) {
   const clientTimeoutMs = (ctx && ctx.clientTimeoutMs) || CLIENT_TIMEOUT_MS;
   const tokenState = loadOrCreateTokenState(tokenPath, now, writeTokenState);
   const machineId = tokenState.machineId;
-  const machineName = os.hostname() || "clawd";
+  const machineName = os.hostname() || "deskbuddy";
   const clients = new Set();
   const clientMeta = new Map();
   let sessionCache = new Map();
@@ -494,10 +494,10 @@ function initMobilePreviewServer(ctx) {
       bonjourService = bonjourInstance.publish({
         name: `deskbuddy-${machineId.slice(0, 8)}`,
         // NOTE: service "type" is a discovery-protocol identifier the Android
-        // app matches against, not user-facing branding — left as "clawd" so
+        // app matches against, not user-facing branding — left as "deskbuddy" so
         // existing mobile pairings keep working. Change both sides together
         // if this is ever renamed.
-        type: "clawd",
+        type: "deskbuddy",
         protocol: "tcp",
         port: activePort,
         host: os.hostname(),
@@ -507,7 +507,7 @@ function initMobilePreviewServer(ctx) {
           version: PROTOCOL_VERSION,
         },
       });
-      console.log(`[mobile-preview] mDNS advertised as deskbuddy-${machineId.slice(0, 8)}._clawd._tcp.local`);
+      console.log(`[mobile-preview] mDNS advertised as deskbuddy-${machineId.slice(0, 8)}._deskbuddy._tcp.local`);
     } catch (err) {
       console.error("[mobile-preview] mDNS advertisement failed:", err.message);
     }

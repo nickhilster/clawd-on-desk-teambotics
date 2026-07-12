@@ -417,5 +417,5 @@
     return list;
   }
 
-  root.ClawdSettingsHardwareBuddyPanel = { build };
+  root.DeskBuddySettingsHardwareBuddyPanel = { build };
 })(globalThis);

@@ -24,7 +24,7 @@ const posixOnly = { skip: process.platform === "win32" ? "requires POSIX /bin/sh
 const windowsOnly = { skip: process.platform !== "win32" ? "requires Windows PowerShell" : false };
 
 function makeTempHome({ withConfig = true } = {}) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-home-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-home-"));
   tempDirs.push(home);
   if (withConfig) fs.mkdirSync(path.join(home, ".gemini", "config"), { recursive: true });
   return home;
@@ -37,7 +37,7 @@ function readJson(filePath) {
 function listCleanupBackups(filePath) {
   const dir = path.dirname(filePath);
   const base = path.basename(filePath);
-  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.clawd-cleanup-`));
+  return fs.readdirSync(dir).filter((name) => name.startsWith(`${base}.deskbuddy-cleanup-`));
 }
 
 function decodeEncodedCommand(command) {
@@ -134,7 +134,7 @@ describe("Antigravity hook installer", () => {
     assert.ok(hooks[HOOK_GROUP_ID]);
   });
 
-  it("preserves a manually disabled Clawd hook group (enabled:false carries over)", () => {
+  it("preserves a manually disabled DeskBuddy hook group (enabled:false carries over)", () => {
     const homeDir = makeTempHome();
     const configPath = path.join(homeDir, ".gemini", "config", "hooks.json");
     fs.writeFileSync(configPath, JSON.stringify({ [HOOK_GROUP_ID]: { enabled: false } }));
@@ -185,9 +185,9 @@ describe("Antigravity hook installer", () => {
   });
 
   it("strips a legacy PreToolUse entry on auto-sync (D2 migration)", () => {
-    // Simulates a user who installed Clawd before the D2 decision. Their
-    // hooks.json has a Clawd-owned PreToolUse entry. Next startup sync
-    // must rewrite the clawd group to the new 4-event shape, removing
+    // Simulates a user who installed DeskBuddy before the D2 decision. Their
+    // hooks.json has a DeskBuddy-owned PreToolUse entry. Next startup sync
+    // must rewrite the deskbuddy group to the new 4-event shape, removing
     // the orphan PreToolUse without manual action.
     const homeDir = makeTempHome();
     const configPath = path.join(homeDir, ".gemini", "config", "hooks.json");
@@ -254,7 +254,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("overrides partial POSIX hook stdout when Node exits nonzero", posixOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-partial-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-partial-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "partial-hook.js");
     fs.writeFileSync(scriptPath, "process.stdout.write('PARTIAL-NOT-JSON'); process.exit(1);", "utf8");
@@ -276,7 +276,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("falls back when a POSIX hook exits successfully with empty stdout", posixOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-empty-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-empty-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "empty-hook.js");
     fs.writeFileSync(scriptPath, "process.exit(0);\n", "utf8");
@@ -298,7 +298,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("preserves successful POSIX multiline stdout and suppresses stderr", posixOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-multiline-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-multiline-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "multiline-hook.js");
     fs.writeFileSync(
@@ -324,7 +324,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("falls back when a POSIX hook prints non-JSON on a zero exit", posixOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-nonjson-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-nonjson-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "nonjson-hook.js");
     fs.writeFileSync(scriptPath, "process.stdout.write('{bad}'); process.exit(0);", "utf8");
@@ -346,7 +346,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("fails open when a POSIX hook exceeds the internal timeout", posixOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-timeout-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-timeout-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "timeout-hook.js");
     fs.writeFileSync(scriptPath, "setTimeout(() => process.stdout.write('{}'), 5000);", "utf8");
@@ -383,7 +383,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("falls back on Windows when the hook prints non-JSON on a zero exit", windowsOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-winjson-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-winjson-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "antigravity-hook.js");
     fs.writeFileSync(scriptPath, "process.stdout.write('{bad}'); process.exit(0);", "utf8");
@@ -400,7 +400,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("preserves successful Windows hook stdout and suppresses stderr", windowsOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-winok-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-winok-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "antigravity-hook.js");
     fs.writeFileSync(
@@ -423,7 +423,7 @@ describe("Antigravity hook installer", () => {
   });
 
   it("fails open when a Windows hook exceeds the internal timeout", windowsOnly, () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-wintimeout-"));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-wintimeout-"));
     tempDirs.push(tmpDir);
     const scriptPath = path.join(tmpDir, "antigravity-hook.js");
     fs.writeFileSync(scriptPath, "setTimeout(() => process.stdout.write('{}'), 5000);", "utf8");
@@ -445,7 +445,7 @@ describe("Antigravity hook installer", () => {
   it("builds Windows PowerShell bridge commands with fail-open fallback", () => {
     const command = __test.buildAntigravityHookCommand(
       "C:\\Program Files\\nodejs\\node.exe",
-      "D:/clawd/hooks/antigravity-hook.js",
+      "D:/deskbuddy/hooks/antigravity-hook.js",
       "PreToolUse",
       { platform: "win32", powerShellBin: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" }
     );
@@ -455,7 +455,7 @@ describe("Antigravity hook installer", () => {
     assert.ok(decoded.includes("$ErrorActionPreference='SilentlyContinue'"));
     assert.ok(decoded.includes("$psi = New-Object System.Diagnostics.ProcessStartInfo"));
     assert.ok(decoded.includes("$psi.FileName = 'C:\\Program Files\\nodejs\\node.exe'"));
-    assert.ok(decoded.includes("$psi.Arguments = 'D:/clawd/hooks/antigravity-hook.js PreToolUse'"));
+    assert.ok(decoded.includes("$psi.Arguments = 'D:/deskbuddy/hooks/antigravity-hook.js PreToolUse'"));
     assert.ok(decoded.includes("if ($proc.WaitForExit(8000))"));
     assert.ok(decoded.includes("ConvertFrom-Json -ErrorAction Stop"));
     assert.ok(decoded.includes("[Console]::Out.WriteLine( '{\"decision\":\"ask\"}' )"));
@@ -488,7 +488,7 @@ describe("Antigravity hook installer", () => {
     const nodeBin = "C:\\Program Files\\nodejs\\node.exe";
     const resolved = __test.resolveAntigravityNodeBin({
       platform: "win32",
-      execPath: "C:\\Program Files\\Clawd\\Clawd.exe",
+      execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
       execFileSync: () => `${nodeBin}\r\n`,
       accessSync: (candidate) => {
         if (candidate !== nodeBin) throw new Error(`unexpected access: ${candidate}`);
@@ -501,7 +501,7 @@ describe("Antigravity hook installer", () => {
   it("ignores Windows scoop shims through the shared node resolver", () => {
     const resolved = __test.resolveAntigravityNodeBin({
       platform: "win32",
-      execPath: "C:\\Program Files\\Clawd\\Clawd.exe",
+      execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
       execFileSync: () => "C:\\Users\\me\\scoop\\shims\\node.exe\r\n",
       accessSync: () => {},
       env: {
@@ -528,7 +528,7 @@ describe("Antigravity hook installer", () => {
       silent: true,
       homeDir,
       platform: "win32",
-      execPath: "C:\\Program Files\\Clawd\\Clawd.exe",
+      execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
       execFileSync: () => { throw new Error("where failed"); },
       accessSync: () => { throw new Error("missing"); },
       powerShellBin: options.powerShellBin,
@@ -540,7 +540,7 @@ describe("Antigravity hook installer", () => {
     assert.match(decodeEncodedCommand(hooks[HOOK_GROUP_ID].PreInvocation[0].command), /C:\\Tools\\node\.exe/);
   });
 
-  it("unregister removes the clawd group only when it contains a Clawd marker", () => {
+  it("unregister removes the deskbuddy group only when it contains a DeskBuddy marker", () => {
     const homeDir = makeTempHome();
     const configPath = path.join(homeDir, ".gemini", "config", "hooks.json");
     fs.writeFileSync(configPath, JSON.stringify({
@@ -567,12 +567,12 @@ describe("Antigravity hook installer", () => {
     assert.strictEqual(listCleanupBackups(configPath).length, 1);
   });
 
-  it("unregister preserves a same-name clawd group without a Clawd marker", () => {
+  it("unregister preserves a same-name deskbuddy group without a DeskBuddy marker", () => {
     const homeDir = makeTempHome();
     const configPath = path.join(homeDir, ".gemini", "config", "hooks.json");
     const original = {
       [HOOK_GROUP_ID]: {
-        Stop: [{ type: "command", command: "echo user-owned clawd group" }],
+        Stop: [{ type: "command", command: "echo user-owned deskbuddy group" }],
       },
     };
     fs.writeFileSync(configPath, JSON.stringify(original, null, 2), "utf8");
@@ -586,7 +586,7 @@ describe("Antigravity hook installer", () => {
 });
 
 function makeTempStatuslineHome({ withSettings = true } = {}) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-antigravity-statusline-home-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-antigravity-statusline-home-"));
   tempDirs.push(home);
   if (withSettings) fs.mkdirSync(path.join(home, ".gemini", "antigravity-cli"), { recursive: true });
   return home;
@@ -689,7 +689,7 @@ describe("Antigravity statusline installer", () => {
     assert.ok(settings.statusLine.command.includes(STATUSLINE_MARKER));
   });
 
-  it("unregister removes only a Clawd-owned statusline", () => {
+  it("unregister removes only a DeskBuddy-owned statusline", () => {
     const homeDir = makeTempStatuslineHome();
     registerAntigravityStatusline({ silent: true, homeDir, nodeBin: "/usr/local/bin/node" });
 

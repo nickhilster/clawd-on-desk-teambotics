@@ -4,8 +4,8 @@
 // to catch regressions in allow/deny/no-decision wire format, exit-0
 // guarantees, and fail-open paths. Documented in this directory's README.
 //
-// Spins up a mock Clawd HTTP server on 127.0.0.1:23333 returning each of
-// the response shapes Clawd can actually emit (200/204/500), then spawns
+// Spins up a mock DeskBuddy HTTP server on 127.0.0.1:23333 returning each of
+// the response shapes DeskBuddy can actually emit (200/204/500), then spawns
 // `node copilot-hook.js permissionRequest` and pipes a stdin payload in.
 //
 // What this verifies that copilot-hook.test.js does NOT:
@@ -33,7 +33,7 @@ const SAMPLE_PAYLOAD = {
 };
 
 // One mock server per scenario. We make headers + body explicit so the
-// hook's parseClawdPermissionResponse sees what Clawd's real route sends.
+// hook's parseDeskBuddyPermissionResponse sees what DeskBuddy's real route sends.
 function startMockServer(responder) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -44,8 +44,8 @@ function startMockServer(responder) {
     server.once("error", (err) => {
       if (err && err.code === "EADDRINUSE") {
         reject(new Error(
-          `Port ${PORT} already in use — likely a real Clawd instance is running. ` +
-          `Stop Clawd (tray → quit) before running this harness so the mock can take its port.`,
+          `Port ${PORT} already in use — likely a real DeskBuddy instance is running. ` +
+          `Stop DeskBuddy (tray → quit) before running this harness so the mock can take its port.`,
         ));
       } else {
         reject(err);
@@ -62,7 +62,7 @@ function stopServer(server) {
 function runHookWithStdin(stdinPayload, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [HOOK_SCRIPT, "permissionRequest"], {
-      env: { ...process.env, CLAWD_REMOTE: "" },
+      env: { ...process.env, DESKBUDDY_REMOTE: "" },
       stdio: ["pipe", "pipe", "pipe"],
     });
     let stdout = "";
@@ -88,40 +88,40 @@ function runHookWithStdin(stdinPayload, timeoutMs = 8000) {
 
 const scenarios = [
   {
-    name: "1. Clawd returns 200 allow",
+    name: "1. DeskBuddy returns 200 allow",
     payload: SAMPLE_PAYLOAD,
     serverResponder(req, body, res) {
       res.writeHead(200, {
         "Content-Type": "application/json",
-        "x-clawd-server": "clawd-on-desk",
+        "x-deskbuddy-server": "deskbuddy",
       });
       res.end(JSON.stringify({ behavior: "allow" }));
     },
     expect: { exitCode: 0, stdout: '{"behavior":"allow"}' },
   },
   {
-    name: "2. Clawd returns 200 deny with message",
+    name: "2. DeskBuddy returns 200 deny with message",
     payload: SAMPLE_PAYLOAD,
     serverResponder(req, body, res) {
       res.writeHead(200, {
         "Content-Type": "application/json",
-        "x-clawd-server": "clawd-on-desk",
+        "x-deskbuddy-server": "deskbuddy",
       });
-      res.end(JSON.stringify({ behavior: "deny", message: "Blocked by Clawd" }));
+      res.end(JSON.stringify({ behavior: "deny", message: "Blocked by DeskBuddy" }));
     },
-    expect: { exitCode: 0, stdout: '{"behavior":"deny","message":"Blocked by Clawd"}' },
+    expect: { exitCode: 0, stdout: '{"behavior":"deny","message":"Blocked by DeskBuddy"}' },
   },
   {
-    name: "3. Clawd returns 204 no-decision",
+    name: "3. DeskBuddy returns 204 no-decision",
     payload: SAMPLE_PAYLOAD,
     serverResponder(req, body, res) {
-      res.writeHead(204, { "x-clawd-server": "clawd-on-desk" });
+      res.writeHead(204, { "x-deskbuddy-server": "deskbuddy" });
       res.end();
     },
     expect: { exitCode: 0, stdout: "" },
   },
   {
-    name: "4. Clawd returns 500 internal error",
+    name: "4. DeskBuddy returns 500 internal error",
     payload: SAMPLE_PAYLOAD,
     serverResponder(req, body, res) {
       res.writeHead(500);
@@ -130,7 +130,7 @@ const scenarios = [
     expect: { exitCode: 0, stdout: "" },
   },
   {
-    name: "5. Clawd unreachable (no mock server bound)",
+    name: "5. DeskBuddy unreachable (no mock server bound)",
     payload: SAMPLE_PAYLOAD,
     serverResponder: null,
     expect: { exitCode: 0, stdout: "" },
@@ -163,10 +163,10 @@ const scenarios = [
     expect: { exitCode: 0, stdout: "" },
   },
   {
-    name: "9. Wrong server identity header (not Clawd) — treat as no-decision",
+    name: "9. Wrong server identity header (not DeskBuddy) — treat as no-decision",
     payload: SAMPLE_PAYLOAD,
     serverResponder(req, body, res) {
-      // Same shape as Clawd would emit but missing the identity header.
+      // Same shape as DeskBuddy would emit but missing the identity header.
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ behavior: "allow" }));
     },
@@ -207,9 +207,9 @@ async function runOne(scenario) {
     } catch (err) {
       results.push({ scenario, error: err.message, pass: false });
       console.log(`ERROR: ${err.message}`);
-      // EADDRINUSE on the very first scenario means Clawd is still running and
+      // EADDRINUSE on the very first scenario means DeskBuddy is still running and
       // every other scenario is going to fail the same way — bail early so the
-      // user sees the helpful "stop Clawd" message at the top of the output.
+      // user sees the helpful "stop DeskBuddy" message at the top of the output.
       if (results.length === 1 && /already in use/i.test(err.message)) {
         process.exit(1);
       }

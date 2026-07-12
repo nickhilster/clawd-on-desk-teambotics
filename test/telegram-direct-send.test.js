@@ -174,7 +174,7 @@ test("direct send asks for a reply target when no completion mapping exists", as
 
   const res = await direct.handleTextMessage({ text: "continue", replyToMessageId: 404 });
   assert.equal(res.status, "unmapped");
-  assert.match(res.text, /Reply to a Clawd completion notification/);
+  assert.match(res.text, /Reply to a DeskBuddy completion notification/);
 });
 
 test("direct send falls back when the mapped session is no longer live", async () => {

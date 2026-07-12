@@ -1,7 +1,7 @@
-"""Clawd on Desk plugin for Hermes Agent.
+"""DeskBuddy plugin for Hermes Agent.
 
 This is intentionally stdlib-only. It forwards conservative Hermes state events
-to Clawd's local /state endpoint when Clawd is running and never raises out of
+to DeskBuddy's local /state endpoint when DeskBuddy is running and never raises out of
 a Hermes hook callback.
 """
 
@@ -22,8 +22,8 @@ from urllib import request
 from urllib.error import URLError
 
 AGENT_ID = "hermes"
-CLAWD_SERVER_HEADER = "x-clawd-server"
-CLAWD_SERVER_ID = "clawd-on-desk"
+DESKBUDDY_SERVER_HEADER = "x-deskbuddy-server"
+DESKBUDDY_SERVER_ID = "deskbuddy"
 SERVER_PORTS = (23333, 23334, 23335, 23336, 23337)
 POST_TIMEOUT_SECONDS = 0.25
 PERMISSION_POST_TIMEOUT_SECONDS = 600.0
@@ -42,7 +42,7 @@ HOOK_TO_STATE: Dict[str, Tuple[str, str]] = {
     "pre_tool_call": ("working", "PreToolUse"),
     "post_tool_call": ("working", "PostToolUse"),
     # Hermes on_session_end fires at the end of every run_conversation turn,
-    # not only when the CLI exits, so Clawd should treat it like turn stop.
+    # not only when the CLI exits, so DeskBuddy should treat it like turn stop.
     "on_session_end": ("attention", "Stop"),
     # Hermes on_session_finalize is the real boundary for session rotation and
     # gateway eviction; one-shot `hermes -z` did not emit it in local QA.
@@ -96,7 +96,7 @@ _process_meta: Dict[str, Any] = {}
 
 
 def _debug_enabled() -> bool:
-    value = os.environ.get("CLAWD_HERMES_DEBUG", "").strip().lower()
+    value = os.environ.get("DESKBUDDY_HERMES_DEBUG", "").strip().lower()
     return value in ("1", "true", "yes", "on")
 
 
@@ -115,11 +115,11 @@ def _hermes_home() -> Path:
 
 
 def _log_path() -> Path:
-    return _hermes_home() / "logs" / "clawd-hermes-plugin.jsonl"
+    return _hermes_home() / "logs" / "deskbuddy-hermes-plugin.jsonl"
 
 
 def _runtime_path() -> Path:
-    return Path.home() / ".clawd" / "runtime.json"
+    return Path.home() / ".deskbuddy" / "runtime.json"
 
 
 def _utc_now() -> str:
@@ -228,7 +228,7 @@ def _post_state(body: Dict[str, Any]) -> None:
         )
         try:
             with request.urlopen(req, timeout=POST_TIMEOUT_SECONDS) as response:
-                if response.headers.get(CLAWD_SERVER_HEADER) == CLAWD_SERVER_ID:
+                if response.headers.get(DESKBUDDY_SERVER_HEADER) == DESKBUDDY_SERVER_ID:
                     _cached_port = port
                     _no_server_until = 0.0
                     try:
@@ -240,7 +240,7 @@ def _post_state(body: Dict[str, Any]) -> None:
                     "ts": _utc_now(),
                     "event": "post_state_header_mismatch",
                     "port": port,
-                    "header": response.headers.get(CLAWD_SERVER_HEADER),
+                    "header": response.headers.get(DESKBUDDY_SERVER_HEADER),
                 })
         except (OSError, URLError) as exc:
             _append_log({
@@ -263,14 +263,14 @@ def _post_state(body: Dict[str, Any]) -> None:
 
 
 def _post_permission(tool_name: str, tool_input: dict, session_id: str, platform: str = "") -> Optional[dict]:
-    """POST to Clawd's /permission endpoint and block until user decides.
+    """POST to DeskBuddy's /permission endpoint and block until user decides.
 
-    Returns the JSON response body as a dict, or None if Clawd is unreachable,
+    Returns the JSON response body as a dict, or None if DeskBuddy is unreachable,
     returns 204 (no-decision), or the request fails.
 
     Respects the no-server cooldown to avoid blocking Hermes tool calls when
-    Clawd is known to be absent.  Before the long blocking POST, issues a short
-    header probe so a non-Clawd service on a candidate port cannot block a
+    DeskBuddy is known to be absent.  Before the long blocking POST, issues a short
+    header probe so a non-DeskBuddy service on a candidate port cannot block a
     Hermes tool call for up to PERMISSION_POST_TIMEOUT_SECONDS.
     """
     global _cached_port, _no_server_until
@@ -299,10 +299,10 @@ def _post_permission(tool_name: str, tool_input: dict, session_id: str, platform
         "Content-Length": str(len(payload)),
     }
     for port in _port_candidates():
-        # ── Short probe — verify Clawd is on this port before the long POST ──
+        # ── Short probe — verify DeskBuddy is on this port before the long POST ──
         # Reuse the existing GET /state health route instead of inventing a
-        # plugin-only /probe endpoint.  The server includes CLAWD_SERVER_HEADER
-        # on /state responses; non-Clawd services or stale candidate ports fail
+        # plugin-only /probe endpoint.  The server includes DESKBUDDY_SERVER_HEADER
+        # on /state responses; non-DeskBuddy services or stale candidate ports fail
         # here with a short timeout and never reach the 600s permission POST.
         probe_req = request.Request(
             f"http://127.0.0.1:{port}/state",
@@ -310,7 +310,7 @@ def _post_permission(tool_name: str, tool_input: dict, session_id: str, platform
         )
         try:
             with request.urlopen(probe_req, timeout=POST_TIMEOUT_SECONDS) as probe_resp:
-                if probe_resp.headers.get(CLAWD_SERVER_HEADER) != CLAWD_SERVER_ID:
+                if probe_resp.headers.get(DESKBUDDY_SERVER_HEADER) != DESKBUDDY_SERVER_ID:
                     continue
         except Exception:
             continue
@@ -327,7 +327,7 @@ def _post_permission(tool_name: str, tool_input: dict, session_id: str, platform
                 if response.status == 204:
                     _cached_port = port
                     return None
-                if response.headers.get(CLAWD_SERVER_HEADER) == CLAWD_SERVER_ID:
+                if response.headers.get(DESKBUDDY_SERVER_HEADER) == DESKBUDDY_SERVER_ID:
                     _cached_port = port
                     body = json.loads(response.read().decode("utf-8"))
                     return body
@@ -655,7 +655,7 @@ def _ensure_process_meta_resolver_started() -> None:
             return
         _process_meta_started = True
     try:
-        thread = threading.Thread(target=_resolve_process_meta_background, name="clawd-hermes-process-meta", daemon=True)
+        thread = threading.Thread(target=_resolve_process_meta_background, name="deskbuddy-hermes-process-meta", daemon=True)
         thread.start()
     except Exception as exc:
         with _process_meta_lock:
@@ -923,14 +923,14 @@ def _event_extra(event_name: str, kwargs: Dict[str, Any], session_id: str = "") 
 
 
 def _state_payload(event_name: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
-    state, clawd_event = HOOK_TO_STATE[event_name]
+    state, deskbuddy_event = HOOK_TO_STATE[event_name]
     if event_name == "post_tool_call" and _tool_result_has_error(kwargs.get("result")):
-        state, clawd_event = "error", "PostToolUseFailure"
+        state, deskbuddy_event = "error", "PostToolUseFailure"
     if event_name == "on_session_end":
         completed = kwargs.get("completed")
         interrupted = kwargs.get("interrupted")
         if completed is False and interrupted is not True:
-            state, clawd_event = "error", "StopFailure"
+            state, deskbuddy_event = "error", "StopFailure"
 
     session_id = _session_id(event_name, kwargs)
     platform = _session_platform(session_id, kwargs)
@@ -938,7 +938,7 @@ def _state_payload(event_name: str, kwargs: Dict[str, Any]) -> Dict[str, Any]:
         "agent_id": AGENT_ID,
         "hook_source": "hermes-plugin",
         "state": state,
-        "event": clawd_event,
+        "event": deskbuddy_event,
         "session_id": session_id,
         "cwd": _runtime_cwd(),
         "agent_pid": os.getpid(),
@@ -1009,8 +1009,8 @@ def _handle_hook(event_name: str, **kwargs: Any) -> None:
 
 
 # Tools that require user approval via permission bubble.
-# Configure via CLAWD_HERMES_PERMISSION_TOOLS env var (comma-separated tool names).
-_PERMISSION_TOOLS_ENV = os.environ.get("CLAWD_HERMES_PERMISSION_TOOLS", "").strip()
+# Configure via DESKBUDDY_HERMES_PERMISSION_TOOLS env var (comma-separated tool names).
+_PERMISSION_TOOLS_ENV = os.environ.get("DESKBUDDY_HERMES_PERMISSION_TOOLS", "").strip()
 _PERMISSION_TOOLS: set = set()
 if _PERMISSION_TOOLS_ENV:
     _PERMISSION_TOOLS = {t.strip() for t in _PERMISSION_TOOLS_ENV.split(",") if t.strip()}
@@ -1026,14 +1026,14 @@ def _make_callback(event_name: str):
                 return _handle_permission_request(tool_name, **kwargs)
             _handle_hook(event_name, **kwargs)
             return None
-        callback.__name__ = "clawd_pre_tool_call"
+        callback.__name__ = "deskbuddy_pre_tool_call"
         return callback
 
     def callback(**kwargs: Any) -> None:
         _handle_hook(event_name, **kwargs)
         return None
 
-    callback.__name__ = f"clawd_{event_name}"
+    callback.__name__ = f"deskbuddy_{event_name}"
     return callback
 
 
@@ -1041,7 +1041,7 @@ def _handle_clarify_tool(**kwargs: Any):
     """Intercept clarify tool and show elicitation bubble via /permission.
 
     COMPROMISE — error-channel result injection:
-    When the user answers via the Clawd permission bubble, we return
+    When the user answers via the DeskBuddy permission bubble, we return
     ``{"action": "block", "message": "User selected: <answer>"}`` from
     ``pre_tool_call``.  Hermes' plugin contract translates this into a tool
     result of ``{"error": "User selected: <answer>"}`` (see
@@ -1054,8 +1054,8 @@ def _handle_clarify_tool(**kwargs: Any):
     cleaner path.
 
     Falls back to Hermes' native clarify dialog when:
-    - Clawd is unreachable (None result)
-    - Clawd returns 204 / no-decision
+    - DeskBuddy is unreachable (None result)
+    - DeskBuddy returns 204 / no-decision
     - The permission bubble fails to create
     """
     args = kwargs.get("args", {})

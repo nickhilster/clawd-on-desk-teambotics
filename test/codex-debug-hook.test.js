@@ -13,7 +13,7 @@ const {
 const tempDirs = [];
 
 function makeTempDir() {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codex-debug-hook-"));
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codex-debug-hook-"));
   tempDirs.push(tmpDir);
   return tmpDir;
 }
@@ -86,7 +86,7 @@ describe("Codex debug hook", () => {
     const result = spawnSync(process.execPath, [scriptPath], {
       input: JSON.stringify({ hook_event_name: "Stop", session_id: "session-1" }),
       encoding: "utf8",
-      env: { ...process.env, CLAWD_CODEX_DEBUG_LOG: logPath },
+      env: { ...process.env, DESKBUDDY_CODEX_DEBUG_LOG: logPath },
       windowsHide: true,
     });
 

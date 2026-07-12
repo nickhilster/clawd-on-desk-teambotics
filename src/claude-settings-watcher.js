@@ -5,7 +5,7 @@ const path = require("path");
 const os = require("os");
 const { buildPermissionUrl } = require("../hooks/server-config");
 
-const HOOK_MARKER = "clawd-hook.js";
+const HOOK_MARKER = "deskbuddy-hook.js";
 const SETTINGS_FILENAME = "settings.json";
 const MANAGED_COMMAND_MARKERS = Object.freeze([
   HOOK_MARKER,
@@ -99,7 +99,7 @@ function countCommandHooksInEntries(entries, options = {}) {
  * Count total command hooks across every event in the hooks object.
  * Handles both nested format (entry.hooks[].command) and flat format (entry.command).
  * HTTP hooks (type: "http") are excluded because they cannot encode the marker.
- * TODO: Decide whether non-Clawd HTTP hooks should contribute to third-party shrink detection.
+ * TODO: Decide whether non-DeskBuddy HTTP hooks should contribute to third-party shrink detection.
  * @param {object|null|undefined} hooks
  * @returns {number}
  */
@@ -209,8 +209,8 @@ function createClaudeSettingsWatcher(ctx = {}) {
     const settingsDir = getClaudeSettingsDir();
     const settingsPath = getClaudeSettingsPath();
     // Seed the trusted baseline from the current settings.json before the watcher starts,
-    // so the very first watcher event after Clawd boots (e.g. an external CLI minimize
-    // landing right after syncClawdHooks() ran) can be compared against a real snapshot
+    // so the very first watcher event after DeskBuddy boots (e.g. an external CLI minimize
+    // landing right after syncDeskBuddyHooks() ran) can be compared against a real snapshot
     // instead of null. Wrapped in its own try/catch so a missing or unreadable file
     // (fresh install, permission error) cannot prevent the watcher from starting.
     // The settingsNeedClaudeHookResync guard inside this block also prevents seeding
@@ -254,7 +254,7 @@ function createClaudeSettingsWatcher(ctx = {}) {
               }
               console.log("DeskBuddy: hooks missing from settings.json — re-registering");
               settingsWatchLastSyncTime = nowFn();
-              if (typeof ctx.syncClawdHooks === "function") ctx.syncClawdHooks();
+              if (typeof ctx.syncDeskBuddyHooks === "function") ctx.syncDeskBuddyHooks();
             } else if (currentSnapshot) {
               // Trust this state — refresh the baseline only when the file looks healthy.
               lastTrustedSnapshot = currentSnapshot;

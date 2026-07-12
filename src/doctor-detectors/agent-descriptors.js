@@ -41,7 +41,7 @@ const AGENT_DESCRIPTORS = Object.freeze([
     configPath: claude.DEFAULT_CONFIG_PATH,
     configMode: "file",
     autoInstall: true,
-    marker: "clawd-hook.js",
+    marker: "deskbuddy-hook.js",
     nested: true,
   }),
   Object.freeze({
@@ -172,7 +172,7 @@ const AGENT_DESCRIPTORS = Object.freeze([
     configPath: codewhale.resolveCodewhaleConfigPath(),
     configMode: "codewhale-hooks-toml",
     autoInstall: true,
-    marker: "managed by clawd-on-desk",
+    marker: "managed by deskbuddy",
     commandMarker: "codewhale-hook.js",
     nested: true,
     hookEvents: codewhale.HOOK_ENTRIES.map((entry) => entry[0]),

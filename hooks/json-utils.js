@@ -72,7 +72,7 @@ function cleanupBackupPath(filePath, options = {}) {
   const stamp = now instanceof Date && !Number.isNaN(now.getTime())
     ? now.toISOString().replace(/[-:TZ.]/g, "").slice(0, 17)
     : String(Date.now());
-  return `${filePath}.clawd-cleanup-${stamp}.bak`;
+  return `${filePath}.deskbuddy-cleanup-${stamp}.bak`;
 }
 
 function uniqueBackupPath(filePath, options = {}) {
@@ -90,7 +90,7 @@ function uniqueBackupPath(filePath, options = {}) {
 // Cap how many timestamped backups we keep for a single file. Without a cap, a
 // config that gets rewritten repeatedly — e.g. the settings watcher
 // re-registering hooks after another tool (CC-Switch) strips them — would
-// accrue `.clawd-cleanup-*.bak` files without bound. 5 keeps a short history
+// accrue `.deskbuddy-cleanup-*.bak` files without bound. 5 keeps a short history
 // while staying bounded; override per-call with `backupKeep`.
 const DEFAULT_BACKUP_KEEP = 5;
 
@@ -101,7 +101,7 @@ function resolveBackupKeep(options = {}) {
 }
 
 function ownBackupPrefix(filePath) {
-  return `${path.basename(filePath)}.clawd-cleanup-`;
+  return `${path.basename(filePath)}.deskbuddy-cleanup-`;
 }
 
 function isOwnBackupName(name, prefix) {

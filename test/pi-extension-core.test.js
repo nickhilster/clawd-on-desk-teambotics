@@ -43,7 +43,7 @@ describe("pi-extension-core", () => {
     }), false);
   });
 
-  it("builds a generic Clawd /state payload with Pi session and pid fields", () => {
+  it("builds a generic DeskBuddy /state payload with Pi session and pid fields", () => {
     const payload = core.buildPayload({
       state: "working",
       event: "PreToolUse",
@@ -87,7 +87,7 @@ describe("pi-extension-core", () => {
     assert.strictEqual(payload.session_id, "pi:default");
   });
 
-  it("registers Pi lifecycle handlers and maps them to Clawd events", async () => {
+  it("registers Pi lifecycle handlers and maps them to DeskBuddy events", async () => {
     const handlers = {};
     const pi = {
       on(name, handler) {

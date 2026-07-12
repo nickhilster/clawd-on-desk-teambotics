@@ -75,7 +75,7 @@ function querySupersetWorkspaceId(dbPath, cwd, callback) {
 
 module.exports = function initFocus(ctx) {
 
-const FOCUS_RESULT_PREFIX = "__CLAWD_FOCUS_RESULT__ ";
+const FOCUS_RESULT_PREFIX = "__DESKBUDDY_FOCUS_RESULT__ ";
 
 const PS_FOCUS_ADDTYPE = `
 Add-Type @"
@@ -206,7 +206,7 @@ public class WinFocus {
 }
 "@
 
-function Write-ClawdFocusResult([string]$token, [string]$reason, [IntPtr]$targetHwnd, [IntPtr]$foregroundHwnd, [bool]$confirmed) {
+function Write-DeskBuddyFocusResult([string]$token, [string]$reason, [IntPtr]$targetHwnd, [IntPtr]$foregroundHwnd, [bool]$confirmed) {
     if (-not $token) { $token = '' }
     if (-not $reason) { $reason = 'unknown' }
     $status = if ($confirmed) { 'confirmed' } else { 'unconfirmed' }
@@ -267,13 +267,13 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
             if ($matches.Count -eq 1) {
                 [WinFocus]::Focus($matches[0])
                 $selectedTargetHwnd = $matches[0]
-                Save-ClawdFocusCache $matches[0]
+                Save-DeskBuddyFocusCache $matches[0]
                 $focused = $true
                 $reason = 'wt-parent-title-match'
             } elseif ($matches.Count -gt 1) {
                 $reason = 'wt-parent-title-ambiguous'
             } else {
-                $pidWindows = @(Get-ClawdVisiblePidWindows -pids @([int]$curPid))
+                $pidWindows = @(Get-DeskBuddyVisiblePidWindows -pids @([int]$curPid))
                 if ($pidWindows.Count -eq 1) {
                     [WinFocus]::Focus($pidWindows[0])
                     $selectedTargetHwnd = $pidWindows[0]
@@ -290,7 +290,7 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
             if ($matches.Count -eq 1) {
                 [WinFocus]::Focus($matches[0])
                 $selectedTargetHwnd = $matches[0]
-                Save-ClawdFocusCache $matches[0]
+                Save-DeskBuddyFocusCache $matches[0]
                 $focused = $true
                 $reason = 'editor-parent-title-match'
             } elseif ($matches.Count -gt 1) {
@@ -301,7 +301,7 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
         } else {
             [WinFocus]::Focus($proc.MainWindowHandle)
             $selectedTargetHwnd = $proc.MainWindowHandle
-            Save-ClawdFocusCache $proc.MainWindowHandle
+            Save-DeskBuddyFocusCache $proc.MainWindowHandle
             $focused = $true
             $reason = 'parent-direct'
         }
@@ -311,7 +311,7 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
         } elseif ($wtProcessNames -notcontains $proc.ProcessName) {
             [WinFocus]::Focus($proc.MainWindowHandle)
             $selectedTargetHwnd = $proc.MainWindowHandle
-            Save-ClawdFocusCache $proc.MainWindowHandle
+            Save-DeskBuddyFocusCache $proc.MainWindowHandle
             $focused = $true
             $reason = 'parent-direct-no-title'
         } else {
@@ -338,13 +338,13 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
     if ($wtMatches.Count -eq 1) {
         [WinFocus]::Focus($wtMatches[0])
         $selectedTargetHwnd = $wtMatches[0]
-        Save-ClawdFocusCache $wtMatches[0]
+        Save-DeskBuddyFocusCache $wtMatches[0]
         $focused = $true
         $reason = 'wt-title-match'
     } elseif ($wtMatches.Count -gt 1) {
         $reason = 'wt-title-ambiguous'
     } else {
-        $pidWindows = @(Get-ClawdVisiblePidWindows -pids $chainWindowsTerminalPids)
+        $pidWindows = @(Get-DeskBuddyVisiblePidWindows -pids $chainWindowsTerminalPids)
         if ($pidWindows.Count -eq 1) {
             [WinFocus]::Focus($pidWindows[0])
             $selectedTargetHwnd = $pidWindows[0]
@@ -353,7 +353,7 @@ function makeFocusCmd(sourcePid, cwdCandidates, focusCacheKey = null, wtHwnd = n
         } elseif ($pidWindows.Count -gt 1) {
             $reason = 'wt-title-mismatch-pid-window-ambiguous'
         } else {
-            $singleWtWindows = @(Get-ClawdWindowsTerminalWindows)
+            $singleWtWindows = @(Get-DeskBuddyWindowsTerminalWindows)
             if ($singleWtWindows.Count -eq 1) {
                 [WinFocus]::Focus($singleWtWindows[0])
                 $selectedTargetHwnd = $singleWtWindows[0]
@@ -378,10 +378,10 @@ $chainWindowsTerminalPids = @()
 $focusCacheKey = ${cacheKey}
 $focusCacheSourcePid = [int64]${sourcePid}
 $wtHwndFromHook = [IntPtr]([int64]${wtHwndLiteral})
-if ($null -eq $global:ClawdFocusWindowCache) {
-    $global:ClawdFocusWindowCache = @{}
+if ($null -eq $global:DeskBuddyFocusWindowCache) {
+    $global:DeskBuddyFocusWindowCache = @{}
 }
-function Test-ClawdWindowTitleMatch([IntPtr]$hwnd, [string[]]$names) {
+function Test-DeskBuddyWindowTitleMatch([IntPtr]$hwnd, [string[]]$names) {
     if ($hwnd -eq [IntPtr]::Zero -or -not $names -or $names.Count -eq 0) { return $false }
     $len = [WinFocus]::GetWindowTextLength($hwnd)
     if ($len -le 0) { return $false }
@@ -395,19 +395,19 @@ function Test-ClawdWindowTitleMatch([IntPtr]$hwnd, [string[]]$names) {
     }
     return $false
 }
-function Save-ClawdFocusCache([IntPtr]$hwnd) {
+function Save-DeskBuddyFocusCache([IntPtr]$hwnd) {
     if (-not $focusCacheKey -or $hwnd -eq [IntPtr]::Zero) { return }
     if (-not $cacheTitleNames -or $cacheTitleNames.Count -eq 0) { return }
-    $global:ClawdFocusWindowCache[$focusCacheKey] = @{
+    $global:DeskBuddyFocusWindowCache[$focusCacheKey] = @{
         hwnd = $hwnd.ToInt64()
         sourcePid = $focusCacheSourcePid
         titleNames = @($cacheTitleNames)
     }
 }
-function Get-ClawdCachedWindow() {
+function Get-DeskBuddyCachedWindow() {
     if (-not $focusCacheKey) { return [IntPtr]::Zero }
-    if (-not $global:ClawdFocusWindowCache.ContainsKey($focusCacheKey)) { return [IntPtr]::Zero }
-    $rawEntry = $global:ClawdFocusWindowCache[$focusCacheKey]
+    if (-not $global:DeskBuddyFocusWindowCache.ContainsKey($focusCacheKey)) { return [IntPtr]::Zero }
+    $rawEntry = $global:DeskBuddyFocusWindowCache[$focusCacheKey]
     $rawHwnd = $rawEntry
     $entrySourcePid = 0
     if ($rawEntry -is [System.Collections.IDictionary]) {
@@ -417,28 +417,28 @@ function Get-ClawdCachedWindow() {
     try {
         $hwnd = [IntPtr]([int64]$rawHwnd)
     } catch {
-        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        $global:DeskBuddyFocusWindowCache.Remove($focusCacheKey)
         return [IntPtr]::Zero
     }
     if (-not [WinFocus]::IsUsableWindow($hwnd)) {
-        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        $global:DeskBuddyFocusWindowCache.Remove($focusCacheKey)
         return [IntPtr]::Zero
     }
     if ($entrySourcePid -gt 0 -and $focusCacheSourcePid -gt 0 -and $entrySourcePid -ne $focusCacheSourcePid) {
-        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        $global:DeskBuddyFocusWindowCache.Remove($focusCacheKey)
         return [IntPtr]::Zero
     }
     if (-not $cacheTitleNames -or $cacheTitleNames.Count -eq 0) {
-        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+        $global:DeskBuddyFocusWindowCache.Remove($focusCacheKey)
         return [IntPtr]::Zero
     }
-    if (-not (Test-ClawdWindowTitleMatch $hwnd ([string[]]$cacheTitleNames))) {
-        $global:ClawdFocusWindowCache.Remove($focusCacheKey)
+    if (-not (Test-DeskBuddyWindowTitleMatch $hwnd ([string[]]$cacheTitleNames))) {
+        $global:DeskBuddyFocusWindowCache.Remove($focusCacheKey)
         return [IntPtr]::Zero
     }
     return $hwnd
 }
-function Get-ClawdVisiblePidWindows([int[]]$pids) {
+function Get-DeskBuddyVisiblePidWindows([int[]]$pids) {
     $windows = @()
     foreach ($pidValue in @($pids)) {
         if (-not $pidValue -or $pidValue -le 0) { continue }
@@ -452,7 +452,7 @@ function Get-ClawdVisiblePidWindows([int[]]$pids) {
     }
     return @($windows)
 }
-function Get-ClawdWindowsTerminalWindows() {
+function Get-DeskBuddyWindowsTerminalWindows() {
     $wtPids = @()
     foreach ($wtName in $wtProcessNames) {
         foreach ($wtProc in @(Get-Process -Name $wtName -ErrorAction SilentlyContinue)) {
@@ -461,7 +461,7 @@ function Get-ClawdWindowsTerminalWindows() {
             }
         }
     }
-    return @(Get-ClawdVisiblePidWindows -pids $wtPids)
+    return @(Get-DeskBuddyVisiblePidWindows -pids $wtPids)
 }
 $curPid = ${sourcePid}
 $focused = $false
@@ -470,7 +470,7 @@ $selectedTargetHwnd = [IntPtr]::Zero
 $pendingConsoleHwnd = [IntPtr]::Zero
 $consoleShimSkipped = $false
 $wtHwndFromHookInvalid = $false
-$cachedHwnd = Get-ClawdCachedWindow
+$cachedHwnd = Get-DeskBuddyCachedWindow
 if ($cachedHwnd -ne [IntPtr]::Zero) {
     [WinFocus]::Focus($cachedHwnd)
     $selectedTargetHwnd = $cachedHwnd
@@ -481,7 +481,7 @@ if (-not $focused -and $wtHwndFromHook -ne [IntPtr]::Zero) {
     if ([WinFocus]::IsUsableWindowsTerminalWindow($wtHwndFromHook)) {
         [WinFocus]::Focus($wtHwndFromHook)
         $selectedTargetHwnd = $wtHwndFromHook
-        Save-ClawdFocusCache $wtHwndFromHook
+        Save-DeskBuddyFocusCache $wtHwndFromHook
         $focused = $true
         $reason = 'wt-hwnd-from-hook'
     } else {
@@ -554,7 +554,7 @@ if ($focused -and $selectedTargetHwnd -ne [IntPtr]::Zero) {
     }
 }
 $confirmed = $focused -and $selectedTargetHwnd -ne [IntPtr]::Zero -and $foregroundHwnd -eq $selectedTargetHwnd
-Write-ClawdFocusResult $focusToken $reason $selectedTargetHwnd $foregroundHwnd $confirmed
+Write-DeskBuddyFocusResult $focusToken $reason $selectedTargetHwnd $foregroundHwnd $confirmed
 `;
 }
 

@@ -1,7 +1,7 @@
 "use strict";
 
 // Main-process controller that bolts the migration reducer + owner-manager
-// onto Clawd's existing sidecar lifecycle. The renderer never talks to the
+// onto DeskBuddy's existing sidecar lifecycle. The renderer never talks to the
 // reducer directly — it goes through this controller via IPC commands, so the
 // state machine has a single source of truth.
 

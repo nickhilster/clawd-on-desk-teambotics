@@ -78,10 +78,10 @@ function createIntegrationSyncRuntime(options = {}) {
   const startClaudeSettingsWatcher = options.startClaudeSettingsWatcher;
   const stopClaudeSettingsWatcher = options.stopClaudeSettingsWatcher;
 
-  function syncClawdHooks() {
+  function syncDeskBuddyHooks() {
     try {
-      if (typeof ctx.syncClawdHooksImpl === "function") {
-        return ctx.syncClawdHooksImpl({
+      if (typeof ctx.syncDeskBuddyHooksImpl === "function") {
+        return ctx.syncDeskBuddyHooksImpl({
           autoStart: ctx.autoStartWithClaude,
           port: getHookServerPort(),
         });
@@ -483,7 +483,7 @@ function createIntegrationSyncRuntime(options = {}) {
   function syncIntegrationForAgent(agentId) {
     if (agentId === "claude-code") {
       if (!shouldManageClaudeHooks()) return false;
-      const result = syncClawdHooks();
+      const result = syncDeskBuddyHooks();
       startClaudeSettingsWatcher();
       return result && typeof result === "object" ? result : true;
     }
@@ -545,7 +545,7 @@ function createIntegrationSyncRuntime(options = {}) {
 
   function syncEnabledStartupIntegrations() {
     if (shouldManageClaudeHooks() && shouldSyncAgentIntegration("claude-code")) {
-      syncClawdHooks();
+      syncDeskBuddyHooks();
       startClaudeSettingsWatcher();
     }
     for (const [agentId, sync] of Object.entries(AGENT_INTEGRATION_SYNCERS)) {
@@ -554,7 +554,7 @@ function createIntegrationSyncRuntime(options = {}) {
   }
 
   return {
-    syncClawdHooks,
+    syncDeskBuddyHooks,
     syncGeminiHooks,
     syncAntigravityHooks,
     syncCursorHooks,

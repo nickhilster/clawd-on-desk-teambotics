@@ -11,9 +11,9 @@ function checkLocalServer(serverApi) {
       status: "fail",
       level: "critical",
       detail: "Local server is not listening",
-      textHint: "Restart Clawd. If the issue persists, check ~/.clawd/ permissions.",
+      textHint: "Restart DeskBuddy. If the issue persists, check ~/.deskbuddy/ permissions.",
       runtime: status,
-      fixAction: { type: "restart-clawd" },
+      fixAction: { type: "restart-deskbuddy" },
     };
   }
 
@@ -23,7 +23,7 @@ function checkLocalServer(serverApi) {
       status: "fail",
       level: "warning",
       detail: `Listening on 127.0.0.1:${status.port}; runtime port is ${status.runtimePort || "missing"}`,
-      textHint: "Restart Clawd to regenerate the runtime file.",
+      textHint: "Restart DeskBuddy to regenerate the runtime file.",
       runtime: status,
       fixAction: { type: "local-server" },
     };

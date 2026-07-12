@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const SIDECAR_ROOT = path.join("bin", "cc-connect-clawd");
+const SIDECAR_ROOT = path.join("bin", "deskbuddy-connect");
 const VERIFY_COMMAND = "node scripts/verify-sidecar-binaries.js";
 
 const BUILD_REQUIREMENTS = Object.freeze({
@@ -44,7 +44,7 @@ function normalizeLifecycleEvent(value) {
 }
 
 function executableName(platform) {
-  return platform === "windows" ? "cc-connect-clawd.exe" : "cc-connect-clawd";
+  return platform === "windows" ? "deskbuddy-connect.exe" : "deskbuddy-connect";
 }
 
 function sidecarBinaryPath(rootDir, platform, arch) {
@@ -90,15 +90,15 @@ function main() {
   const result = verifySidecarBinaries({ lifecycleEvent });
   if (result.required.length === 0) return;
   if (result.ok) {
-    console.log(`Verified ${result.required.length} cc-connect-clawd sidecar binary/binaries.`);
+    console.log(`Verified ${result.required.length} deskbuddy-connect sidecar binary/binaries.`);
     return;
   }
-  console.error("Missing cc-connect-clawd sidecar binary/binaries for this build:");
+  console.error("Missing deskbuddy-connect sidecar binary/binaries for this build:");
   for (const item of result.missing) {
     console.error(`- ${item.platform}-${item.arch}: ${item.path}`);
   }
   console.error("");
-  console.error("Build the Go sidecar first, or set CLAWD_CC_CONNECT_CLAWD_PATH for development runs.");
+  console.error("Build the Go sidecar first, or set DESKBUDDY_DESKBUDDY_CONNECT_PATH for development runs.");
   process.exitCode = 1;
 }
 

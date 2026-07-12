@@ -8,7 +8,7 @@ function runGeminiHook(argvEvent, payload = {}) {
   const scriptPath = path.resolve(__dirname, "..", "hooks", "gemini-hook.js");
   const httpBlockerPath = path.resolve(__dirname, "hook-http-blocker.js");
   return spawnSync(process.execPath, ["--require", httpBlockerPath, scriptPath, argvEvent], {
-    env: { ...process.env, CLAWD_REMOTE: "1" },
+    env: { ...process.env, DESKBUDDY_REMOTE: "1" },
     input: JSON.stringify(payload),
     encoding: "utf8",
     windowsHide: true,
@@ -143,7 +143,7 @@ describe("Gemini hook script", () => {
       session_id: "s1",
       cwd: process.cwd(),
     }, "AfterAgent", {
-      env: { CLAWD_REMOTE: "1" },
+      env: { DESKBUDDY_REMOTE: "1" },
       readHostPrefix: () => "remote-host",
       resolvePid: () => {
         resolveCalls++;

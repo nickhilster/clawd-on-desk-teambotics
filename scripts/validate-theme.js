@@ -2,12 +2,12 @@
 "use strict";
 
 /**
- * validate-theme.js — CLI tool to validate a Clawd theme before distribution.
+ * validate-theme.js — CLI tool to validate a DeskBuddy theme before distribution.
  *
  * Usage:
  *   node scripts/validate-theme.js <theme-dir>
  *   node scripts/validate-theme.js themes/template
- *   node scripts/validate-theme.js ~/AppData/Roaming/clawd-on-desk/themes/my-theme
+ *   node scripts/validate-theme.js ~/AppData/Roaming/deskbuddy/themes/my-theme
  *
  * Checks:
  *   1. theme.json schema (required fields, types, schemaVersion)

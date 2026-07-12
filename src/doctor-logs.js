@@ -37,7 +37,7 @@ function getAllowedLogDirs(options = {}) {
   const pathApi = options.path || path;
   const homeDir = options.homeDir || os.homedir();
   return uniqueDirs([
-    pathApi.join(homeDir, ".clawd"),
+    pathApi.join(homeDir, ".deskbuddy"),
     options.userDataDir,
   ], pathApi);
 }
@@ -52,7 +52,7 @@ function getLogMtime(fsApi, filePath) {
   }
 }
 
-function resolveClawdLogTarget(options = {}) {
+function resolveDeskBuddyLogTarget(options = {}) {
   const fsApi = options.fs || fs;
   const pathApi = options.path || path;
   const dirs = getAllowedLogDirs(options);
@@ -78,17 +78,17 @@ function resolveClawdLogTarget(options = {}) {
     return { status: "file", path: candidates[0].path };
   }
 
-  const fallbackDir = dirs[0] || pathApi.join(os.homedir(), ".clawd");
+  const fallbackDir = dirs[0] || pathApi.join(os.homedir(), ".deskbuddy");
   return { status: "directory", path: fallbackDir, reason: "no-log-found" };
 }
 
-async function openClawdLog(options = {}) {
+async function openDeskBuddyLog(options = {}) {
   const fsApi = options.fs || fs;
   const shell = options.shell;
   if (!shell || typeof shell.openPath !== "function") {
     return { status: "error", reason: "shell-unavailable" };
   }
-  const target = resolveClawdLogTarget(options);
+  const target = resolveDeskBuddyLogTarget(options);
   if (target.status === "error") return target;
   if (target.status === "directory") {
     try {
@@ -104,6 +104,6 @@ module.exports = {
   DEFAULT_LOG_BASENAMES,
   getAllowedLogDirs,
   isAllowedLogBasename,
-  openClawdLog,
-  resolveClawdLogTarget,
+  openDeskBuddyLog,
+  resolveDeskBuddyLogTarget,
 };

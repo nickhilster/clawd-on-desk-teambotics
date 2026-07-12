@@ -236,7 +236,7 @@ describe("dashboard window", () => {
     assert.deepStrictEqual(timers.map((timer) => timer.delay), [0, 80]);
   });
 
-  it("exposes a Clawd-only hide action instead of a terminal close action", () => {
+  it("exposes a DeskBuddy-only hide action instead of a terminal close action", () => {
     const rendererSource = fs.readFileSync(path.join(__dirname, "..", "src", "dashboard-renderer.js"), "utf8");
     const preloadSource = fs.readFileSync(path.join(__dirname, "..", "src", "preload-dashboard.js"), "utf8");
 

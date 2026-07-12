@@ -8,14 +8,14 @@ describe("login item settings", () => {
     const settings = getLoginItemSettings({
       isPackaged: false,
       openAtLogin: true,
-      execPath: "D:\\clawd-on-desk\\node_modules\\electron\\dist\\electron.exe",
-      appPath: "D:\\clawd-on-desk",
+      execPath: "D:\\deskbuddy\\node_modules\\electron\\dist\\electron.exe",
+      appPath: "D:\\deskbuddy",
     });
 
     assert.deepStrictEqual(settings, {
       openAtLogin: true,
-      path: "D:\\clawd-on-desk\\node_modules\\electron\\dist\\electron.exe",
-      args: ["D:\\clawd-on-desk"],
+      path: "D:\\deskbuddy\\node_modules\\electron\\dist\\electron.exe",
+      args: ["D:\\deskbuddy"],
     });
   });
 
@@ -23,8 +23,8 @@ describe("login item settings", () => {
     const settings = getLoginItemSettings({
       isPackaged: true,
       openAtLogin: true,
-      execPath: "C:\\Program Files\\Clawd on Desk\\Clawd on Desk.exe",
-      appPath: "C:\\Program Files\\Clawd on Desk\\resources\\app.asar",
+      execPath: "C:\\Program Files\\DeskBuddy\\DeskBuddy.exe",
+      appPath: "C:\\Program Files\\DeskBuddy\\resources\\app.asar",
     });
 
     assert.deepStrictEqual(settings, { openAtLogin: true });
@@ -34,14 +34,14 @@ describe("login item settings", () => {
     const settings = getLoginItemSettings({
       isPackaged: false,
       openAtLogin: false,
-      execPath: "D:\\clawd-on-desk\\node_modules\\electron\\dist\\electron.exe",
-      appPath: "D:\\clawd-on-desk",
+      execPath: "D:\\deskbuddy\\node_modules\\electron\\dist\\electron.exe",
+      appPath: "D:\\deskbuddy",
     });
 
     assert.deepStrictEqual(settings, {
       openAtLogin: false,
-      path: "D:\\clawd-on-desk\\node_modules\\electron\\dist\\electron.exe",
-      args: ["D:\\clawd-on-desk"],
+      path: "D:\\deskbuddy\\node_modules\\electron\\dist\\electron.exe",
+      args: ["D:\\deskbuddy"],
     });
   });
 

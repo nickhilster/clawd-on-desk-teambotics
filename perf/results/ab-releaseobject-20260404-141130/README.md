@@ -2,8 +2,8 @@
 
 - Date: 2026-04-04
 - Scope: compare `main` vs `releaseobject_only` branch behavior under the same quick stress load
-- Load generator: `bash scripts/run-clawdbot-stress.sh quick`
-- Resource sampler: `bash scripts/monitor-clawd-resources.sh --interval 1 --pid <app_pid>`
+- Load generator: `bash scripts/run-deskbuddybot-stress.sh quick`
+- Resource sampler: `bash scripts/monitor-deskbuddy-resources.sh --interval 1 --pid <app_pid>`
 - Duration per side: ~6 minutes
 
 ## Summary

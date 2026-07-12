@@ -28,9 +28,9 @@ const { validateOpenClawEntry } = require("./openclaw-entry-validator");
 const { hasIncludeDirective } = require("../../hooks/openclaw-install");
 
 const REPAIRABLE_AGENT_STATUSES = new Set(["not-connected", "broken-path"]);
-const GEMINI_HOOKS_DISABLED_DETAIL = "Gemini hooks are disabled in settings.json; Clawd preserves this user setting and will not receive hook events";
-const ANTIGRAVITY_HOOKS_DISABLED_DETAIL = "Antigravity Clawd hooks are disabled in hooks.json; Clawd preserves this user setting and will not receive hook events";
-const QWEN_HOOKS_DISABLED_DETAIL = "Qwen Code hooks are disabled in settings.json; Clawd preserves this user setting and will not receive hook events";
+const GEMINI_HOOKS_DISABLED_DETAIL = "Gemini hooks are disabled in settings.json; DeskBuddy preserves this user setting and will not receive hook events";
+const ANTIGRAVITY_HOOKS_DISABLED_DETAIL = "Antigravity DeskBuddy hooks are disabled in hooks.json; DeskBuddy preserves this user setting and will not receive hook events";
+const QWEN_HOOKS_DISABLED_DETAIL = "Qwen Code hooks are disabled in settings.json; DeskBuddy preserves this user setting and will not receive hook events";
 
 function dirExists(fsImpl, dirPath) {
   try {
@@ -63,7 +63,7 @@ function readJson(fsImpl, filePath) {
 
 function withAgentBubbleNote(detail, prefs, agentId) {
   // State-only agents (capabilities.permissionApproval === false) never
-  // surface a Clawd bubble in the first place, so annotating them as
+  // surface a DeskBuddy bubble in the first place, so annotating them as
   // "permission bubbles disabled" would be misleading. Antigravity, Pi,
   // and OpenClaw are current examples.
   const agent = getAgent(agentId);
@@ -97,7 +97,7 @@ function withClaudeHookGuardNotice(detail, descriptor, options) {
   if (!guard || guard.type !== "suspicious-shrink") return detail;
   return {
     ...detail,
-    detail: "Clawd paused automatic Claude hook repair after settings.json shrank during an external rewrite. Use Fix or restart Clawd to reinstall Clawd hooks.",
+    detail: "DeskBuddy paused automatic Claude hook repair after settings.json shrank during an external rewrite. Use Fix or restart DeskBuddy to reinstall DeskBuddy hooks.",
     claudeHookGuard: {
       type: guard.type,
       at: guard.at || null,
@@ -141,10 +141,10 @@ function withAgentFixAction(detail, descriptor) {
     && (detail.supplementary.value.startsWith("disabled")
         || detail.supplementary.value === "permission-user-hook")
   ) {
-    // disabled-*: user set disableAllHooks; Clawd must not override.
+    // disabled-*: user set disableAllHooks; DeskBuddy must not override.
     // permission-user-hook: user (or a sibling *.json) owns permissionRequest;
     // running Fix would re-trigger the same safe-v1 skip — surface a warning
-    // without a button so the user wires Clawd in manually if they want it.
+    // without a button so the user wires DeskBuddy in manually if they want it.
     return detail;
   }
   const fixAction = { type: "agent-integration", agentId: descriptor.agentId };
@@ -428,21 +428,21 @@ function validateCopilotHookEvents(descriptor, settings, settingsJson, options) 
   if (settings && settings.disableAllHooks === true) {
     return makeDetail(descriptor, "not-connected", {
       level: "warning",
-      detail: `${descriptor.configPath} has disableAllHooks=true; Clawd hooks will not run`,
+      detail: `${descriptor.configPath} has disableAllHooks=true; DeskBuddy hooks will not run`,
       supplementary: { key: "copilot_hooks", value: "disabled-file" },
     });
   }
   if (settingsJson && settingsJson.disableAllHooks === true) {
     return makeDetail(descriptor, "not-connected", {
       level: "warning",
-      detail: `${descriptor.settingsPath || "settings.json"} has disableAllHooks=true; Clawd hooks will not run`,
+      detail: `${descriptor.settingsPath || "settings.json"} has disableAllHooks=true; DeskBuddy hooks will not run`,
       supplementary: { key: "copilot_hooks", value: "disabled-global" },
     });
   }
 
   // Safe-v1 cross-file check. Mirrors hooks/copilot-install.js so the
   // installer's silent skip is visible to the user via the doctor pane:
-  //   - in-file: another (non-Clawd) entry in hooks.json's permissionRequest
+  //   - in-file: another (non-DeskBuddy) entry in hooks.json's permissionRequest
   //   - cross-file: any sibling *.json in the same hooks/ dir declares the event
   // When triggered, permissionRequest is removed from the per-event validation
   // pass and the result is annotated with `permission-user-hook`. The Fix
@@ -694,7 +694,7 @@ function getGeminiHooksSupplementary(settings, descriptor) {
     return {
       key: "gemini_hooks",
       value: "enabled",
-      detail: "hooksConfig allows Clawd Gemini hooks",
+      detail: "hooksConfig allows DeskBuddy Gemini hooks",
     };
   }
 
@@ -707,18 +707,18 @@ function getGeminiHooksSupplementary(settings, descriptor) {
   }
 
   const disabled = Array.isArray(hooksConfig.disabled) ? hooksConfig.disabled : [];
-  if (disabled.includes("clawd")) {
+  if (disabled.includes("deskbuddy")) {
     return {
       key: "gemini_hooks",
-      value: "disabled-clawd",
-      detail: 'hooksConfig.disabled includes "clawd"',
+      value: "disabled-deskbuddy",
+      detail: 'hooksConfig.disabled includes "deskbuddy"',
     };
   }
 
   return {
     key: "gemini_hooks",
     value: "enabled",
-    detail: "hooksConfig allows Clawd Gemini hooks",
+    detail: "hooksConfig allows DeskBuddy Gemini hooks",
   };
 }
 
@@ -752,7 +752,7 @@ function getQwenHooksSupplementary(settings) {
   return {
     key: "qwen_hooks",
     value: "enabled",
-    detail: "settings.json allows Clawd Qwen hooks",
+    detail: "settings.json allows DeskBuddy Qwen hooks",
   };
 }
 
@@ -780,14 +780,14 @@ function getAntigravityHooksSupplementary(settings) {
   if (hookGroup && typeof hookGroup === "object" && hookGroup.enabled === false) {
     return {
       key: "antigravity_hooks",
-      value: "disabled-clawd",
+      value: "disabled-deskbuddy",
       detail: `${ANTIGRAVITY_HOOK_GROUP_ID}.enabled is false`,
     };
   }
   return {
     key: "antigravity_hooks",
     value: "enabled",
-    detail: "hooks.json allows Clawd Antigravity hooks",
+    detail: "hooks.json allows DeskBuddy Antigravity hooks",
   };
 }
 
@@ -1026,7 +1026,7 @@ function validateCodewhaleHookEvents(descriptor, text, options) {
   if (codewhaleHooksExplicitlyDisabled(text)) {
     return makeDetail(descriptor, "not-connected", {
       level: "warning",
-      detail: "CodeWhale hooks are disabled in config.toml; Clawd will not receive hook events",
+      detail: "CodeWhale hooks are disabled in config.toml; DeskBuddy will not receive hook events",
       supplementary: {
         key: "codewhale_hooks",
         value: "disabled",
@@ -1195,7 +1195,7 @@ function checkKiroDirMode(descriptor, options) {
       parentDirExists: true,
       configFileExists: true,
       configPath: agentsDir,
-      detail: `${scan.fullyValidFiles.length} hooked agent(s). Use 'kiro-cli --agent clawd' to activate.`,
+      detail: `${scan.fullyValidFiles.length} hooked agent(s). Use 'kiro-cli --agent deskbuddy' to activate.`,
       kiroScan: scan,
     });
   }
@@ -1227,7 +1227,7 @@ function checkKiroDirMode(descriptor, options) {
     parentDirExists: true,
     configFileExists: true,
     configPath: agentsDir,
-    detail: "No Kiro agent config contains a valid Clawd hook",
+    detail: "No Kiro agent config contains a valid DeskBuddy hook",
     kiroScan: scan,
   });
 }
@@ -1539,7 +1539,7 @@ function checkOpenClawPluginMode(descriptor, options) {
       parentDirExists: true,
       configFileExists: true,
       configPath: descriptor.configPath,
-      detail: `OpenClaw config is not strict JSON; Clawd startup sync will skip direct edits (${err && err.message ? err.message : "parse failed"})`,
+      detail: `OpenClaw config is not strict JSON; DeskBuddy startup sync will skip direct edits (${err && err.message ? err.message : "parse failed"})`,
     });
   }
 
@@ -1549,7 +1549,7 @@ function checkOpenClawPluginMode(descriptor, options) {
       parentDirExists: true,
       configFileExists: true,
       configPath: descriptor.configPath,
-      detail: "OpenClaw config uses include directives; Clawd startup sync will not edit it directly",
+      detail: "OpenClaw config uses include directives; DeskBuddy startup sync will not edit it directly",
     });
   }
 
@@ -1571,14 +1571,14 @@ function checkOpenClawPluginMode(descriptor, options) {
   const pluginConfig = settings
     && settings.plugins
     && settings.plugins.entries
-    && settings.plugins.entries[descriptor.pluginId || "clawd-on-desk"];
+    && settings.plugins.entries[descriptor.pluginId || "deskbuddy"];
   if (pluginConfig && pluginConfig.enabled === false) {
     return makeDetail(descriptor, "not-connected", {
       level: "warning",
       parentDirExists: true,
       configFileExists: true,
       configPath: descriptor.configPath,
-      detail: "OpenClaw Clawd plugin is registered but disabled",
+      detail: "OpenClaw DeskBuddy plugin is registered but disabled",
       openclawEntry: entry,
     });
   }
@@ -1617,7 +1617,7 @@ function readJsonIfPresent(fsImpl, filePath) {
 function isPiManagedMarker(value) {
   return !!(
     value
-    && value.app === "clawd-on-desk"
+    && value.app === "deskbuddy"
     && value.integration === "pi"
     && value.managed === true
   );
@@ -1625,7 +1625,7 @@ function isPiManagedMarker(value) {
 
 function checkPiExtensionMode(descriptor, options) {
   const extensionDir = descriptor.configPath;
-  const markerPath = path.join(extensionDir, descriptor.markerFile || ".clawd-managed.json");
+  const markerPath = path.join(extensionDir, descriptor.markerFile || ".deskbuddy-managed.json");
   const extensionPath = path.join(extensionDir, descriptor.marker || "index.ts");
   const corePath = path.join(extensionDir, descriptor.coreFile || "pi-extension-core.js");
 
@@ -1649,7 +1649,7 @@ function checkPiExtensionMode(descriptor, options) {
       configPath: extensionDir,
       extensionDir,
       markerPath,
-      detail: `${extensionDir} exists but is not Clawd-managed`,
+      detail: `${extensionDir} exists but is not DeskBuddy-managed`,
     });
   }
 

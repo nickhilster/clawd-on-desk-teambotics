@@ -160,7 +160,7 @@ function evaluateConnectionTest(input = {}) {
     return {
       status: "http-blocked",
       level: "warning",
-      detail: `File activity changed for ${agents.join(", ")}, but no HTTP hook event reached Clawd. Firewall, EDR, or proxy interception is likely.`,
+      detail: `File activity changed for ${agents.join(", ")}, but no HTTP hook event reached DeskBuddy. Firewall, EDR, or proxy interception is likely.`,
     };
   }
 

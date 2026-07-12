@@ -13,7 +13,7 @@ const os = require("os");
 // Pure text completions (no tools all turn) get feedback after this delay.
 const DEFER_COMPLETION_MS = 4000;
 
-const DEBUG = !!(process.env.CLAWD_DEBUG || process.env.CLAWD_DEBUG_GEMINI);
+const DEBUG = !!(process.env.DESKBUDDY_DEBUG || process.env.DESKBUDDY_DEBUG_GEMINI);
 
 class GeminiLogMonitor {
   /**
@@ -254,7 +254,7 @@ class GeminiLogMonitor {
 
   _debugLog(msgCount, lastMsg) {
     if (!this._debugLogPath) {
-      const dir = path.join(os.homedir(), ".clawd");
+      const dir = path.join(os.homedir(), ".deskbuddy");
       try { fs.mkdirSync(dir, { recursive: true }); } catch {}
       this._debugLogPath = path.join(dir, "gemini-debug.log");
     }

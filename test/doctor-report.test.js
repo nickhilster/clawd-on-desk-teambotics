@@ -44,7 +44,7 @@ describe("doctor report redaction", () => {
     assert.ok(out.includes("[REDACTED]"));
   });
 
-  it("redacts configured Clawd app roots without consuming the rest of the path", () => {
+  it("redacts configured DeskBuddy app roots without consuming the rest of the path", () => {
     const out = redact([
       "D:/animation/hooks/opencode-plugin",
       "D:\\animation\\hooks\\codex-hook.js",
@@ -75,7 +75,7 @@ describe("doctor report redaction", () => {
     const result = redactDoctorResult({
       checks: [{
         id: "agent-integrations",
-        detail: "C:\\Users\\Alice\\.clawd\\runtime.json",
+        detail: "C:\\Users\\Alice\\.deskbuddy\\runtime.json",
         details: [{
           agentName: "Cursor Agent",
           detail: "C:\\Users\\Alice\\.cursor\\hooks.json missing",
@@ -109,10 +109,10 @@ describe("formatDiagnosticReport", () => {
       codexHookTrust: {
         key: "codex_hook_trust",
         value: "needs-review",
-        detail: "2/2 Clawd Codex hook(s) need Codex /hooks review: PermissionRequest, Stop",
+        detail: "2/2 DeskBuddy Codex hook(s) need Codex /hooks review: PermissionRequest, Stop",
       },
       kiroScan: {
-        fullyValidFiles: ["clawd.json"],
+        fullyValidFiles: ["deskbuddy.json"],
         brokenFiles: ["custom.json"],
         noMarkerFiles: ["other.json"],
         corruptFiles: ["bad.json"],
@@ -125,7 +125,7 @@ describe("formatDiagnosticReport", () => {
     assert.match(detail, /hooks=uncertain/);
     assert.match(detail, /codex_hook_trust=needs-review/);
     assert.match(detail, /PermissionRequest, Stop/);
-    assert.match(detail, /valid=clawd\.json/);
+    assert.match(detail, /valid=deskbuddy\.json/);
     assert.match(detail, /broken=custom\.json/);
     assert.match(detail, /corrupt=bad\.json/);
     assert.match(detail, /no-marker=1/);
@@ -135,7 +135,7 @@ describe("formatDiagnosticReport", () => {
 
   it("formats Gemini supplementary diagnostics into visible detail text", () => {
     const detail = formatAgentDetail({
-      detail: "Gemini hooks are disabled in settings.json; Clawd preserves this user setting and will not receive hook events",
+      detail: "Gemini hooks are disabled in settings.json; DeskBuddy preserves this user setting and will not receive hook events",
       supplementary: {
         key: "gemini_hooks",
         value: "disabled-global",
@@ -172,7 +172,7 @@ describe("formatDiagnosticReport", () => {
                 detail: "config missing",
               },
               kiroScan: {
-                fullyValidFiles: ["clawd.json"],
+                fullyValidFiles: ["deskbuddy.json"],
                 brokenFiles: [],
                 noMarkerFiles: [],
                 corruptFiles: [],
@@ -208,12 +208,12 @@ describe("formatDiagnosticReport", () => {
       appRoot: "D:\\animation",
     });
 
-    assert.match(report, /# Clawd Diagnostic Report/);
+    assert.match(report, /# DeskBuddy Diagnostic Report/);
     assert.match(report, /Overall: WARNING/);
     assert.match(report, /Cursor Agent/);
     assert.match(report, /permission bubbles disabled/);
     assert.match(report, /hooks=uncertain/);
-    assert.match(report, /valid=clawd\.json/);
+    assert.match(report, /valid=deskbuddy\.json/);
     assert.match(report, /opencode issue: directory-missing/);
     assert.match(report, /\[APP\]\/hooks\/opencode-plugin/);
     assert.match(report, /## Connection Test/);
@@ -227,7 +227,7 @@ describe("formatDiagnosticReport", () => {
     assert.ok(!report.includes("~/.cursor\\hooks.json"));
   });
 
-  it("keeps the fallback file table when no HTTP event reached Clawd", () => {
+  it("keeps the fallback file table when no HTTP event reached DeskBuddy", () => {
     const report = formatDiagnosticReport({
       generatedAt: "2026-04-28T14:32:00.000Z",
       overall: { status: "warning", issueCount: 1 },
@@ -235,7 +235,7 @@ describe("formatDiagnosticReport", () => {
       connectionTest: {
         status: "http-blocked",
         level: "warning",
-        detail: "File activity changed, but no HTTP hook event reached Clawd.",
+        detail: "File activity changed, but no HTTP hook event reached DeskBuddy.",
         events: [],
         fileActivity: [{
           agentId: "codex",

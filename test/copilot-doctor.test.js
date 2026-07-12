@@ -18,7 +18,7 @@ const { COPILOT_HOOK_EVENTS, MARKER } = require("../hooks/copilot-install");
 const tempDirs = [];
 
 function makeTempCopilotHome() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-doctor-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-doctor-"));
   const parentDir = path.join(root, ".copilot");
   fs.mkdirSync(path.join(parentDir, "hooks"), { recursive: true });
   tempDirs.push(root);
@@ -81,7 +81,7 @@ afterEach(() => {
 });
 
 describe("Copilot doctor — happy path", () => {
-  it("ok when all 11 events register Clawd hook in bash field (10 state + permissionRequest)", () => {
+  it("ok when all 11 events register DeskBuddy hook in bash field (10 state + permissionRequest)", () => {
     const parentDir = makeTempCopilotHome();
     const descriptor = copilotDescriptor(parentDir);
     writeJson(descriptor.configPath, copilotHooksConfig(COPILOT_HOOK_EVENTS));
@@ -120,7 +120,7 @@ describe("Copilot doctor — happy path", () => {
 
 describe("Copilot doctor — missing / broken paths", () => {
   it("not-installed when parent dir is absent", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-copilot-doctor-empty-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-copilot-doctor-empty-"));
     tempDirs.push(root);
     const descriptor = copilotDescriptor(path.join(root, "absent"));
 
@@ -285,7 +285,7 @@ describe("Copilot doctor — safe-v1 permission-user-hook signal", () => {
   //   1. show "missing permissionRequest" + a Fix button that does nothing.
   //   2. quietly report ok while a sibling user hook owns the event.
 
-  it("annotates ok + supplementary when a non-Clawd entry sits alongside Clawd in hooks.json", () => {
+  it("annotates ok + supplementary when a non-DeskBuddy entry sits alongside DeskBuddy in hooks.json", () => {
     const parentDir = makeTempCopilotHome();
     const descriptor = copilotDescriptor(parentDir);
     const cfg = copilotHooksConfig(COPILOT_HOOK_EVENTS);
@@ -306,7 +306,7 @@ describe("Copilot doctor — safe-v1 permission-user-hook signal", () => {
   it("annotates ok + supplementary when a sibling *.json declares permissionRequest", () => {
     const parentDir = makeTempCopilotHome();
     const descriptor = copilotDescriptor(parentDir);
-    // hooks.json: Clawd state hooks only, no permissionRequest entry
+    // hooks.json: DeskBuddy state hooks only, no permissionRequest entry
     const stateOnly = COPILOT_HOOK_EVENTS.filter((e) => e !== "permissionRequest");
     writeJson(descriptor.configPath, copilotHooksConfig(stateOnly));
     // sibling file: user permission hook

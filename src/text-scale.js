@@ -56,34 +56,34 @@ function applyZoomToWindow(win, scale) {
   // Reposition paths call this every frame during pet drags; memoize per
   // webContents. Inserted CSS does not survive reloads, so the
   // did-finish-load hook below clears the memo and the next call re-injects.
-  if (wc.__clawdAppliedTextZoom === s) return true;
+  if (wc.__deskbuddyAppliedTextZoom === s) return true;
   try {
-    if (!wc.__clawdTextZoomReloadHooked && typeof wc.on === "function") {
-      wc.__clawdTextZoomReloadHooked = true;
+    if (!wc.__deskbuddyTextZoomReloadHooked && typeof wc.on === "function") {
+      wc.__deskbuddyTextZoomReloadHooked = true;
       wc.on("did-finish-load", () => {
-        wc.__clawdAppliedTextZoom = undefined;
-        wc.__clawdTextZoomCssKey = undefined;
+        wc.__deskbuddyAppliedTextZoom = undefined;
+        wc.__deskbuddyTextZoomCssKey = undefined;
       });
     }
     // Neutralize any shared HostZoomMap factor left behind by the earlier
     // setZoomFactor-based builds.
     if (typeof wc.setZoomFactor === "function") wc.setZoomFactor(1);
 
-    wc.__clawdAppliedTextZoom = s;
+    wc.__deskbuddyAppliedTextZoom = s;
     const runInjection = () => {
-      // --clawd-text-zoom rides along for stylesheets that need zoom-corrected
+      // --deskbuddy-text-zoom rides along for stylesheets that need zoom-corrected
       // viewport units: vh/vw resolve against the UNZOOMED initial containing
       // block, so `100vh` renders S× too tall inside the zoomed page. Rules
-      // write `calc(100vh / var(--clawd-text-zoom, 1))` to stay window-true.
+      // write `calc(100vh / var(--deskbuddy-text-zoom, 1))` to stay window-true.
       const insertion = wc.insertCSS(
-        `:root { zoom: ${s} !important; --clawd-text-zoom: ${s}; }`
+        `:root { zoom: ${s} !important; --deskbuddy-text-zoom: ${s}; }`
       );
       if (!insertion || typeof insertion.then !== "function") return insertion;
       return insertion.then((key) => {
         // Swap-then-remove keeps exactly one zoom stylesheet alive; removal
         // failures are harmless (the newer sheet wins the cascade).
-        const previousKey = wc.__clawdTextZoomCssKey;
-        wc.__clawdTextZoomCssKey = key;
+        const previousKey = wc.__deskbuddyTextZoomCssKey;
+        wc.__deskbuddyTextZoomCssKey = key;
         if (previousKey != null && typeof wc.removeInsertedCSS === "function") {
           const removal = wc.removeInsertedCSS(previousKey);
           if (removal && typeof removal.catch === "function") removal.catch(() => {});
@@ -91,18 +91,18 @@ function applyZoomToWindow(win, scale) {
       }, () => {
         // Pre-load injections reject; clearing the memo lets the
         // did-finish-load / next reposition apply retry.
-        if (wc.__clawdAppliedTextZoom === s) wc.__clawdAppliedTextZoom = undefined;
+        if (wc.__deskbuddyAppliedTextZoom === s) wc.__deskbuddyAppliedTextZoom = undefined;
       });
     };
     // Serialize insert/remove pairs per webContents so rapid slider drags
     // can't interleave and resurrect a stale sheet.
-    const queue = wc.__clawdTextZoomQueue;
-    wc.__clawdTextZoomQueue = queue && typeof queue.then === "function"
+    const queue = wc.__deskbuddyTextZoomQueue;
+    wc.__deskbuddyTextZoomQueue = queue && typeof queue.then === "function"
       ? queue.then(runInjection, runInjection)
       : runInjection();
     return true;
   } catch {
-    wc.__clawdAppliedTextZoom = undefined;
+    wc.__deskbuddyAppliedTextZoom = undefined;
     return false;
   }
 }

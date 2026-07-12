@@ -84,21 +84,21 @@ test("buildSidecarEnv uses an allowlist and does not inherit unrelated secrets",
       OPENAI_API_KEY: "sk-should-not-inherit",
       RANDOM_SECRET: "nope",
       // Sidecar must read the token from the env-file at SIDECAR_ENV_TOKEN_FILE,
-      // never inherit it from Clawd's process.env. If a stray CLAWD_TG_BOT_TOKEN
-      // leaks into Clawd's environment (e.g. shell export), it MUST NOT be
+      // never inherit it from DeskBuddy's process.env. If a stray DESKBUDDY_TG_BOT_TOKEN
+      // leaks into DeskBuddy's environment (e.g. shell export), it MUST NOT be
       // forwarded to the child.
-      CLAWD_TG_BOT_TOKEN: "123:should-not-inherit",
+      DESKBUDDY_TG_BOT_TOKEN: "123:should-not-inherit",
     },
-    configPath: "C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk\\cc-connect-clawd\\clawd-bridge.toml",
-    tokenEnvFilePath: "C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk\\telegram-approval.env",
+    configPath: "C:\\Users\\me\\AppData\\Roaming\\DeskBuddy\\deskbuddy-connect\\deskbuddy-bridge.toml",
+    tokenEnvFilePath: "C:\\Users\\me\\AppData\\Roaming\\DeskBuddy\\telegram-approval.env",
   });
   assert.equal(env.PATH, "C:\\Windows");
   assert.equal(env.SystemRoot, "C:\\Windows");
   assert.equal(env.OPENAI_API_KEY, undefined);
   assert.equal(env.RANDOM_SECRET, undefined);
-  assert.equal(env[SIDECAR_ENV_CONFIG].endsWith("clawd-bridge.toml"), true);
+  assert.equal(env[SIDECAR_ENV_CONFIG].endsWith("deskbuddy-bridge.toml"), true);
   assert.equal(env[SIDECAR_ENV_TOKEN_FILE].endsWith("telegram-approval.env"), true);
-  assert.equal(env.CLAWD_TG_BOT_TOKEN, undefined);
+  assert.equal(env.DESKBUDDY_TG_BOT_TOKEN, undefined);
 });
 
 test("buildSidecarEnv ignores any botToken option — token must come from the env-file", () => {
@@ -107,11 +107,11 @@ test("buildSidecarEnv ignores any botToken option — token must come from the e
   const env = buildSidecarEnv({
     platform: "linux",
     baseEnv: { PATH: "/usr/bin" },
-    configPath: "/userdata/cc-connect-clawd/clawd-bridge.toml",
+    configPath: "/userdata/deskbuddy-connect/deskbuddy-bridge.toml",
     tokenEnvFilePath: "/userdata/telegram-approval.env",
     botToken: "123:caller-tried-to-pass-a-token",
   });
-  assert.equal(env.CLAWD_TG_BOT_TOKEN, undefined);
+  assert.equal(env.DESKBUDDY_TG_BOT_TOKEN, undefined);
 });
 
 test("sidecar manager parses handshake and creates a client", async () => {
@@ -119,8 +119,8 @@ test("sidecar manager parses handshake and creates a client", async () => {
   const { spawn, calls } = makeSpawn([child]);
   const sidecar = new TelegramApprovalSidecar({
     spawn,
-    binaryPath: "D:\\tmp\\cc-connect-clawd\\cc-connect-clawd.exe",
-    userDataDir: "C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk",
+    binaryPath: "D:\\tmp\\deskbuddy-connect\\deskbuddy-connect.exe",
+    userDataDir: "C:\\Users\\me\\AppData\\Roaming\\DeskBuddy",
     baseEnv: { PATH: "C:\\Windows", OPENAI_API_KEY: "sk-nope" },
     startupTimeoutMs: 100,
   });
@@ -136,9 +136,9 @@ test("sidecar manager parses handshake and creates a client", async () => {
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].args, [
     "--config",
-    defaultConfigPath("C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk"),
+    defaultConfigPath("C:\\Users\\me\\AppData\\Roaming\\DeskBuddy"),
     "--env-file",
-    defaultTokenEnvFilePath("C:\\Users\\me\\AppData\\Roaming\\Clawd on Desk"),
+    defaultTokenEnvFilePath("C:\\Users\\me\\AppData\\Roaming\\DeskBuddy"),
   ]);
   assert.equal(calls[0].opts.env.OPENAI_API_KEY, undefined);
 });
@@ -296,8 +296,8 @@ test("resolveOverrideBinaryPath accepts a directory override for dev builds", ()
     statSync: () => ({ isDirectory: () => true }),
   };
   assert.equal(
-    resolveOverrideBinaryPath("D:\\tmp\\cc-connect-clawd", { platform: "win32", fs: fakeFs }),
-    path.join("D:\\tmp\\cc-connect-clawd", "cc-connect-clawd.exe")
+    resolveOverrideBinaryPath("D:\\tmp\\deskbuddy-connect", { platform: "win32", fs: fakeFs }),
+    path.join("D:\\tmp\\deskbuddy-connect", "deskbuddy-connect.exe")
   );
 });
 
@@ -307,7 +307,7 @@ test("resolveSidecarBinaryPath uses packaged resources path by platform and arch
     platform: "win32",
     arch: "arm64",
     isPackaged: true,
-  }), path.join("C:\\resources", "sidecars", "cc-connect-clawd", "windows-arm64", "cc-connect-clawd.exe"));
+  }), path.join("C:\\resources", "sidecars", "deskbuddy-connect", "windows-arm64", "deskbuddy-connect.exe"));
 });
 
 test("resolveSidecarBinaryPath ignores resourcesPath in source mode and falls back to repo bin", () => {
@@ -320,7 +320,7 @@ test("resolveSidecarBinaryPath ignores resourcesPath in source mode and falls ba
   assert.equal(resolved.source, "dev");
   assert.equal(
     resolved.path,
-    path.join(__dirname, "..", "bin", "cc-connect-clawd", "linux-x64", "cc-connect-clawd")
+    path.join(__dirname, "..", "bin", "deskbuddy-connect", "linux-x64", "deskbuddy-connect")
   );
 });
 
@@ -333,19 +333,19 @@ test("resolveSidecarBinaryPath treats resourcesPath without packaged mode as sou
   assert.equal(resolved.source, "dev");
   assert.equal(
     resolved.path,
-    path.join(__dirname, "..", "bin", "cc-connect-clawd", "windows-x64", "cc-connect-clawd.exe")
+    path.join(__dirname, "..", "bin", "deskbuddy-connect", "windows-x64", "deskbuddy-connect.exe")
   );
 });
 
 test("sidecar binary names are stable across packaged platforms", () => {
-  assert.equal(sidecarExecutableName("win32"), "cc-connect-clawd.exe");
-  assert.equal(sidecarExecutableName("darwin"), "cc-connect-clawd");
-  assert.equal(sidecarExecutableName("linux"), "cc-connect-clawd");
+  assert.equal(sidecarExecutableName("win32"), "deskbuddy-connect.exe");
+  assert.equal(sidecarExecutableName("darwin"), "deskbuddy-connect");
+  assert.equal(sidecarExecutableName("linux"), "deskbuddy-connect");
   assert.equal(sidecarPlatformArchDir({ platform: "win32", arch: "x64" }), "windows-x64");
   assert.equal(sidecarPlatformArchDir({ platform: "darwin", arch: "arm64" }), "darwin-arm64");
   assert.equal(
     sidecarResourceRelativePath({ platform: "linux", arch: "x64" }),
-    path.join("sidecars", "cc-connect-clawd", "linux-x64", "cc-connect-clawd")
+    path.join("sidecars", "deskbuddy-connect", "linux-x64", "deskbuddy-connect")
   );
 });
 
@@ -404,7 +404,7 @@ test("sidecar manager does not suggest an unsupported source fetch target", asyn
   assert.equal(sidecar.getStatus().status, "failed");
   assert.equal(sidecar.getStatus().binaryPathSource, "dev");
   assert.match(sidecar.getStatus().message, /No pinned Telegram approval sidecar is available for linux-arm64/);
-  assert.match(sidecar.getStatus().message, /CLAWD_CC_CONNECT_CLAWD_PATH/);
+  assert.match(sidecar.getStatus().message, /DESKBUDDY_DESKBUDDY_CONNECT_PATH/);
   assert.doesNotMatch(sidecar.getStatus().message, /npm run fetch:sidecars -- --target linux-arm64/);
 });
 

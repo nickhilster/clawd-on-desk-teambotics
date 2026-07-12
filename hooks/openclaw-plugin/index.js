@@ -3,12 +3,12 @@ import { request } from "http";
 import { homedir } from "os";
 import { join } from "path";
 
-export const PLUGIN_ID = "clawd-on-desk";
+export const PLUGIN_ID = "deskbuddy";
 export const AGENT_ID = "openclaw";
 export const STOP_DEBOUNCE_MS = 1500;
 
-const CLAWD_DIR = join(homedir(), ".clawd");
-const RUNTIME_CONFIG_PATH = join(CLAWD_DIR, "runtime.json");
+const DESKBUDDY_DIR = join(homedir(), ".deskbuddy");
+const RUNTIME_CONFIG_PATH = join(DESKBUDDY_DIR, "runtime.json");
 const DEFAULT_OPENCLAW_STATE_DIR = join(homedir(), ".openclaw");
 const SERVER_PORTS = [23333, 23334, 23335, 23336, 23337];
 const POST_TIMEOUT_MS = 1000;
@@ -196,7 +196,7 @@ export function createOpenClawRuntime(options = {}) {
   const pendingStops = new Map();
   const setTimeoutFn = options.setTimeout || setTimeout;
   const clearTimeoutFn = options.clearTimeout || clearTimeout;
-  const postState = typeof options.postState === "function" ? options.postState : postStateToClawd;
+  const postState = typeof options.postState === "function" ? options.postState : postStateToDeskBuddy;
   const processInfo = options.processInfo === undefined ? null : options.processInfo;
 
   function clearPendingStop(key) {
@@ -323,7 +323,7 @@ export function createOpenClawRuntime(options = {}) {
   };
 }
 
-export function postStateToClawd(body) {
+export function postStateToDeskBuddy(body) {
   const payload = JSON.stringify(body);
 
   (async () => {
@@ -356,9 +356,9 @@ function postJsonToPort(port, payload) {
       },
       timeout: POST_TIMEOUT_MS,
     }, (res) => {
-      const isClawd = res.headers["x-clawd-server"] === "clawd-on-desk";
+      const isDeskBuddy = res.headers["x-deskbuddy-server"] === "deskbuddy";
       res.resume();
-      res.on("end", () => finish(isClawd));
+      res.on("end", () => finish(isDeskBuddy));
     });
     req.on("timeout", () => {
       req.destroy();
@@ -374,7 +374,7 @@ let defaultRuntime = null;
 
 export default {
   id: PLUGIN_ID,
-  name: "Clawd on Desk",
+  name: "DeskBuddy",
   register(api) {
     if (!defaultRuntime) defaultRuntime = createOpenClawRuntime();
     defaultRuntime.register(api);

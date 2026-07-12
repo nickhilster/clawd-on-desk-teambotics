@@ -226,7 +226,7 @@ async function pollWithConflictRetry(
       const remaining = totalDeadlineMs - elapsed;
       if (remaining <= 0) {
         // Deadline hit — propagate the original conflict so caller can decide
-        // (UI prompts user to close other Clawd instances).
+        // (UI prompts user to close other DeskBuddy instances).
         const wrapped = new TelegramApiError({
           status: 409,
           code: 409,

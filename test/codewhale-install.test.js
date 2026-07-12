@@ -14,7 +14,7 @@ const {
 const tempDirs = [];
 
 function makeTempConfig() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codewhale-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codewhale-"));
   tempDirs.push(root);
   const configDir = path.join(root, ".codewhale");
   fs.mkdirSync(configDir, { recursive: true });
@@ -39,7 +39,7 @@ function legacyManagedBlock(event) {
     "# managed by deskbuddy",
     "[[hooks.hooks]]",
     `event = "${event}"`,
-    `command = '''"node" "/old/clawd/hooks/codewhale-hook.js" "${event}"'''`,
+    `command = '''"node" "/old/deskbuddy/hooks/codewhale-hook.js" "${event}"'''`,
     "background = true",
   ].join("\n");
 }
@@ -49,7 +49,7 @@ function legacyOrphanBlock(event) {
     "",
     "[[hooks.hooks]]",
     "background = true",
-    `command = '"/usr/local/bin/node" "/old/clawd/hooks/codewhale-hook.js" ${event}'`,
+    `command = '"/usr/local/bin/node" "/old/deskbuddy/hooks/codewhale-hook.js" ${event}'`,
     `event = "${event}"`,
     "timeout_secs = 5",
   ].join("\n");
@@ -103,14 +103,14 @@ describe("CodeWhale hook installer", () => {
       "[[hooks.hooks]]",
       "# managed by deskbuddy",
       "event = \"session_start\"",
-      `command = '''"${existingNode}" "/old/clawd/hooks/codewhale-hook.js" "session_start"'''`,
+      `command = '''"${existingNode}" "/old/deskbuddy/hooks/codewhale-hook.js" "session_start"'''`,
       "background = true",
       "",
     ].join("\n"));
 
     const result = registerCodewhaleHooks({
       configPath,
-      hookScriptPath: "/new/clawd/hooks/codewhale-hook.js",
+      hookScriptPath: "/new/deskbuddy/hooks/codewhale-hook.js",
       isElectron: true,
       platform: "darwin",
       homeDir: "/Users/tester",
@@ -123,13 +123,13 @@ describe("CodeWhale hook installer", () => {
     assert.strictEqual(result.added, HOOK_ENTRIES.length);
     assert.match(
       content,
-      /command = '''"\/Users\/tester\/\.nvm\/versions\/node\/v22\.0\.0\/bin\/node" "\/new\/clawd\/hooks\/codewhale-hook\.js" "session_start"'''/
+      /command = '''"\/Users\/tester\/\.nvm\/versions\/node\/v22\.0\.0\/bin\/node" "\/new\/deskbuddy\/hooks\/codewhale-hook\.js" "session_start"'''/
     );
     assert.doesNotMatch(content, /command = '''"node"/);
   });
 
   it("respects CodeWhale config path environment overrides", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "clawd-codewhale-env-"));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "deskbuddy-codewhale-env-"));
     tempDirs.push(root);
     const codewhalePath = path.join(root, "custom", "codewhale.toml");
     const deepseekPath = path.join(root, "legacy", "deepseek.toml");
@@ -150,7 +150,7 @@ describe("CodeWhale hook installer", () => {
     const result = registerCodewhaleHooks({
       silent: true,
       env: { CODEWHALE_CONFIG_PATH: codewhalePath },
-      hookScriptPath: "/new/clawd/hooks/codewhale-hook.js",
+      hookScriptPath: "/new/deskbuddy/hooks/codewhale-hook.js",
       nodeBin: "/usr/local/bin/node",
       platform: "linux",
     });
@@ -182,14 +182,14 @@ describe("CodeWhale hook installer", () => {
       registerCodewhaleHooks({
         silent: true,
         configPath,
-        hookScriptPath: "/new/clawd/hooks/codewhale-hook.js",
+        hookScriptPath: "/new/deskbuddy/hooks/codewhale-hook.js",
         nodeBin: "/usr/local/bin/node",
         platform: "linux",
       });
       const content = read(configPath);
       assert.strictEqual(countHookBlocks(content), HOOK_ENTRIES.length + 1);
       assert.strictEqual(countManagedMarkers(content), HOOK_ENTRIES.length);
-      assert.strictEqual((content.match(/\/old\/clawd\/hooks\/codewhale-hook\.js/g) || []).length, 0);
+      assert.strictEqual((content.match(/\/old\/deskbuddy\/hooks\/codewhale-hook\.js/g) || []).length, 0);
       assert.ok(content.includes('command = "echo user-hook"'));
     }
 
@@ -225,7 +225,7 @@ describe("CodeWhale hook installer", () => {
     const result = registerCodewhaleHooks({
       silent: true,
       configPath,
-      hookScriptPath: "/new/clawd/hooks/codewhale-hook.js",
+      hookScriptPath: "/new/deskbuddy/hooks/codewhale-hook.js",
       nodeBin: "/usr/local/bin/node",
       platform: "linux",
     });
@@ -235,13 +235,13 @@ describe("CodeWhale hook installer", () => {
     assert.strictEqual(result.added, HOOK_ENTRIES.length);
     assert.strictEqual(countHookBlocks(content), HOOK_ENTRIES.length + 1);
     assert.strictEqual(countManagedMarkers(content), HOOK_ENTRIES.length);
-    assert.strictEqual((content.match(/\/old\/clawd\/hooks\/codewhale-hook\.js/g) || []).length, 0);
+    assert.strictEqual((content.match(/\/old\/deskbuddy\/hooks\/codewhale-hook\.js/g) || []).length, 0);
     assert.ok(content.includes('command = "echo user-hook"'));
 
     const second = registerCodewhaleHooks({
       silent: true,
       configPath,
-      hookScriptPath: "/new/clawd/hooks/codewhale-hook.js",
+      hookScriptPath: "/new/deskbuddy/hooks/codewhale-hook.js",
       nodeBin: "/usr/local/bin/node",
       platform: "linux",
     });
@@ -274,7 +274,7 @@ describe("CodeWhale hook installer", () => {
     const hookSection = sections.find((section) => section.header === "hooks.hooks");
 
     assert.strictEqual(__test.sectionHasMarker(hookSection), false);
-    assert.strictEqual(__test.sectionHasClawdHookCommand(hookSection), true);
+    assert.strictEqual(__test.sectionHasDeskBuddyHookCommand(hookSection), true);
     assert.strictEqual(__test.sectionIsManagedHook(hookSection), true);
   });
 
@@ -289,7 +289,7 @@ describe("CodeWhale hook installer", () => {
         "[[hooks.hooks]]",
         "# managed by deskbuddy",
         'event = "session_start"',
-        `command = '''"node" "/old/clawd/hooks/codewhale-hook.js" "session_start"'''`,
+        `command = '''"node" "/old/deskbuddy/hooks/codewhale-hook.js" "session_start"'''`,
         "",
         "[[mcp.servers]]",
         'name = "keep-me"',
@@ -326,7 +326,7 @@ describe("CodeWhale hook installer", () => {
     registerCodewhaleHooks({
       silent: true,
       configPath,
-      hookScriptPath: "/new/clawd/hooks/codewhale-hook.js",
+      hookScriptPath: "/new/deskbuddy/hooks/codewhale-hook.js",
       nodeBin: "/usr/local/bin/node",
       platform: "linux",
     });
