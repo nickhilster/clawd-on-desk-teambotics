@@ -113,7 +113,7 @@ scripts/*
 !scripts/verify-sidecar-binaries.js
 !scripts/fetch-sidecar-binaries.js
 
-# Superpowers brainstorming companion scratch files
+# Superpowers brainstorming/subagent-driven-development scratch files
 .superpowers/
 
 # oh-my-cursor state
