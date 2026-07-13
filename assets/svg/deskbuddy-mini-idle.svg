@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-7 -8 28 28" width="200" height="200">
+  <defs>
+    <linearGradient id="db-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <style>
+      #body-js { transform-box: fill-box; transform-origin: 50% 50%; animation: db-mini-breathe 3.2s ease-in-out infinite; }
+      @keyframes db-mini-breathe {
+        0%, 100% { transform: scale(1,1); }
+        50%      { transform: scale(1.02,0.98); }
+      }
+      .mini-blink { transform-box: fill-box; transform-origin: 50% 50%; animation: db-mini-blink 4s ease-in-out infinite; }
+      @keyframes db-mini-blink {
+        0%, 92%, 100% { transform: scaleY(1); }
+        96%           { transform: scaleY(0.1); }
+      }
+    </style>
+  </defs>
+  <ellipse id="shadow-js" cx="7" cy="14" rx="5" ry="0.9" fill="#000000" opacity="0.35"/>
+  <g id="body-js">
+    <circle cx="7" cy="8" r="6" fill="url(#db-gradient)"/>
+    <g id="eyes-js" fill="#1a1025">
+      <circle class="mini-blink" cx="5" cy="7" r="1"/>
+      <circle class="mini-blink" cx="9" cy="7" r="1"/>
+    </g>
+    <path d="M5 10 Q7 11.4 9 10" stroke="#1a1025" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -15,7 +15,7 @@
   },
   "eyeTracking": {
     "enabled": true,
-    "states": ["idle", "dozing"],
+    "states": ["idle", "dozing", "mini-idle"],
     "eyeRatioX": 0.5,
     "eyeRatioY": 0.65,
     "maxOffset": 3,
@@ -56,7 +56,21 @@
     { "file": "deskbuddy-idle-reading.svg", "duration": 13000 },
     { "file": "deskbuddy-idle-daydream.svg", "duration": 8000 }
   ],
-  "miniMode": { "supported": false },
+  "miniMode": {
+    "supported": true,
+    "offsetRatio": 0.486,
+    "states": {
+      "mini-idle": ["deskbuddy-mini-idle.svg"],
+      "mini-enter": ["deskbuddy-mini-enter.svg"],
+      "mini-peek": ["deskbuddy-mini-peek.svg"],
+      "mini-alert": ["deskbuddy-mini-alert.svg"],
+      "mini-happy": ["deskbuddy-mini-happy.svg"],
+      "mini-sleep": ["deskbuddy-mini-sleep.svg"],
+      "mini-enter-sleep": ["deskbuddy-mini-enter-sleep.svg"],
+      "mini-crabwalk": ["deskbuddy-mini-hop.svg"],
+      "mini-working": ["deskbuddy-mini-working.svg"]
+    }
+  },
   "sounds": { "complete": "complete.mp3", "confirm": "confirm.mp3" },
   "objectScale": {
     "widthRatio": 1.9,

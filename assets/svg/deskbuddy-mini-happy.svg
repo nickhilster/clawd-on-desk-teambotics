@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-7 -8 28 28" width="200" height="200">
+  <defs>
+    <linearGradient id="db-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+    <style>
+      #body-js { transform-box: fill-box; transform-origin: 50% 100%; animation: db-mini-happy-bob 0.7s ease-in-out infinite; }
+      @keyframes db-mini-happy-bob {
+        0%, 100% { transform: scale(1,1) translateY(0); }
+        50%      { transform: scale(1.05,1.08) translateY(-1px); }
+      }
+    </style>
+  </defs>
+  <ellipse cx="7" cy="14" rx="5" ry="0.9" fill="#000000" opacity="0.35"/>
+  <g id="body-js">
+    <circle cx="7" cy="8" r="6" fill="url(#db-gradient)"/>
+    <g stroke="#1a1025" stroke-width="0.8" fill="none" stroke-linecap="round">
+      <path d="M4 6.6 Q5 5.2 6 6.6"/>
+      <path d="M8 6.6 Q9 5.2 10 6.6"/>
+    </g>
+    <path d="M4.5 10 Q7 13 9.5 10 Q7 11.2 4.5 10 Z" fill="#1a1025"/>
+  </g>
+</svg>
