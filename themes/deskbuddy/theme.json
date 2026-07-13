@@ -51,6 +51,11 @@
     { "minSessions": 2, "file": "deskbuddy-dizzy.svg" },
     { "minSessions": 1, "file": "deskbuddy-groove.svg" }
   ],
+  "idleAnimations": [
+    { "file": "deskbuddy-idle-look.svg", "duration": 6500 },
+    { "file": "deskbuddy-idle-reading.svg", "duration": 13000 },
+    { "file": "deskbuddy-idle-daydream.svg", "duration": 8000 }
+  ],
   "miniMode": { "supported": false },
   "sounds": { "complete": "complete.mp3", "confirm": "confirm.mp3" },
   "objectScale": {
