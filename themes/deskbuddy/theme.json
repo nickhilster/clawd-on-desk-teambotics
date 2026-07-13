@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "name": "DeskBuddy",
+  "version": "1.0.0",
+  "author": "DeskBuddy Team",
+  "description": "The DeskBuddy mascot come to life — a gradient blob with a whole library of emoji-inspired expressions.",
+  "viewBox": { "x": -13, "y": -15, "width": 52, "height": 52 },
+  "layout": {
+    "contentBox": { "x": 2, "y": 4, "width": 22, "height": 22 },
+    "marginBox": { "x": -2, "y": 0, "width": 30, "height": 30 },
+    "centerX": 13,
+    "baselineY": 27,
+    "visibleHeightRatio": 0.6,
+    "baselineBottomRatio": 0.05
+  },
+  "eyeTracking": {
+    "enabled": true,
+    "states": ["idle"],
+    "eyeRatioX": 0.5,
+    "eyeRatioY": 0.65,
+    "maxOffset": 3,
+    "bodyScale": 0.3,
+    "shadowStretch": 0.15,
+    "shadowShift": 0.3,
+    "ids": { "eyes": "eyes-js", "body": "body-js", "shadow": "shadow-js" },
+    "shadowOrigin": "13px 27px"
+  },
+  "sleepSequence": { "mode": "direct" },
+  "states": {
+    "idle": ["deskbuddy-idle.svg"],
+    "thinking": ["deskbuddy-thinking.svg"],
+    "working": ["deskbuddy-working.svg"],
+    "sleeping": ["deskbuddy-sleeping.svg"]
+  },
+  "miniMode": { "supported": false },
+  "sounds": { "complete": "complete.mp3", "confirm": "confirm.mp3" },
+  "objectScale": {
+    "widthRatio": 1.9,
+    "heightRatio": 1.3,
+    "offsetX": -0.45,
+    "offsetY": -0.25
+  }
+}
