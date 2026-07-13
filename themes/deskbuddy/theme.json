@@ -56,6 +56,13 @@
     { "file": "deskbuddy-idle-reading.svg", "duration": 13000 },
     { "file": "deskbuddy-idle-daydream.svg", "duration": 8000 }
   ],
+  "reactions": {
+    "drag": { "file": "deskbuddy-react-drag.svg" },
+    "clickLeft": { "file": "deskbuddy-react-left.svg", "duration": 2500 },
+    "clickRight": { "file": "deskbuddy-react-right.svg", "duration": 2500 },
+    "annoyed": { "file": "deskbuddy-react-annoyed.svg", "duration": 3500 },
+    "double": { "files": ["deskbuddy-react-double.svg"], "duration": 3500 }
+  },
   "miniMode": {
     "supported": true,
     "offsetRatio": 0.486,

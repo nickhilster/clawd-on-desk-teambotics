@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-13 -15 52 52" width="400" height="400">
+  <defs>
+    <linearGradient id="db-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#2dd4bf"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="13" cy="27" rx="9" ry="1.5" fill="#000000" opacity="0.25"/>
+  <ellipse cx="13" cy="15" rx="11" ry="8" fill="url(#db-gradient)" transform="rotate(-20 13 15)"/>
+  <g fill="#1a1025">
+    <ellipse cx="9" cy="14" rx="1.5" ry="1"/>
+    <ellipse cx="17" cy="14" rx="1.5" ry="1"/>
+  </g>
+  <path d="M9 19 Q13 20 17 19" stroke="#1a1025" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+</svg>
