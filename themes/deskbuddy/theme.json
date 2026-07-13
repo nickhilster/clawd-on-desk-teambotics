@@ -15,7 +15,7 @@
   },
   "eyeTracking": {
     "enabled": true,
-    "states": ["idle"],
+    "states": ["idle", "dozing"],
     "eyeRatioX": 0.5,
     "eyeRatioY": 0.65,
     "maxOffset": 3,
@@ -25,12 +25,16 @@
     "ids": { "eyes": "eyes-js", "body": "body-js", "shadow": "shadow-js" },
     "shadowOrigin": "13px 27px"
   },
-  "sleepSequence": { "mode": "direct" },
+  "sleepSequence": { "mode": "full" },
   "states": {
     "idle": ["deskbuddy-idle.svg"],
     "thinking": ["deskbuddy-thinking.svg"],
     "working": ["deskbuddy-working.svg"],
-    "sleeping": ["deskbuddy-sleeping.svg"]
+    "sleeping": ["deskbuddy-sleeping.svg"],
+    "yawning": ["deskbuddy-yawning.svg"],
+    "dozing": ["deskbuddy-dozing.svg"],
+    "collapsing": ["deskbuddy-collapsing.svg"],
+    "waking": ["deskbuddy-waking.svg"]
   },
   "miniMode": { "supported": false },
   "sounds": { "complete": "complete.mp3", "confirm": "confirm.mp3" },
