@@ -113,6 +113,9 @@ scripts/*
 !scripts/verify-sidecar-binaries.js
 !scripts/fetch-sidecar-binaries.js
 
+# Superpowers brainstorming companion scratch files
+.superpowers/
+
 # oh-my-cursor state
 .omc/
 
@@ -139,3 +142,6 @@ android/build-release.log
 
 # Relay server dependencies
 relay/node_modules/
+
+# Git worktrees for isolated feature work
+.worktrees/
